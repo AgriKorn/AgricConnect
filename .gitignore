@@ -18,3 +18,16 @@ logs/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Project reference PDFs (not source code)
+*.pdf
+
+# Build output
+dist/
+
+# Backend planning docs (local reference only)
+backend/afia_tasks.md
+backend/hanz_tasks.md
+backend/week1_tasks.md
+backend/agriconnect_backend_analysis.md
+backend/backend_task_delegation.md
