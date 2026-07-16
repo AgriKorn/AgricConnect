@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { errorHandler } from './middleware/errorHandler';
 import { sendSuccess } from './utils/response';
+import listingRoutes from './modules/listing/listing.routes';
 
 const app = express();
 
@@ -33,6 +34,9 @@ app.use(morgan('dev'));
 app.get('/api/health', (_req, res) => {
   sendSuccess(res, { message: 'AgriConnect API is running' });
 });
+
+// --------------- Routes ---------------
+app.use('/api/listings', listingRoutes);
 
 // --------------- Global Error Handler (must be last) ---------------
 app.use(errorHandler);
