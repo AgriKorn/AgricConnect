@@ -1,0 +1,63 @@
+name: Backend CD
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Build and Deploy to AWS Beanstalk
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './backend/package-lock.json'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Compile TypeScript
+        run: npm run build
+
+      - name: Prepare Deployment Package
+        # Creates a deployment zip containing only files required for production execution
+        run: |
+          mkdir -p deploy
+          cp -r dist deploy/dist
+          cp package.json deploy/package.json
+          cp package-lock.json deploy/package-lock.json
+          cp Procfile deploy/Procfile || true
+          cd deploy
+          zip -r ../deploy-package.zip .
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }} # e.g. eu-west-1, us-east-1
+
+      - name: Deploy to AWS Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v22
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          application_name: AgriConnect-Backend
+          environment_name: Agriconnectbackend-env
+          version_label: backend-${{ github.sha }}
+          region: ${{ secrets.AWS_REGION }}
+          deployment_package: backend/deploy-package.zip
