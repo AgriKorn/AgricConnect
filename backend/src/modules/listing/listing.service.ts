@@ -1,9 +1,10 @@
 import crypto from 'crypto';
 import QRCode from 'qrcode';
 import { ForbiddenError, NotFoundError } from '../../utils/errors';
+import { auditService } from '../audit/audit.service';
 import { CreateListingInput, UpdateListingInput } from './listing.schema';
 import { IListingRepository } from './listing.repository';
-import { InMemoryListingRepository } from './listing.repository.memory';
+import { listingRepository } from './listing.repository.memory';
 import { Listing } from './listing.types';
 
 /**
@@ -30,13 +31,17 @@ export class ListingService {
   async createListing(data: CreateListingInput, farmerId: string): Promise<Listing> {
     const { listingHash, qrCodeData } = await generateListingProof(farmerId, data);
 
-    return this.repo.create({
+    const listing = await this.repo.create({
       farmerId,
       ...data,
       listingHash,
       qrCodeData,
       status: 'ACTIVE',
     });
+
+    await auditService.log('LISTING_CREATED', listing.id, { cropType: data.cropType, quantityKg: data.quantityKg, pricePerKg: data.pricePerKg }, farmerId);
+
+    return listing;
   }
 
   getFarmerListings(farmerId: string): Promise<Listing[]> {
@@ -49,7 +54,9 @@ export class ListingService {
 
   async updateListing(id: string, farmerId: string, data: UpdateListingInput): Promise<Listing> {
     const listing = await this.assertOwnedListing(id, farmerId);
-    return this.repo.update(listing.id, data);
+    const updated = await this.repo.update(listing.id, data);
+    await auditService.log('LISTING_UPDATED', listing.id, data, farmerId);
+    return updated;
   }
 
   async deleteListing(id: string, farmerId: string): Promise<Listing> {
@@ -65,5 +72,4 @@ export class ListingService {
   }
 }
 
-// Swap InMemoryListingRepository for a PrismaListingRepository once schema.prisma exists.
-export const listingService = new ListingService(new InMemoryListingRepository());
+export const listingService = new ListingService(listingRepository);
