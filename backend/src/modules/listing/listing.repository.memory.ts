@@ -75,6 +75,14 @@ export class InMemoryListingRepository implements IListingRepository {
     this.listings.set(id, updated);
     return updated;
   }
+
+  async markSold(id: string): Promise<Listing> {
+    const existing = this.listings.get(id);
+    if (!existing) throw new NotFoundError('Listing not found');
+    const updated: Listing = { ...existing, status: 'SOLD', updatedAt: new Date() };
+    this.listings.set(id, updated);
+    return updated;
+  }
 }
 
 // Shared singleton — the listing and marketplace modules read/write the same store.

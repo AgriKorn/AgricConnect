@@ -14,6 +14,9 @@ import listingRoutes from './modules/listing/listing.routes';
 import marketplaceRoutes from './modules/marketplace/marketplace.routes';
 import pricingRoutes from './modules/pricing/pricing.routes';
 import auditRoutes from './modules/audit/audit.routes';
+import transactionRoutes from './modules/transaction/transaction.routes';
+import dispatchRoutes from './modules/dispatch/dispatch.routes';
+import disputeRoutes from './modules/dispute/dispute.routes';
 
 const app = express();
 
@@ -69,6 +72,9 @@ app.use('/api/listings', listingRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/pricing', pricingRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/api/transactions', transactionRoutes);
+app.use('/api/dispatch', dispatchRoutes);
+app.use('/api/disputes', disputeRoutes);
 
 // --------------- Global Error Handler (must be last) ---------------
 app.use(errorHandler);

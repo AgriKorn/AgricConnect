@@ -11,6 +11,7 @@ export interface IUserRepository {
   findById(id: string): Promise<User | null>;
   findManyByStatus(status: UserStatus): Promise<User[]>;
   findFarmerIdsByRegion(region: string): Promise<string[]>;
+  findAvailableDrivers(minCapacityKg: number, excludeIds: string[]): Promise<User[]>;
   update(id: string, data: Partial<User>): Promise<User>;
   updateProfile(id: string, profile: Partial<User['profile']>): Promise<User>;
 }

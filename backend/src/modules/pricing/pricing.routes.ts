@@ -17,8 +17,9 @@ const router = Router();
  *       - { in: query, name: crop, required: true, schema: { type: string }, example: tomato }
  *       - { in: query, name: region, required: true, schema: { type: string }, example: "greater accra" }
  *       - { in: query, name: freshness, required: true, schema: { type: number, minimum: 0, maximum: 100 } }
+ *       - { in: query, name: shelfLifeDays, schema: { type: integer, minimum: 1 }, description: "Optional — when given, returns a day-by-day decay projection (linear model)" }
  *     responses:
- *       200: { description: "{ mofaPrice, ceiling, softFloor, freshness }" }
+ *       200: { description: "{ mofaPrice, ceiling, softFloor, freshness, decayProjection? }" }
  *       404: { description: No MOFA reference price for that crop/region }
  */
 router.get('/recommend', authenticate, validate(recommendPriceSchema), recommendPriceHandler);

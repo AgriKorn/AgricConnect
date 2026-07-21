@@ -22,4 +22,5 @@ export interface IListingRepository {
   findById(id: string): Promise<Listing | null>;
   update(id: string, data: UpdateListingRecord): Promise<Listing>;
   softDelete(id: string): Promise<Listing>;
+  markSold(id: string): Promise<Listing>;
 }

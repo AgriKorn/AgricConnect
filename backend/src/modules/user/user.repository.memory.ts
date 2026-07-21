@@ -54,6 +54,20 @@ export class InMemoryUserRepository implements IUserRepository {
       .map((user) => user.id);
   }
 
+  async findAvailableDrivers(minCapacityKg: number, excludeIds: string[]): Promise<User[]> {
+    // NOTE: real "nearest" matching needs GPS on the driver profile, which
+    // doesn't exist in the current schema — this filters by capacity/
+    // availability only and returns candidates in registration order.
+    return [...this.usersById.values()].filter(
+      (user) =>
+        user.role === 'driver' &&
+        user.status === 'ACTIVE' &&
+        user.profile.isAvailable === true &&
+        (user.profile.truckCapacity ?? 0) >= minCapacityKg &&
+        !excludeIds.includes(user.id),
+    );
+  }
+
   async update(id: string, data: Partial<User>): Promise<User> {
     const existing = this.usersById.get(id);
     if (!existing) throw new NotFoundError('User not found');

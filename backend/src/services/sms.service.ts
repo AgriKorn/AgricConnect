@@ -7,11 +7,16 @@ import logger from '../utils/logger';
  */
 export interface ISmsService {
   sendOtp(phone: string, code: string): Promise<void>;
+  sendDriverJobAlert(phone: string, cropType: string, quantityKg: number): Promise<void>;
 }
 
 class ConsoleSmsService implements ISmsService {
   async sendOtp(phone: string, code: string): Promise<void> {
     logger.info(`[sms-stub] OTP for ${phone}: ${code}`);
+  }
+
+  async sendDriverJobAlert(phone: string, cropType: string, quantityKg: number): Promise<void> {
+    logger.info(`[sms-stub] Job alert to ${phone}: pickup ${quantityKg}kg of ${cropType} — open the app to accept/decline`);
   }
 }
 
