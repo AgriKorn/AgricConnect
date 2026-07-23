@@ -3,6 +3,8 @@ import { sendSuccess } from '../../utils/response';
 import { disputeService } from '../dispute/dispute.service';
 import { adminService } from './admin.service';
 
+import { auditService } from '../audit/audit.service';
+
 export const listPendingUsersHandler = async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const users = await adminService.listPendingUsers();
@@ -50,8 +52,27 @@ export const listDisputesHandler = async (_req: Request, res: Response, next: Ne
 
 export const resolveDisputeHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const dispute = await disputeService.resolve(req.params.id, req.body.resolution);
+    const action = req.body.action || 'REFUND_BUYER';
+    const dispute = await disputeService.resolve(req.params.id, req.body.resolution, action);
     sendSuccess(res, dispute);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getAuditLogsHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { eventType, entityType, actorId, startDate, endDate, page, limit } = req.query as any;
+    const result = await auditService.searchAuditLogs({
+      eventType,
+      entityType,
+      actorId,
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? Math.min(parseInt(limit, 10), 50) : 20,
+    });
+    sendSuccess(res, result);
   } catch (err) {
     next(err);
   }

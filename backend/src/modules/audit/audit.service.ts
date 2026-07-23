@@ -1,55 +1,78 @@
 import crypto from 'crypto';
-import { IAuditRepository } from './audit.repository';
-import { auditRepository } from './audit.repository.memory';
+import { auditRepository, AuditSearchFilters, PrismaAuditRepository } from './audit.repository.prisma';
 import { AuditEntry, AuditEventType } from './audit.types';
 
-const hashEntry = (input: {
-  eventType: AuditEventType;
-  entityId: string;
-  data: Record<string, unknown>;
-  userId: string;
-  timestamp: string;
-  previousHash: string;
-}): string => crypto.createHash('sha256').update(JSON.stringify(input)).digest('hex');
-
-export interface ChainVerification {
-  isValid: boolean;
-  entries: number;
-  brokenAt?: number;
+export interface ChainVerificationResult {
+  valid: boolean;
+  totalEntries: number;
+  brokenEntryId?: string;
+  failureReason?: string;
 }
 
+const canonicalJson = (obj: any): string => {
+  if (obj === null || typeof obj !== 'object') return JSON.stringify(obj);
+  if (Array.isArray(obj)) return `[${obj.map(canonicalJson).join(',')}]`;
+  const keys = Object.keys(obj).sort();
+  return `{${keys.map((k) => `${JSON.stringify(k)}:${canonicalJson(obj[k])}`).join(',')}}`;
+};
+
+export const truncateToSeconds = (d: Date): Date => {
+  const t = new Date(d);
+  t.setMilliseconds(0);
+  return t;
+};
+
+export const formatTimestamp = (d: Date): string => {
+  return truncateToSeconds(d).toISOString();
+};
+
+export const computePayloadHash = (previousHash: string, eventType: string, entityId: string, userId: string, data: any, createdAt: Date): string => {
+  const payload = `${previousHash}:${eventType}:ENTITY:${entityId}:${userId}:${canonicalJson(data)}:${formatTimestamp(createdAt)}`;
+  return crypto.createHash('sha256').update(payload).digest('hex');
+};
+
 export class AuditService {
-  constructor(private readonly repo: IAuditRepository) {}
+  constructor(private readonly repo: PrismaAuditRepository) {}
 
   async log(eventType: AuditEventType, entityId: string, data: Record<string, unknown>, userId: string): Promise<AuditEntry> {
     const previous = await this.repo.findLatest();
-    const previousHash = previous?.hash ?? '0';
-    const timestamp = new Date().toISOString();
-    const hash = hashEntry({ eventType, entityId, data, userId, timestamp, previousHash });
+    const previousHash = previous?.hash ?? 'GENESIS';
+    const createdAt = truncateToSeconds(new Date());
 
-    return this.repo.create({ eventType, entityId, data, userId, hash, previousHash });
+    const hash = computePayloadHash(previousHash, eventType, entityId, userId, data, createdAt);
+
+    return this.repo.create({ eventType, entityId, data, userId, hash, previousHash, createdAt });
   }
 
-  async verifyChain(entityId: string): Promise<ChainVerification> {
+  async verifyChainForEntity(entityId: string): Promise<ChainVerificationResult> {
     const entries = await this.repo.findByEntityId(entityId);
-    if (entries.length === 0) return { isValid: true, entries: 0 };
+    if (entries.length === 0) return { valid: true, totalEntries: 0 };
 
-    for (let i = 0; i < entries.length; i++) {
-      const entry = entries[i];
-      const expectedHash = hashEntry({
-        eventType: entry.eventType,
-        entityId: entry.entityId,
-        data: entry.data,
-        userId: entry.userId,
-        timestamp: entry.createdAt.toISOString(),
-        previousHash: entry.previousHash,
-      });
-      if (expectedHash !== entry.hash) {
-        return { isValid: false, entries: entries.length, brokenAt: i };
+    for (const entry of entries) {
+      const recomputedHash = computePayloadHash(
+        entry.previousHash,
+        entry.eventType,
+        entry.entityId,
+        entry.userId,
+        entry.data,
+        entry.createdAt,
+      );
+
+      if (entry.hash !== recomputedHash) {
+        return {
+          valid: false,
+          totalEntries: entries.length,
+          brokenEntryId: entry.id,
+          failureReason: `Hash tampering detected at entry ${entry.id}. Calculated '${recomputedHash}', stored '${entry.hash}'`,
+        };
       }
     }
 
-    return { isValid: true, entries: entries.length };
+    return { valid: true, totalEntries: entries.length };
+  }
+
+  async searchAuditLogs(filters: AuditSearchFilters) {
+    return await this.repo.findFiltered(filters);
   }
 }
 

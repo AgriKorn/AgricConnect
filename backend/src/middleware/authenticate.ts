@@ -14,7 +14,7 @@ export const authenticate = (req: Request, _res: Response, next: NextFunction) =
 
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET) as { userId: string; role: string };
-    req.user = decoded;
+    (req as any).user = decoded;
     return next();
   } catch {
     return next(new UnauthorizedError('Access token is invalid or expired'));

@@ -15,7 +15,7 @@ export class InMemoryAuditRepository implements IAuditRepository {
   }
 
   async create(entry: CreateAuditEntryRecord): Promise<AuditEntry> {
-    const created: AuditEntry = { id: randomUUID(), ...entry, createdAt: new Date() };
+    const created: AuditEntry = { id: randomUUID(), ...entry, createdAt: entry.createdAt ?? new Date() };
     this.entries.push(created);
     return created;
   }

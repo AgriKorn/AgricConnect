@@ -36,6 +36,12 @@ export class InMemoryDispatchRepository implements IDispatchRepository {
     );
   }
 
+  async findJobsForDriver(driverId: string, status?: DriverJobStatus): Promise<DriverJob[]> {
+    return [...this.jobs.values()]
+      .filter((job) => job.driverId === driverId && (!status || job.status === status))
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
   async update(id: string, status: DriverJobStatus): Promise<DriverJob> {
     const existing = this.jobs.get(id);
     if (!existing) throw new NotFoundError('Driver job not found');

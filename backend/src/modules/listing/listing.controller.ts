@@ -4,8 +4,9 @@ import { sendSuccess } from '../../utils/response';
 import { listingService } from './listing.service';
 
 const requireUserId = (req: Request): string => {
-  if (!req.user) throw new UnauthorizedError('Authentication required');
-  return req.user.userId;
+  const user = (req as any).user;
+  if (!user) throw new UnauthorizedError('Authentication required');
+  return user.userId;
 };
 
 export const createListingHandler = async (req: Request, res: Response, next: NextFunction) => {

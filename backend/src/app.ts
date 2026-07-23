@@ -17,6 +17,7 @@ import auditRoutes from './modules/audit/audit.routes';
 import transactionRoutes from './modules/transaction/transaction.routes';
 import dispatchRoutes from './modules/dispatch/dispatch.routes';
 import disputeRoutes from './modules/dispute/dispute.routes';
+import notificationRoutes from './modules/notification/notification.routes';
 
 const app = express();
 
@@ -34,6 +35,16 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+// Strict rate limit for authentication endpoints to prevent brute-force attacks
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20, // max 20 requests per 15 min per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: { code: 'AUTH_RATE_LIMIT', message: 'Too many authentication attempts, please try again later' } },
+});
+app.use('/api/auth', authLimiter);
+
 // --------------- Body Parsing ---------------
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -41,8 +52,10 @@ app.use(express.urlencoded({ extended: true }));
 // --------------- Request Logging ---------------
 app.use(morgan('dev'));
 
+import docsRouter from './docs/docs.routes';
+
 // --------------- API Docs ---------------
-app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use('/api/docs', docsRouter);
 
 /**
  * @swagger
@@ -75,6 +88,7 @@ app.use('/api/audit', auditRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/dispatch', dispatchRoutes);
 app.use('/api/disputes', disputeRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // --------------- Global Error Handler (must be last) ---------------
 app.use(errorHandler);

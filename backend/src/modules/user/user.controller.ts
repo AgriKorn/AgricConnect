@@ -5,8 +5,9 @@ import { userService } from './user.service';
 
 export const getProfileHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) throw new UnauthorizedError();
-    const profile = await userService.getProfile(req.user.userId);
+    const user = (req as any).user;
+    if (!user) throw new UnauthorizedError();
+    const profile = await userService.getProfile(user.userId);
     sendSuccess(res, profile);
   } catch (err) {
     next(err);
@@ -15,8 +16,9 @@ export const getProfileHandler = async (req: Request, res: Response, next: NextF
 
 export const updateProfileHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    if (!req.user) throw new UnauthorizedError();
-    const profile = await userService.updateProfile(req.user.userId, req.body);
+    const user = (req as any).user;
+    if (!user) throw new UnauthorizedError();
+    const profile = await userService.updateProfile(user.userId, req.body);
     sendSuccess(res, profile);
   } catch (err) {
     next(err);

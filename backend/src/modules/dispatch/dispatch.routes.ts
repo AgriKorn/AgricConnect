@@ -2,8 +2,8 @@ import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { authorize } from '../../middleware/authorize';
 import { validate } from '../../middleware/validate';
-import { acceptJobHandler, declineJobHandler } from './dispatch.controller';
-import { jobIdParamSchema } from './dispatch.schema';
+import { acceptJobHandler, declineJobHandler, getDriverJobsHandler } from './dispatch.controller';
+import { getDriverJobsQuerySchema, jobIdParamSchema } from './dispatch.schema';
 
 const router = Router();
 
@@ -11,6 +11,15 @@ router.use(authenticate, authorize('driver'));
 
 /**
  * @swagger
+ * /dispatch/jobs:
+ *   get:
+ *     summary: Driver retrieves list of assigned and offered delivery jobs
+ *     tags: [Dispatch]
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: query, name: status, schema: { type: string, enum: [PENDING, ACCEPTED, DECLINED, COMPLETED] } }
+ *     responses:
+ *       200: { description: List of driver jobs }
  * /dispatch/{jobId}/accept:
  *   patch:
  *     summary: Driver accepts an offered delivery job
@@ -31,6 +40,7 @@ router.use(authenticate, authorize('driver'));
  *     responses:
  *       200: { description: "{ job, reassigned }" }
  */
+router.get('/jobs', validate(getDriverJobsQuerySchema), getDriverJobsHandler);
 router.patch('/:jobId/accept', validate(jobIdParamSchema), acceptJobHandler);
 router.patch('/:jobId/decline', validate(jobIdParamSchema), declineJobHandler);
 

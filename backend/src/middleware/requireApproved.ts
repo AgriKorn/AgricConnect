@@ -8,9 +8,10 @@ import { ForbiddenError, UnauthorizedError } from '../utils/errors';
  * payload, since a short-lived access token can be older than the approval.
  */
 export const requireApproved = async (req: Request, _res: Response, next: NextFunction) => {
-  if (!req.user) return next(new UnauthorizedError());
+  const reqUser = (req as any).user;
+  if (!reqUser) return next(new UnauthorizedError());
 
-  const user = await userRepository.findById(req.user.userId);
+  const user = await userRepository.findById(reqUser.userId);
   if (!user || user.status !== 'ACTIVE') {
     return next(new ForbiddenError('Your account is pending admin approval'));
   }

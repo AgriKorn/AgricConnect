@@ -5,6 +5,7 @@ import { validate } from '../../middleware/validate';
 import { disputeIdParamSchema, resolveDisputeSchema } from '../dispute/dispute.schema';
 import {
   approveUserHandler,
+  getAuditLogsHandler,
   listDisputesHandler,
   listPendingUsersHandler,
   listTransactionsHandler,
@@ -25,5 +26,7 @@ router.get('/transactions', listTransactionsHandler);
 
 router.get('/disputes', listDisputesHandler);
 router.patch('/disputes/:id/resolve', validate(disputeIdParamSchema), validate(resolveDisputeSchema), resolveDisputeHandler);
+
+router.get('/audit', getAuditLogsHandler);
 
 export default router;

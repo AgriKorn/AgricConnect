@@ -1,7 +1,23 @@
 import { Router } from 'express';
 import { validate } from '../../middleware/validate';
-import { loginHandler, logoutHandler, refreshHandler, registerHandler, verifyOtpHandler } from './auth.controller';
-import { loginSchema, refreshSchema, registerSchema, verifyOtpSchema } from './auth.schema';
+import {
+  forgotPasswordHandler,
+  getGoogleAuthUrlHandler,
+  googleAuthHandler,
+  loginHandler,
+  logoutHandler,
+  refreshHandler,
+  registerHandler,
+  resetPasswordHandler,
+} from './auth.controller';
+import {
+  forgotPasswordSchema,
+  googleAuthSchema,
+  loginSchema,
+  refreshSchema,
+  registerSchema,
+  resetPasswordSchema,
+} from './auth.schema';
 
 const router = Router();
 
@@ -24,16 +40,29 @@ const router = Router();
  *               password: { type: string, format: password }
  *               role: { type: string, enum: [farmer, buyer, driver] }
  *     responses:
- *       201: { description: Registered, OTP dispatched via SmsService }
+ *       201: { description: Registered, account pending admin approval }
  *       409: { description: Phone number already registered }
  */
 router.post('/register', validate(registerSchema), registerHandler);
 
 /**
  * @swagger
- * /auth/verify-otp:
+ * /auth/google/url:
+ *   get:
+ *     summary: Get Supabase Google OAuth authorization URL
+ *     tags: [Auth]
+ *     parameters:
+ *       - { in: query, name: redirectTo, schema: { type: string } }
+ *     responses:
+ *       200: { description: OAuth redirect URL }
+ */
+router.get('/google/url', getGoogleAuthUrlHandler);
+
+/**
+ * @swagger
+ * /auth/google:
  *   post:
- *     summary: Verify the OTP sent at registration
+ *     summary: Sign up or log in via Google OAuth / Supabase token
  *     tags: [Auth]
  *     requestBody:
  *       required: true
@@ -41,15 +70,58 @@ router.post('/register', validate(registerSchema), registerHandler);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [phone, otp]
+ *             required: [token]
  *             properties:
- *               phone: { type: string }
- *               otp: { type: string, minLength: 6, maxLength: 6 }
+ *               token: { type: string }
+ *               role: { type: string, enum: [farmer, buyer, driver] }
  *     responses:
- *       200: { description: Phone verified, account now pending admin approval }
- *       400: { description: Invalid or expired OTP }
+ *       200: { description: Access token (15m) + refresh token (7d) issued }
+ *       401: { description: Invalid Google token }
  */
-router.post('/verify-otp', validate(verifyOtpSchema), verifyOtpHandler);
+router.post('/google', validate(googleAuthSchema), googleAuthHandler);
+
+/**
+ * @swagger
+ * /auth/forgot-password:
+ *   post:
+ *     summary: Request a password reset token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [phone]
+ *             properties:
+ *               phone: { type: string, example: "+233241234567" }
+ *     responses:
+ *       200: { description: Password reset token issued }
+ *       404: { description: User not found }
+ */
+router.post('/forgot-password', validate(forgotPasswordSchema), forgotPasswordHandler);
+
+/**
+ * @swagger
+ * /auth/reset-password:
+ *   post:
+ *     summary: Reset user password using reset token
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token, newPassword]
+ *             properties:
+ *               token: { type: string }
+ *               newPassword: { type: string, format: password }
+ *     responses:
+ *       200: { description: Password reset successfully }
+ *       400: { description: Invalid or expired token }
+ */
+router.post('/reset-password', validate(resetPasswordSchema), resetPasswordHandler);
 
 /**
  * @swagger

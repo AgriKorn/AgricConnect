@@ -1,10 +1,9 @@
+import { prisma } from '../../config/db';
 import { ForbiddenError, NotFoundError } from '../../utils/errors';
 import { auditService } from '../audit/audit.service';
-import { smsService } from '../../services/sms.service';
-import { IUserRepository } from '../user/user.repository';
-import { userRepository } from '../user/user.repository.memory';
-import { IDispatchRepository } from './dispatch.repository';
-import { dispatchRepository } from './dispatch.repository.memory';
+import { notificationService } from '../notification/notification.service';
+import { userRepository } from '../user/user.repository.prisma';
+import { dispatchRepository, PrismaDispatchRepository } from './dispatch.repository.prisma';
 import { DriverJob } from './dispatch.types';
 
 export interface AssignDriverParams {
@@ -17,11 +16,10 @@ export interface AssignDriverParams {
 
 export class DispatchService {
   constructor(
-    private readonly jobs: IDispatchRepository,
-    private readonly users: IUserRepository,
+    private readonly jobs: PrismaDispatchRepository = dispatchRepository,
+    private readonly users: typeof userRepository = userRepository,
   ) {}
 
-  /** Finds the first available driver with sufficient capacity and offers them the job. Returns null if none are free. */
   async assignDriver(params: AssignDriverParams): Promise<DriverJob | null> {
     const candidates = await this.users.findAvailableDrivers(params.quantityKg, params.excludeDriverIds ?? []);
     const driver = candidates[0];
@@ -35,18 +33,63 @@ export class DispatchService {
       quantityKg: params.quantityKg,
     });
 
-    await smsService.sendDriverJobAlert(driver.phone, params.cropType, params.quantityKg);
     await auditService.log('DRIVER_DISPATCHED', params.transactionId, { driverId: driver.id, jobId: job.id }, driver.id);
+
+    await notificationService.sendNotification({
+      userId: driver.id,
+      type: 'DRIVER_JOB_OFFERED',
+      message: `New delivery job offer: Pickup ${params.quantityKg}kg of ${params.cropType}. Open app to accept or decline.`,
+      orderId: params.transactionId,
+    });
 
     return job;
   }
 
+  getDriverJobs(driverId: string, status?: DriverJob['status']): Promise<DriverJob[]> {
+    return this.jobs.findJobsForDriver(driverId, status);
+  }
+
+  async findActiveForTransaction(transactionId: string): Promise<DriverJob | null> {
+    return this.jobs.findActiveForTransaction(transactionId);
+  }
+
   async acceptJob(jobId: string, driverId: string): Promise<DriverJob> {
     const job = await this.assertOwnedPendingJob(jobId, driverId);
-    const updated = await this.jobs.update(job.id, 'ACCEPTED');
-    await this.users.updateProfile(driverId, { isAvailable: false });
-    await auditService.log('DRIVER_ACCEPTED', job.transactionId, { driverId, jobId: job.id }, driverId);
-    return updated;
+
+    return await prisma.$transaction(async (tx) => {
+      const updated = await this.jobs.update(job.id, 'ACCEPTED');
+      await this.users.updateProfile(driverId, { isAvailable: false });
+
+      await tx.orders.update({
+        where: { id: job.transactionId },
+        data: { order_status: 'driver_assigned' },
+      });
+
+      await auditService.log('DRIVER_ACCEPTED', job.transactionId, { driverId, jobId: job.id }, driverId);
+
+      const order = await tx.orders.findUnique({
+        where: { id: job.transactionId },
+        include: { produce_listings: true },
+      });
+
+      if (order) {
+        await notificationService.sendNotification({
+          userId: order.buyer_id,
+          type: 'DRIVER_ACCEPTED_BUYER',
+          message: `A driver has accepted the transport assignment for Order #${order.id}.`,
+          orderId: order.id,
+        });
+
+        await notificationService.sendNotification({
+          userId: order.produce_listings.farmer_id,
+          type: 'DRIVER_ACCEPTED_FARMER',
+          message: `A driver has accepted transport for Order #${order.id}. Produce pickup is scheduled.`,
+          orderId: order.id,
+        });
+      }
+
+      return updated;
+    });
   }
 
   async declineJob(jobId: string, driverId: string): Promise<{ job: DriverJob; reassigned: DriverJob | null }> {
@@ -63,6 +106,36 @@ export class DispatchService {
       quantityKg: job.quantityKg,
       excludeDriverIds,
     });
+
+    if (!reassigned) {
+      // Driver Exhaustion Terminal Case Handling
+      const order = await prisma.orders.findUnique({ where: { id: job.transactionId } });
+      if (order) {
+        await prisma.orders.update({
+          where: { id: order.id },
+          data: { order_status: 'awaiting_driver' },
+        });
+
+        const admins = await prisma.user.findMany({ where: { role: 'admin' } });
+        for (const admin of admins) {
+          await notificationService.sendNotification({
+            userId: admin.id,
+            type: 'MANUAL_DISPATCH_REQUIRED',
+            message: `Order #${order.id} has no remaining available drivers in the operating region. Manual driver assignment required via POST /api/dispatch/assign.`,
+            orderId: order.id,
+          });
+        }
+
+        await notificationService.sendNotification({
+          userId: order.buyer_id,
+          type: 'DISPATCH_DELAYED',
+          message: `Your order #${order.id} is confirmed! We are matching specialized transport for your crop and will notify you as soon as a driver is assigned.`,
+          orderId: order.id,
+        });
+
+        await auditService.log('DRIVER_DISPATCH_EXHAUSTED' as any, order.id, { declinedDrivers: excludeDriverIds }, driverId);
+      }
+    }
 
     return { job: declined, reassigned };
   }

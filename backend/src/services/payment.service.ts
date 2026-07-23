@@ -2,9 +2,9 @@ import { randomUUID } from 'crypto';
 import logger from '../utils/logger';
 
 /**
- * Stand-in for the real Paystack-backed PaymentService (A5) — no Paystack
- * account exists yet. Swap the body of these methods for real API calls
- * once one does; everything that imports paymentService stays the same.
+ * Flexible payment service abstraction. Paystack integration is currently on hold.
+ * Future payment gateways (e.g. Mobile Money direct, custom escrow) can implement
+ * IPaymentService without breaking transaction routes.
  */
 export interface InitializeTransactionResult {
   reference: string;

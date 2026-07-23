@@ -1,6 +1,6 @@
 import { AuditEntry } from './audit.types';
 
-export type CreateAuditEntryRecord = Omit<AuditEntry, 'id' | 'createdAt'>;
+export type CreateAuditEntryRecord = Omit<AuditEntry, 'id' | 'createdAt'> & { createdAt?: Date };
 
 export interface IAuditRepository {
   findLatest(): Promise<AuditEntry | null>;

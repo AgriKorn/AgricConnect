@@ -24,6 +24,11 @@ Thumbs.db
 
 # Build output
 dist/
+coverage/
+backend/coverage/
+
+# Generated Prisma client
+backend/src/generated/prisma/
 
 # Backend planning docs (local reference only)
 backend/afia_tasks.md

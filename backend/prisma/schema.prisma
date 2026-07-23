@@ -1,0 +1,302 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                                   String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  phone_number                         String                  @unique @db.VarChar(20)
+  full_name                            String                  @db.VarChar(150)
+  role                                 user_role
+  region                               String                  @db.VarChar(100)
+  otp_verified                         Boolean                 @default(false)
+  account_status                       account_status          @default(pending)
+  approved_by                          String?                 @db.Uuid
+  approved_at                          DateTime?               @db.Timestamptz(6)
+  created_at                           DateTime                @default(now()) @db.Timestamptz(6)
+  updated_at                           DateTime                @default(now()) @db.Timestamptz(6)
+  audit_trail                          AuditTrail[]
+  disputes_disputes_raised_byTousers   Dispute[]               @relation("disputes_raised_byTousers")
+  disputes_disputes_resolved_byTousers Dispute[]               @relation("disputes_resolved_byTousers")
+  driver_assignments                   driver_assignments[]
+  driver_details                       driver_details?
+  mofa_price_references                mofa_price_references[]
+  notifications                        notifications[]
+  orders                               orders[]
+  produce_listings                     produce_listings[]
+  qr_scans                             qr_scans[]
+  users                                User?                   @relation("usersTousers", fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_users                          User[]                  @relation("usersTousers")
+
+  @@index([region], map: "idx_users_region")
+  @@index([role, account_status], map: "idx_users_role_status")
+  @@map("users")
+}
+
+model Dispute {
+  id                                String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id                          String         @db.Uuid
+  raised_by                         String         @db.Uuid
+  reason                            String
+  status                            dispute_status @default(open)
+  resolved_by                       String?        @db.Uuid
+  resolution_notes                  String?
+  created_at                        DateTime       @default(now()) @db.Timestamptz(6)
+  resolved_at                       DateTime?      @db.Timestamptz(6)
+  orders                            orders         @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_disputes_raised_byTousers   User           @relation("disputes_raised_byTousers", fields: [raised_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users_disputes_resolved_byTousers User?          @relation("disputes_resolved_byTousers", fields: [resolved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([status], map: "idx_disputes_status")
+  @@map("disputes")
+}
+
+model AuditTrail {
+  id            BigInt   @id @default(autoincrement())
+  event_type    String   @db.VarChar(100)
+  entity_type   String   @db.VarChar(50)
+  entity_id     String   @db.Uuid
+  actor_id      String?  @db.Uuid
+  event_data    Json     @default("{}")
+  event_hash    String   @db.Char(64)
+  previous_hash String?  @db.Char(64)
+  created_at    DateTime @default(now()) @db.Timestamptz(6)
+  users         User?    @relation(fields: [actor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([created_at], map: "idx_audit_created")
+  @@index([entity_type, entity_id], map: "idx_audit_entity")
+  @@map("audit_trail")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model crop_types {
+  id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                  String                  @unique @db.VarChar(100)
+  category              String?                 @db.VarChar(100)
+  mofa_price_references mofa_price_references[]
+  produce_listings      produce_listings[]
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model driver_assignments {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id          String            @db.Uuid
+  driver_id         String            @db.Uuid
+  sequence_number   Int
+  status            assignment_status @default(notified)
+  agreed_cash_price Decimal?          @db.Decimal(10, 2)
+  notified_at       DateTime          @default(now()) @db.Timestamptz(6)
+  responded_at      DateTime?         @db.Timestamptz(6)
+  users             User              @relation(fields: [driver_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  orders            orders            @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([order_id, sequence_number])
+  @@index([driver_id, status], map: "idx_driver_assignments_driver")
+  @@index([order_id], map: "idx_driver_assignments_order")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model driver_details {
+  user_id             String              @id @db.Uuid
+  truck_capacity_kg   Decimal             @db.Decimal(10, 2)
+  operating_region    String              @db.VarChar(100)
+  availability_status driver_availability @default(offline)
+  current_lat         Decimal?            @db.Decimal(9, 6)
+  current_lng         Decimal?            @db.Decimal(9, 6)
+  updated_at          DateTime            @default(now()) @db.Timestamptz(6)
+  users               User                @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([operating_region, availability_status], map: "idx_driver_region_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model mofa_price_references {
+  id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  crop_type_id   String     @db.Uuid
+  region         String     @db.VarChar(100)
+  price_per_kg   Decimal    @db.Decimal(10, 2)
+  effective_date DateTime   @db.Date
+  updated_by     String     @db.Uuid
+  created_at     DateTime   @default(now()) @db.Timestamptz(6)
+  crop_types     crop_types @relation(fields: [crop_type_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users          User       @relation(fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([crop_type_id, region, effective_date])
+  @@index([crop_type_id, region, effective_date(sort: Desc)], map: "idx_mofa_lookup")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model notifications {
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id          String            @db.Uuid
+  order_id         String?           @db.Uuid
+  listing_id       String?           @db.Uuid
+  type             String            @db.VarChar(50)
+  message          String
+  is_read          Boolean           @default(false)
+  created_at       DateTime          @default(now()) @db.Timestamptz(6)
+  produce_listings produce_listings? @relation(fields: [listing_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  orders           orders?           @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users            User              @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([user_id, is_read], map: "idx_notifications_user_unread")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model orders {
+  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  listing_id         String               @unique @db.Uuid
+  buyer_id           String               @db.Uuid
+  transport_mode     transport_mode
+  order_status       order_status         @default(pending_payment)
+  amount             Decimal              @db.Decimal(10, 2)
+  created_at         DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at         DateTime             @default(now()) @db.Timestamptz(6)
+  delivered_at       DateTime?            @db.Timestamptz(6)
+  completed_at       DateTime?            @db.Timestamptz(6)
+  disputes           Dispute[]
+  driver_assignments driver_assignments[]
+  notifications      notifications[]
+  users              User                 @relation(fields: [buyer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  produce_listings   produce_listings     @relation(fields: [listing_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  payments           payments?
+  qr_scans           qr_scans?
+
+  @@index([buyer_id], map: "idx_orders_buyer")
+  @@index([order_status], map: "idx_orders_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model payments {
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id           String         @unique @db.Uuid
+  amount             Decimal        @db.Decimal(10, 2)
+  status             payment_status @default(held)
+  provider           String         @default("paystack") @db.VarChar(50)
+  provider_reference String?        @db.VarChar(150)
+  held_at            DateTime       @default(now()) @db.Timestamptz(6)
+  released_at        DateTime?      @db.Timestamptz(6)
+  refunded_at        DateTime?      @db.Timestamptz(6)
+  orders             orders         @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model produce_listings {
+  id                       String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  farmer_id                String          @db.Uuid
+  crop_type_id             String          @db.Uuid
+  quantity_kg              Decimal         @db.Decimal(10, 2)
+  region                   String          @db.VarChar(100)
+  gps_lat                  Decimal         @db.Decimal(9, 6)
+  gps_lng                  Decimal         @db.Decimal(9, 6)
+  freshness_score          Decimal         @db.Decimal(5, 2)
+  estimated_viable_days    Int
+  mofa_reference_price     Decimal         @db.Decimal(10, 2)
+  price_ceiling            Decimal         @db.Decimal(10, 2)
+  price_floor              Decimal         @db.Decimal(10, 2)
+  listed_price             Decimal         @db.Decimal(10, 2)
+  below_floor_acknowledged Boolean         @default(false)
+  listing_hash             String          @unique @db.Char(64)
+  qr_code_data             String?
+  status                   listing_status  @default(active)
+  created_at               DateTime        @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime        @default(now()) @db.Timestamptz(6)
+  sold_at                  DateTime?       @db.Timestamptz(6)
+  notifications            notifications[]
+  orders                   orders?
+  crop_types               crop_types      @relation(fields: [crop_type_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users                    User            @relation(fields: [farmer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([farmer_id], map: "idx_listings_farmer")
+  @@index([status, region, crop_type_id, freshness_score], map: "idx_listings_marketplace")
+  @@index([status, created_at(sort: Desc)], map: "idx_listings_status_created")
+  @@index([status, freshness_score(sort: Desc)], map: "idx_listings_status_freshness")
+  @@index([status, listed_price(sort: Desc)], map: "idx_listings_status_price_high")
+  @@index([status, listed_price], map: "idx_listings_status_price_low")
+  @@index([status, quantity_kg(sort: Desc)], map: "idx_listings_status_quantity")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model qr_scans {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id     String   @unique @db.Uuid
+  scanned_by   String   @db.Uuid
+  scanned_hash String   @db.Char(64)
+  hash_match   Boolean
+  scanned_at   DateTime @default(now()) @db.Timestamptz(6)
+  orders       orders   @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users        User     @relation(fields: [scanned_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+enum account_status {
+  pending
+  approved
+  rejected
+  suspended
+}
+
+enum assignment_status {
+  notified
+  accepted
+  declined
+  expired
+}
+
+enum dispute_status {
+  open
+  under_review
+  resolved
+  rejected
+}
+
+enum driver_availability {
+  available
+  busy
+  offline
+}
+
+enum listing_status {
+  active
+  sold
+  expired
+  flagged
+  cancelled
+}
+
+enum order_status {
+  pending_payment
+  awaiting_driver
+  driver_assigned
+  in_transit
+  delivered_pending_confirmation
+  completed
+  disputed
+  cancelled
+}
+
+enum payment_status {
+  held
+  released
+  refunded
+}
+
+enum transport_mode {
+  self_collect
+  driver_assisted
+}
+
+enum user_role {
+  farmer
+  buyer
+  driver
+  admin
+}

@@ -37,8 +37,38 @@ export class NotFoundError extends AppError {
 }
 
 export class ConflictError extends AppError {
-  constructor(message = 'Resource already exists') {
-    super(message, 409, 'CONFLICT');
+  constructor(message = 'Resource already exists', code = 'CONFLICT') {
+    super(message, 409, code);
+  }
+}
+
+export class OAuthProviderError extends AppError {
+  constructor(message = 'OAuth provider authentication failed', statusCode = 400) {
+    super(message, statusCode, 'OAUTH_PROVIDER_ERROR');
+  }
+}
+
+export class InvalidTokenError extends AppError {
+  constructor(message = 'Provided token is invalid') {
+    super(message, 401, 'INVALID_TOKEN');
+  }
+}
+
+export class TokenExpiredError extends AppError {
+  constructor(message = 'Provided token has expired') {
+    super(message, 401, 'TOKEN_EXPIRED');
+  }
+}
+
+export class AccountRejectedError extends AppError {
+  constructor(message = 'This account has been rejected by an administrator') {
+    super(message, 403, 'ACCOUNT_REJECTED');
+  }
+}
+
+export class AccountPendingApprovalError extends AppError {
+  constructor(message = 'Your account is pending admin approval') {
+    super(message, 403, 'ACCOUNT_PENDING_APPROVAL');
   }
 }
 
