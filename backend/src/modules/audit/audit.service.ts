@@ -74,6 +74,25 @@ export class AuditService {
   async searchAuditLogs(filters: AuditSearchFilters) {
     return await this.repo.findFiltered(filters);
   }
+
+  async exportAuditLogsCsv(entityId?: string): Promise<string> {
+    const entries = entityId
+      ? await this.repo.findByEntityId(entityId)
+      : (await this.repo.findFiltered({ page: 1, limit: 1000 })).entries;
+
+    const headers = ['ID', 'Event Type', 'Entity ID', 'Actor ID', 'Hash', 'Previous Hash', 'Created At'];
+    const rows = entries.map((e) => [
+      e.id,
+      e.eventType,
+      e.entityId,
+      e.userId,
+      e.hash,
+      e.previousHash,
+      e.createdAt.toISOString(),
+    ]);
+
+    return [headers.join(','), ...rows.map((r) => r.map((cell) => `"${cell}"`).join(','))].join('\n');
+  }
 }
 
 export const auditService = new AuditService(auditRepository);

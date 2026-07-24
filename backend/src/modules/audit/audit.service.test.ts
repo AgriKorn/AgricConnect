@@ -150,4 +150,27 @@ describe('AuditService', () => {
       expect(mockRepo.findFiltered).toHaveBeenCalledWith(filters);
     });
   });
+
+  describe('exportAuditLogsCsv', () => {
+    it('should generate valid CSV output for audit logs', async () => {
+      const entityId = 'order-100';
+      const now = new Date();
+      mockRepo.findByEntityId.mockResolvedValue([
+        {
+          id: '1',
+          eventType: 'PURCHASE_INITIATED',
+          entityId,
+          userId: 'buyer-1',
+          data: {},
+          hash: 'h1',
+          previousHash: 'GENESIS',
+          createdAt: now,
+        },
+      ]);
+
+      const csv = await auditService.exportAuditLogsCsv(entityId);
+      expect(csv).toContain('ID,Event Type,Entity ID,Actor ID,Hash,Previous Hash,Created At');
+      expect(csv).toContain('"1","PURCHASE_INITIATED","order-100","buyer-1","h1","GENESIS"');
+    });
+  });
 });
