@@ -1,0 +1,45 @@
+{
+  "name": "AgriConnect Local Environment",
+  "values": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "enabled": true
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "listingId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "transactionId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "disputeId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "jobId",
+      "value": "",
+      "enabled": true
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "enabled": true
+    }
+  ]
+}

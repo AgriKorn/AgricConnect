@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts",
-    "test": "jest --coverage"
+    "test": "jest --coverage",
+    "export:postman": "ts-node src/scripts/export-postman.ts"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^7.0.0",
