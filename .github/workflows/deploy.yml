@@ -35,6 +35,10 @@ jobs:
         run: npx prisma generate
 
       - name: Run Unit Tests & Coverage
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/agriconnect_test
+          JWT_SECRET: test_jwt_secret_min_16_characters_long
         run: npm test -- --runInBand
 
       - name: Build TypeScript Output
