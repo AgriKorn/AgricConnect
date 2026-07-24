@@ -13,6 +13,7 @@ const config: Config = {
     'src/modules/listing/listing.service.ts',
     'src/modules/notification/notification.service.ts',
     'src/modules/transaction/transaction.service.ts',
+    'src/modules/outbox/outbox.service.ts',
   ],
   coverageThreshold: {
     global: {

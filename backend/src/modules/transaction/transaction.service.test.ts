@@ -55,6 +55,16 @@ describe('TransactionService', () => {
     mockPrisma.auditTrail.create.mockResolvedValue(mockAuditRecord as any);
     mockPrisma.auditTrail.update.mockResolvedValue(mockAuditRecord as any);
 
+    mockPrisma.outbox_events.create.mockResolvedValue({
+      id: 'outbox-1',
+      aggregate_type: 'ORDER',
+      aggregate_id: 'tx-100',
+      event_type: 'ORDER_PLACED',
+      payload: {},
+      published_at: null,
+      created_at: new Date(),
+    } as any);
+
     mockRepo = {
       findRecentOrderByBuyerAndListing: jest.fn(),
       create: jest.fn(),

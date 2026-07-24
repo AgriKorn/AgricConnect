@@ -9,6 +9,7 @@ import { userRepository } from '../user/user.repository.prisma';
 import { PrismaTransactionRepository, transactionRepository } from './transaction.repository.prisma';
 import { Transaction } from './transaction.types';
 import { paymentService } from '../../services/payment.service';
+import { outboxService } from '../outbox/outbox.service';
 
 export interface PurchaseResult {
   transaction: Transaction;
@@ -57,6 +58,15 @@ export class TransactionService {
 
         await auditService.log('PURCHASE_INITIATED', transaction.id, { listingId, amountGhs }, buyerId);
         await auditService.log('PAYMENT_HELD', transaction.id, { amountGhs, reference }, buyerId);
+
+        // Record transactional outbox event
+        await outboxService.recordEvent(tx, 'ORDER', transaction.id, 'ORDER_PLACED', {
+          listingId,
+          buyerId,
+          farmerId: listing.farmerId,
+          amountGhs,
+          hasOwnTransport,
+        });
 
         await notificationService.sendNotification({
           userId: listing.farmerId,
@@ -135,6 +145,14 @@ export class TransactionService {
 
         await auditService.log('DELIVERY_CONFIRMED', transaction.id, { qrHash, confirmedBy }, confirmedBy);
         await auditService.log('PAYMENT_RELEASED', transaction.id, { amountGhs: transaction.amountGhs }, confirmedBy);
+
+        // Record transactional outbox event
+        await outboxService.recordEvent(tx, 'ORDER', transaction.id, 'DELIVERY_CONFIRMED', {
+          qrHash,
+          confirmedBy,
+          farmerId: transaction.farmerId,
+          amountGhs: transaction.amountGhs,
+        });
 
         await notificationService.sendNotification({
           userId: transaction.farmerId,
