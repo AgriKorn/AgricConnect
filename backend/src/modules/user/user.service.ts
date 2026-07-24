@@ -19,6 +19,11 @@ export class UserService {
     const updated = await this.users.updateProfile(userId, profileFields);
     return toSafeUser(updated);
   }
+
+  async registerDeviceToken(userId: string, fcmToken: string): Promise<SafeUser> {
+    const updated = await this.users.updateFcmToken(userId, fcmToken);
+    return toSafeUser(updated);
+  }
 }
 
 export const userService = new UserService(userRepository);

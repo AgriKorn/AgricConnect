@@ -17,4 +17,11 @@ export const updateProfileSchema = z.object({
   }),
 });
 
+export const registerDeviceTokenSchema = z.object({
+  body: z.object({
+    fcmToken: z.string({ required_error: 'fcmToken is required' }).min(1, 'fcmToken cannot be empty'),
+  }),
+});
+
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>['body'];
+export type RegisterDeviceTokenInput = z.infer<typeof registerDeviceTokenSchema>['body'];

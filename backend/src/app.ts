@@ -18,6 +18,7 @@ import transactionRoutes from './modules/transaction/transaction.routes';
 import dispatchRoutes from './modules/dispatch/dispatch.routes';
 import disputeRoutes from './modules/dispute/dispute.routes';
 import notificationRoutes from './modules/notification/notification.routes';
+import paymentRoutes from './modules/payment/payment.routes';
 
 const app = express();
 
@@ -92,6 +93,7 @@ app.use('/api/transactions', transactionRoutes);
 app.use('/api/dispatch', dispatchRoutes);
 app.use('/api/disputes', disputeRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // --------------- Global Error Handler (must be last) ---------------
 app.use(errorHandler);

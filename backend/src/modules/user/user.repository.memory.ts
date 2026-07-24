@@ -83,6 +83,14 @@ export class InMemoryUserRepository implements IUserRepository {
     this.usersById.set(id, updated);
     return updated;
   }
+
+  async updateFcmToken(id: string, fcmToken: string): Promise<User> {
+    const existing = this.usersById.get(id);
+    if (!existing) throw new NotFoundError('User not found');
+    const updated: User = { ...existing, updatedAt: new Date() };
+    this.usersById.set(id, updated);
+    return updated;
+  }
 }
 
 // Shared singleton — auth, user profile, and admin modules all read/write the same store.

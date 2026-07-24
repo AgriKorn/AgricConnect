@@ -147,6 +147,21 @@ export class DispatchService {
     await this.users.updateProfile(job.driverId, { isAvailable: true });
   }
 
+  async reassignNextDriver(transactionId: string): Promise<DriverJob | null> {
+    const priorAttempts = await this.jobs.findAllForTransaction(transactionId);
+    if (priorAttempts.length === 0) return null;
+    const latestAttempt = priorAttempts[priorAttempts.length - 1];
+    const excludeDriverIds = priorAttempts.map((attempt) => attempt.driverId);
+
+    return await this.assignDriver({
+      transactionId,
+      listingId: latestAttempt.listingId,
+      cropType: latestAttempt.cropType,
+      quantityKg: latestAttempt.quantityKg,
+      excludeDriverIds,
+    });
+  }
+
   private async assertOwnedPendingJob(jobId: string, driverId: string): Promise<DriverJob> {
     const job = await this.jobs.findById(jobId);
     if (!job) throw new NotFoundError('Driver job not found');

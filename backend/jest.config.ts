@@ -14,6 +14,7 @@ const config: Config = {
     'src/modules/notification/notification.service.ts',
     'src/modules/transaction/transaction.service.ts',
     'src/modules/outbox/outbox.service.ts',
+    'src/services/payment.service.ts',
   ],
   coverageThreshold: {
     global: {

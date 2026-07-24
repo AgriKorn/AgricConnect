@@ -24,3 +24,14 @@ export const updateProfileHandler = async (req: Request, res: Response, next: Ne
     next(err);
   }
 };
+
+export const registerDeviceTokenHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = (req as any).user;
+    if (!user) throw new UnauthorizedError();
+    const updated = await userService.registerDeviceToken(user.userId, req.body.fcmToken);
+    sendSuccess(res, updated);
+  } catch (err) {
+    next(err);
+  }
+};

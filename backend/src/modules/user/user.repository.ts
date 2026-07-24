@@ -14,4 +14,5 @@ export interface IUserRepository {
   findAvailableDrivers(minCapacityKg: number, excludeIds: string[]): Promise<User[]>;
   update(id: string, data: Partial<User>): Promise<User>;
   updateProfile(id: string, profile: Partial<User['profile']>): Promise<User>;
+  updateFcmToken(id: string, fcmToken: string): Promise<User>;
 }

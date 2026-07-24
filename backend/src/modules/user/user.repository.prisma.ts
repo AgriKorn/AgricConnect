@@ -170,6 +170,15 @@ export class PrismaUserRepository implements IUserRepository {
     const updated = await this.findById(id);
     return updated!;
   }
+
+  async updateFcmToken(id: string, fcmToken: string): Promise<User> {
+    await prisma.user.update({
+      where: { id },
+      data: { fcm_token: fcmToken },
+    });
+    const updated = await this.findById(id);
+    return updated!;
+  }
 }
 
 export const userRepository = new PrismaUserRepository();
