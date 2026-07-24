@@ -21,6 +21,9 @@ import notificationRoutes from './modules/notification/notification.routes';
 
 const app = express();
 
+// --------------- Trust Proxy (Required for AWS Load Balancers & App Runner) ---------------
+app.set('trust proxy', 1);
+
 // --------------- Security Middleware ---------------
 app.use(helmet());
 app.use(cors());
