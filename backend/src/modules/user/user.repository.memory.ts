@@ -84,12 +84,43 @@ export class InMemoryUserRepository implements IUserRepository {
     return updated;
   }
 
+  private readonly deviceTokens = new Map<string, { userId: string; platform?: string; deviceId?: string; isActive: boolean }>();
+
   async updateFcmToken(id: string, fcmToken: string): Promise<User> {
     const existing = this.usersById.get(id);
     if (!existing) throw new NotFoundError('User not found');
+    await this.registerDeviceToken(id, fcmToken);
     const updated: User = { ...existing, updatedAt: new Date() };
     this.usersById.set(id, updated);
     return updated;
+  }
+
+  async registerDeviceToken(userId: string, token: string, platform?: string, deviceId?: string): Promise<void> {
+    this.deviceTokens.set(token, { userId, platform, deviceId, isActive: true });
+  }
+
+  async removeDeviceToken(userId: string, token: string): Promise<void> {
+    const existing = this.deviceTokens.get(token);
+    if (existing && existing.userId === userId) {
+      existing.isActive = false;
+    }
+  }
+
+  async findActiveDeviceTokens(userId: string): Promise<string[]> {
+    const tokens: string[] = [];
+    for (const [token, record] of this.deviceTokens.entries()) {
+      if (record.userId === userId && record.isActive) {
+        tokens.push(token);
+      }
+    }
+    return tokens;
+  }
+
+  async deactivateDeviceToken(token: string): Promise<void> {
+    const existing = this.deviceTokens.get(token);
+    if (existing) {
+      existing.isActive = false;
+    }
   }
 }
 

@@ -3,7 +3,7 @@ import { env } from './config/env';
 import logger from './utils/logger';
 import { seedDevAdmin } from './modules/user/seedAdmin';
 
-const PORT = parseInt(env.PORT, 10);
+const PORT = env.PORT;
 
 const start = async () => {
   if (env.NODE_ENV !== 'production') {

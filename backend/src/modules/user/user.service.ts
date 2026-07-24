@@ -20,9 +20,15 @@ export class UserService {
     return toSafeUser(updated);
   }
 
-  async registerDeviceToken(userId: string, fcmToken: string): Promise<SafeUser> {
-    const updated = await this.users.updateFcmToken(userId, fcmToken);
-    return toSafeUser(updated);
+  async registerDeviceToken(userId: string, fcmToken: string, platform?: string, deviceId?: string): Promise<SafeUser> {
+    await this.users.registerDeviceToken(userId, fcmToken, platform, deviceId);
+    const user = await this.users.findById(userId);
+    if (!user) throw new NotFoundError('User not found');
+    return toSafeUser(user);
+  }
+
+  async removeDeviceToken(userId: string, fcmToken: string): Promise<void> {
+    await this.users.removeDeviceToken(userId, fcmToken);
   }
 }
 

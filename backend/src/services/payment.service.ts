@@ -1,4 +1,4 @@
-import { randomUUID, createHmac } from 'crypto';
+import { randomUUID, createHmac, timingSafeEqual } from 'crypto';
 import axios from 'axios';
 import logger from '../utils/logger';
 
@@ -140,10 +140,23 @@ export class PaystackPaymentService implements IPaymentService {
     }
   }
 
-  verifyWebhookSignature(signature: string, rawBody: string | Buffer): boolean {
-    if (!this.secretKey) return true;
-    const computedHash = createHmac('sha512', this.secretKey).update(rawBody).digest('hex');
-    return computedHash === signature;
+  verifyWebhookSignature(signature: string, rawBody: Buffer | string): boolean {
+    const activeSecretKey = process.env.PAYSTACK_SECRET_KEY || this.secretKey;
+    if (!signature || !rawBody) return false;
+    if (!activeSecretKey) {
+      // In dev mode without secret key configured, bypass signature check
+      return true;
+    }
+
+    const computedHash = createHmac('sha512', activeSecretKey).update(rawBody).digest('hex');
+    const sigBuffer = Buffer.from(signature, 'utf8');
+    const compBuffer = Buffer.from(computedHash, 'utf8');
+
+    if (sigBuffer.length !== compBuffer.length) {
+      return false;
+    }
+
+    return timingSafeEqual(sigBuffer, compBuffer);
   }
 }
 

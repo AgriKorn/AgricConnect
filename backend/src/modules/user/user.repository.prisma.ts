@@ -176,8 +176,75 @@ export class PrismaUserRepository implements IUserRepository {
       where: { id },
       data: { fcm_token: fcmToken },
     });
+    await this.registerDeviceToken(id, fcmToken);
     const updated = await this.findById(id);
     return updated!;
+  }
+
+  async registerDeviceToken(userId: string, token: string, platform?: string, deviceId?: string): Promise<void> {
+    await prisma.user_device_tokens.upsert({
+      where: { token },
+      update: {
+        user_id: userId,
+        platform: platform || undefined,
+        device_id: deviceId || undefined,
+        is_active: true,
+        last_used_at: new Date(),
+        updated_at: new Date(),
+      },
+      create: {
+        user_id: userId,
+        token,
+        platform: platform || null,
+        device_id: deviceId || null,
+        is_active: true,
+      },
+    });
+  }
+
+  async removeDeviceToken(userId: string, token: string): Promise<void> {
+    await prisma.user_device_tokens.updateMany({
+      where: { user_id: userId, token },
+      data: { is_active: false, updated_at: new Date() },
+    });
+  }
+
+  async findActiveDeviceTokens(userId: string): Promise<string[]> {
+    const tokens: string[] = [];
+
+    try {
+      const list = await prisma.user_device_tokens.findMany({
+        where: { user_id: userId, is_active: true },
+        select: { token: true },
+      });
+      if (list) {
+        tokens.push(...list.map((t) => t.token));
+      }
+    } catch (_err) {
+      // Table may not exist yet or mock in unit test
+    }
+
+    try {
+      // Also fallback check single legacy User.fcm_token column
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { fcm_token: true },
+      });
+      if (user?.fcm_token && !tokens.includes(user.fcm_token)) {
+        tokens.push(user.fcm_token);
+      }
+    } catch (_err) {
+      // Ignore
+    }
+
+    return Array.from(new Set(tokens));
+  }
+
+  async deactivateDeviceToken(token: string): Promise<void> {
+    await prisma.user_device_tokens.updateMany({
+      where: { token },
+      data: { is_active: false, updated_at: new Date() },
+    });
   }
 }
 

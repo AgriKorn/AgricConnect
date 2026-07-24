@@ -15,4 +15,8 @@ export interface IUserRepository {
   update(id: string, data: Partial<User>): Promise<User>;
   updateProfile(id: string, profile: Partial<User['profile']>): Promise<User>;
   updateFcmToken(id: string, fcmToken: string): Promise<User>;
+  registerDeviceToken(userId: string, token: string, platform?: string, deviceId?: string): Promise<void>;
+  removeDeviceToken(userId: string, token: string): Promise<void>;
+  findActiveDeviceTokens(userId: string): Promise<string[]>;
+  deactivateDeviceToken(token: string): Promise<void>;
 }

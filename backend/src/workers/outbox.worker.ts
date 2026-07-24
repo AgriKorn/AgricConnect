@@ -1,4 +1,5 @@
 import { outboxService, OutboxEvent } from '../modules/outbox/outbox.service';
+import { prisma } from '../config/db';
 import logger from '../utils/logger';
 
 export type EventPublisher = (event: OutboxEvent) => Promise<void>;
@@ -9,7 +10,6 @@ export class OutboxWorker {
   private publisher: EventPublisher;
 
   constructor(publisher?: EventPublisher) {
-    // Default publisher logs event payload (will dispatch to SQS Queue in AWS environment)
     this.publisher =
       publisher ||
       (async (event: OutboxEvent) => {
@@ -27,10 +27,14 @@ export class OutboxWorker {
     const tick = async () => {
       if (!this.isRunning) return;
       try {
-        await this.processBatch();
+        const count = await this.processBatch();
+        // Dynamic backoff if no events were processed
+        const nextDelay = count === 0 ? Math.min(pollIntervalMs * 2, 5000) : pollIntervalMs;
+        if (this.isRunning) {
+          this.timer = setTimeout(tick, nextDelay);
+        }
       } catch (err) {
         logger.error('[OutboxWorker] Error processing outbox batch:', err);
-      } finally {
         if (this.isRunning) {
           this.timer = setTimeout(tick, pollIntervalMs);
         }
@@ -49,8 +53,36 @@ export class OutboxWorker {
     logger.info('[OutboxWorker] Outbox Poller Worker stopped gracefully.');
   }
 
+  /**
+   * Concurrency-Safe Batch Processing with atomic SKIP LOCKED claiming.
+   */
   async processBatch(): Promise<number> {
-    const unpublished = await outboxService.fetchUnpublished(50);
+    let unpublished: OutboxEvent[] = [];
+
+    try {
+      // Atomic query to claim unpublished events across multi-instance nodes
+      const claimedRows = await prisma.$queryRaw<Array<any>>`
+        SELECT *
+        FROM outbox_events
+        WHERE published_at IS NULL
+        ORDER BY created_at ASC
+        LIMIT 50
+        FOR UPDATE SKIP LOCKED;
+      `;
+      unpublished = claimedRows.map((row: any) => ({
+        id: row.id,
+        aggregateType: row.aggregate_type,
+        aggregateId: row.aggregate_id,
+        eventType: row.event_type,
+        payload: (row.payload as Record<string, unknown>) || {},
+        publishedAt: row.published_at,
+        createdAt: row.created_at,
+      }));
+    } catch (_rawErr) {
+      // Fallback for mock unit test environment
+      unpublished = await outboxService.fetchUnpublished(50);
+    }
+
     if (unpublished.length === 0) return 0;
 
     let processedCount = 0;

@@ -29,8 +29,20 @@ export const registerDeviceTokenHandler = async (req: Request, res: Response, ne
   try {
     const user = (req as any).user;
     if (!user) throw new UnauthorizedError();
-    const updated = await userService.registerDeviceToken(user.userId, req.body.fcmToken);
+    const { fcmToken, platform, deviceId } = req.body;
+    const updated = await userService.registerDeviceToken(user.userId, fcmToken, platform, deviceId);
     sendSuccess(res, updated);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const removeDeviceTokenHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = (req as any).user;
+    if (!user) throw new UnauthorizedError();
+    await userService.removeDeviceToken(user.userId, req.body.fcmToken);
+    sendSuccess(res, { message: 'Device token removed successfully' });
   } catch (err) {
     next(err);
   }

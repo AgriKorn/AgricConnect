@@ -1,5 +1,5 @@
 import { notificationRepository, NotificationRepository } from './notification.repository.prisma';
-import { userRepository } from '../user/user.repository.memory';
+import { userRepository } from '../user/user.repository.prisma';
 import { IUserRepository } from '../user/user.repository';
 import logger from '../../utils/logger';
 
@@ -12,16 +12,16 @@ export class NotificationService {
   async sendNotification(data: { userId: string; type: string; message: string; orderId?: string; listingId?: string }) {
     const notification = await this.repo.create(data);
 
-    // Fetch target user to check for active FCM push token
+    // Fetch target user's active device tokens for FCM push dispatch
     try {
-      const user = await this.users.findById(data.userId);
-      if (user) {
+      const activeTokens = await this.users.findActiveDeviceTokens(data.userId);
+      if (activeTokens.length > 0) {
         logger.info(
-          `[FCM Push] Sent real-time push notification (${data.type}) to user ${user.name} (${user.phone})`,
+          `[FCM Push] Dispatched real-time push notification (${data.type}) to ${activeTokens.length} active device(s) for user ${data.userId}`,
         );
       }
     } catch (err) {
-      logger.error('[FCM Push Error] Failed to fetch FCM token for push notification:', err);
+      logger.error('[FCM Push Error] Failed to fetch active device tokens:', err);
     }
 
     return notification;
