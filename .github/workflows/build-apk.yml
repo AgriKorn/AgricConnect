@@ -44,14 +44,3 @@ jobs:
         with:
           name: AgriConnect-Android-Release
           path: frontend/build/app/outputs/flutter-apk/app-release.apk
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: eu-west-1
-
-      - name: Upload APK to AWS S3 Direct Download Link
-        run: |
-          aws s3 cp build/app/outputs/flutter-apk/app-release.apk s3://agriconnect-public-assets/downloads/AgriConnect.apk --region eu-west-1
