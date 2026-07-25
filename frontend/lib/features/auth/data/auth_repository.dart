@@ -120,7 +120,7 @@ class HttpAuthRepository implements AuthRepository {
       region: json['region']?.toString(),
       businessName: json['businessName']?.toString(),
       businessType: json['businessType']?.toString(),
-      vehicleCapacity: json['vehicleCapacity'] != null ? double.tryParse(json['vehicleCapacity'].toString()) : null,
+      vehicleCapacity: json['vehicleCapacity']?.toString(),
       operatingRegion: json['operatingRegion']?.toString(),
     );
   }
