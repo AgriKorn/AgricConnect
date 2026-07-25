@@ -9,6 +9,9 @@ on:
       - main
       - feature/K1-scaffolding
 
+permissions:
+  contents: read
+
 jobs:
   test-and-deploy:
     name: Test, Build Docker & Deploy to AWS App Runner
