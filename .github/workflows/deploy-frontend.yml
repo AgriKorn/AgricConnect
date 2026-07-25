@@ -1,4 +1,4 @@
-name: Frontend CD (AWS ECR & Lightsail Container)
+name: Frontend CD (Flutter Web & AWS ECR)
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-and-deploy-frontend:
-    name: Build Docker & Push Frontend Image to AWS ECR
+    name: Build Flutter Web & Push Docker Image to AWS ECR
     runs-on: ubuntu-latest
 
     defaults:
@@ -21,6 +21,17 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install Flutter Dependencies
+        run: flutter pub get
+
+      - name: Build Flutter Web Release
+        run: flutter build web --release --base-href "/"
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
