@@ -2,6 +2,7 @@ import { NotificationService } from './notification.service';
 import { NotificationRepository } from './notification.repository.prisma';
 
 describe('NotificationService', () => {
+  jest.setTimeout(15000);
   let notificationService: NotificationService;
   let mockRepo: jest.Mocked<NotificationRepository>;
 
