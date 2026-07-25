@@ -1,4 +1,4 @@
-name: Frontend CD (Flutter Web to AWS S3)
+name: Frontend CD (AWS ECR & Lightsail Container)
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-and-deploy-frontend:
-    name: Build Flutter Web & Host on AWS
+    name: Build Docker & Push Frontend Image to AWS ECR
     runs-on: ubuntu-latest
 
     defaults:
@@ -22,17 +22,6 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Flutter SDK
-        uses: subosito/flutter-action@v2
-        with:
-          channel: 'stable'
-
-      - name: Install Flutter Dependencies
-        run: flutter pub get
-
-      - name: Build Flutter Web Release
-        run: flutter build web --release --base-href "/"
-
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -40,6 +29,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-west-1
 
-      - name: Deploy Built Flutter Web to AWS S3 Bucket
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push Frontend Docker Image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: agriconnect-backend
+          IMAGE_TAG: frontend-${{ github.sha }}
         run: |
-          aws s3 sync build/web s3://agriconnect-public-assets/app --delete --region eu-west-1
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:frontend-latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:frontend-latest
