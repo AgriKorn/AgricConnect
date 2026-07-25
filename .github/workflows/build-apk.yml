@@ -1,0 +1,57 @@
+name: Build Android APK (Mobile Release)
+
+on:
+  push:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/build-apk.yml'
+    branches:
+      - main
+      - feature/frontend-integration
+
+jobs:
+  build-android-apk:
+    name: Build Native Android APK
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install Flutter Dependencies
+        run: flutter pub get
+
+      - name: Build Android APK (Release)
+        run: flutter build apk --release --dart-define=API_BASE_URL=https://container-service-1.veg2jxqsfecbm.eu-west-1.cs.amazonlightsail.com/api
+
+      - name: Upload APK as GitHub Action Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AgriConnect-Android-Release
+          path: frontend/build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-1
+
+      - name: Upload APK to AWS S3 Direct Download Link
+        run: |
+          aws s3 cp build/app/outputs/flutter-apk/app-release.apk s3://agriconnect-public-assets/downloads/AgriConnect.apk --region eu-west-1
