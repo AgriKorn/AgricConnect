@@ -1,0 +1,45 @@
+name: Frontend CD (Flutter Web to AWS S3)
+
+on:
+  push:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+    branches:
+      - main
+      - feature/frontend-integration
+
+jobs:
+  build-and-deploy-frontend:
+    name: Build Flutter Web & Host on AWS
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install Flutter Dependencies
+        run: flutter pub get
+
+      - name: Build Flutter Web Release
+        run: flutter build web --release --base-href "/"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-1
+
+      - name: Deploy Built Flutter Web to AWS S3 Bucket
+        run: |
+          aws s3 sync build/web s3://agriconnect-public-assets/app --delete --region eu-west-1
