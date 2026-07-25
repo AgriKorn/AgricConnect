@@ -14,7 +14,7 @@ import {
 import { IUserRepository } from '../user/user.repository';
 import { userRepository } from '../user/user.repository.memory';
 import { supabase } from '../../config/supabase';
-import { SafeUser, toSafeUser } from '../user/user.types';
+import { SafeUser, toSafeUser, UserStatus } from '../user/user.types';
 import { ForgotPasswordInput, GoogleAuthInput, LoginInput, RegisterInput, ResetPasswordInput } from './auth.schema';
 import logger from '../../utils/logger';
 
@@ -40,9 +40,15 @@ export class AuthService {
       otpExpiry: new Date(),
     });
 
-    await this.users.update(user.id, { status: 'PENDING_APPROVAL' });
+    const isBuyer = data.role.toLowerCase() === 'buyer';
+    const initialStatus: UserStatus = isBuyer ? 'ACTIVE' : 'PENDING_APPROVAL';
+    await this.users.update(user.id, { status: initialStatus });
 
-    return { userId: user.id, message: 'Registration successful. Your account is pending admin approval.' };
+    const message = isBuyer
+      ? 'Registration successful. Welcome to AgriConnect!'
+      : 'Registration successful. Your account is pending admin approval.';
+
+    return { userId: user.id, message };
   }
 
   async forgotPassword(data: ForgotPasswordInput): Promise<{ message: string; resetToken?: string }> {
