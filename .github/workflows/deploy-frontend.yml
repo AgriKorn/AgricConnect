@@ -1,4 +1,4 @@
-name: Frontend CD (AWS Lightsail Direct Container Push)
+name: Frontend CD (AWS ECR & Lightsail Containers)
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-and-deploy-frontend:
-    name: Build Flutter Web & Deploy to AWS Lightsail
+    name: Build Flutter Web & Push Docker Image to AWS ECR
     runs-on: ubuntu-latest
 
     defaults:
@@ -40,16 +40,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-west-1
 
-      - name: Install Lightsail Control Plugin
-        run: |
-          sudo curl "https://s3.us-west-2.amazonaws.com/lightsailctl/latest/linux-amd64/lightsailctl" -o "/usr/local/bin/lightsailctl"
-          sudo chmod +x /usr/local/bin/lightsailctl
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build & Push Container Image to Lightsail Native Registry
+      - name: Build & Push Frontend Docker Image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: agriconnect-backend
+          IMAGE_TAG: frontend-${{ github.sha }}
         run: |
-          docker build -t agriconnect-frontend:latest .
-          aws lightsail push-container-image \
-            --region eu-west-1 \
-            --service-name container-service-2 \
-            --label agriconnect-frontend \
-            --image agriconnect-frontend:latest
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:frontend-latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:frontend-latest
