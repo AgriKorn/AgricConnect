@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'backend/**'
+      - '.github/workflows/**'
     branches:
       - main
       - feature/K1-scaffolding
