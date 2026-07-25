@@ -13,7 +13,7 @@ void main() async {
   // This app must work on patchy rural networks (PRD 7.1) — the type
   // system itself can't depend on a CDN fetch. Falls back to the platform
   // default font instead of blocking on a network request for Inter.
-  GoogleFonts.config.allowRuntimeFetching = false;
+  GoogleFonts.config.allowRuntimeFetching = true;
   await Hive.initFlutter();
   final localPrefs = await LocalPrefs.open();
 
