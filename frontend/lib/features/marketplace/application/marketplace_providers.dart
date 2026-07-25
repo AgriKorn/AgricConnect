@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/marketplace_mock.dart';
+import '../data/marketplace_repository.dart';
 
 enum ListingSort { freshnessDesc, priceAsc, priceDesc }
 
@@ -12,8 +13,10 @@ extension ListingSortX on ListingSort {
   };
 }
 
-final marketplaceListingsProvider = Provider<List<MarketplaceListing>>((ref) {
-  return mockMarketplaceListings;
+/// Fetches produce listings directly from live AWS API / fallback repository
+final marketplaceListingsProvider = FutureProvider<List<MarketplaceListing>>((ref) async {
+  final repository = ref.watch(marketplaceRepositoryProvider);
+  return repository.fetchListings();
 });
 
 /// null means "All Crops".
@@ -27,9 +30,14 @@ final filteredMarketplaceListingsProvider = Provider<List<MarketplaceListing>>((
   final category = ref.watch(marketplaceCategoryFilterProvider);
   final query = ref.watch(marketplaceSearchQueryProvider).trim().toLowerCase();
   final sort = ref.watch(marketplaceSortProvider);
+  final listingsAsync = ref.watch(marketplaceListingsProvider);
 
-  final result = ref
-      .watch(marketplaceListingsProvider)
+  final rawList = listingsAsync.maybeWhen(
+    data: (list) => list,
+    orElse: () => mockMarketplaceListings,
+  );
+
+  final result = rawList
       .where((listing) => category == null || listing.category == category)
       .where((listing) => query.isEmpty || listing.name.toLowerCase().contains(query))
       .toList();
