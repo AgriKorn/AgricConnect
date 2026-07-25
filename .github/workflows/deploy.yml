@@ -64,8 +64,3 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-
-      - name: Trigger AWS App Runner Deployment
-        if: ${{ secrets.AWS_APPRUNNER_SERVICE_ARN != '' }}
-        run: |
-          aws apprunner start-deployment --service-arn ${{ secrets.AWS_APPRUNNER_SERVICE_ARN }}
