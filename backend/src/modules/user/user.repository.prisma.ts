@@ -59,7 +59,7 @@ export class PrismaUserRepository implements IUserRepository {
         full_name: data.name,
         role: data.role as user_role,
         region: 'Greater Accra',
-        account_status: 'pending',
+        account_status: data.role === 'buyer' ? 'approved' : 'pending',
       },
     });
 
