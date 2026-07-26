@@ -66,6 +66,7 @@ class FarmerListingSummary {
     required this.unit,
     required this.status,
     this.tag,
+    this.imageAsset,
   });
 
   final String id;
@@ -75,6 +76,7 @@ class FarmerListingSummary {
   final String unit;
   final String status; // Active | Pending | Sold
   final String? tag; // Premium | Verified
+  final String? imageAsset;
 }
 
 class FreshnessAlertItem {
@@ -98,6 +100,7 @@ const mockFarmerListings = [
     unit: 'kg',
     status: 'Active',
     tag: 'Premium',
+    imageAsset: 'assets/images/roma tomatoes.png',
   ),
   FarmerListingSummary(
     id: 'l2',
@@ -107,6 +110,7 @@ const mockFarmerListings = [
     unit: 'kg',
     status: 'Active',
     tag: 'Verified',
+    imageAsset: 'assets/images/yellow maize.png',
   ),
   FarmerListingSummary(
     id: 'l3',
@@ -116,6 +120,7 @@ const mockFarmerListings = [
     unit: 'box',
     status: 'Active',
     tag: 'Premium',
+    imageAsset: 'assets/images/haden mangoes.png',
   ),
   FarmerListingSummary(
     id: 'l4',
@@ -125,6 +130,7 @@ const mockFarmerListings = [
     unit: 'kg',
     status: 'Active',
     tag: 'Verified',
+    imageAsset: 'assets/images/belll pepper.png',
   ),
   FarmerListingSummary(
     id: 'l5',
@@ -133,6 +139,7 @@ const mockFarmerListings = [
     price: 15,
     unit: 'bunch',
     status: 'Active',
+    imageAsset: 'assets/images/bananas.png',
   ),
   FarmerListingSummary(
     id: 'l6',
@@ -141,6 +148,7 @@ const mockFarmerListings = [
     price: 18,
     unit: 'bag',
     status: 'Pending',
+    imageAsset: 'assets/images/cassava.png',
   ),
   FarmerListingSummary(
     id: 'l7',
@@ -149,7 +157,9 @@ const mockFarmerListings = [
     price: 22,
     unit: 'bag',
     status: 'Sold',
+    imageAsset: 'assets/images/sweet_potatoes.png',
   ),
+
 ];
 
 const mockFreshnessAlerts = [

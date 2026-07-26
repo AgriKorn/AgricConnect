@@ -313,18 +313,20 @@ class _ListingCard extends StatelessWidget {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.12)],
-                          ),
-                        ),
-                        child: Center(
-                          child: Icon(Icons.eco_rounded, size: 40, color: accent.withValues(alpha: 0.8)),
-                        ),
-                      ),
+                      child: listing.imageAsset != null
+                          ? Image.asset(listing.imageAsset!, fit: BoxFit.cover)
+                          : DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.12)],
+                                ),
+                              ),
+                              child: Center(
+                                child: Icon(Icons.eco_rounded, size: 40, color: accent.withValues(alpha: 0.8)),
+                              ),
+                            ),
                     ),
                     Positioned(
                       top: 8,

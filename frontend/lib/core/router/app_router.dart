@@ -14,7 +14,9 @@ import '../../features/auth/presentation/profile_screen.dart';
 import '../../features/auth/presentation/registration_screen.dart';
 import '../../features/auth/presentation/role_selection_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
+import '../../features/dispatch/presentation/driver_dispatch_screen.dart';
 import '../../features/dispatch/presentation/driver_home_screen.dart';
+import '../../features/dispatch/presentation/driver_profile_screen.dart';
 import '../../features/dispatch/presentation/job_history_screen.dart';
 import '../../features/home/presentation/farmer_dashboard_screen.dart';
 import '../../features/home/presentation/farmer_profile_screen.dart';
@@ -289,7 +291,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         ],
       ),
 
-      // Driver: Home (Availability toggle) · Job History · Profile (checklist 2.2)
+      // Driver: Home (Availability toggle) · Jobs (Dispatch) · Job History · Profile (checklist 2.2)
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => RoleNavShell(
           navigationShell: navigationShell,
@@ -298,6 +300,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               icon: Icon(Icons.local_shipping_outlined),
               selectedIcon: Icon(Icons.local_shipping_rounded),
               label: 'Home',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.assignment_outlined),
+              selectedIcon: Icon(Icons.assignment_rounded),
+              label: 'Jobs',
             ),
             NavigationDestination(
               icon: Icon(Icons.history_outlined),
@@ -319,6 +326,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/driver/jobs',
+                builder: (context, state) => const DriverDispatchScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: '/driver/history',
                 builder: (context, state) => const JobHistoryScreen(),
               ),
@@ -328,7 +343,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/driver/profile',
-                builder: (context, state) => const ProfileScreen(),
+                builder: (context, state) => const DriverProfileScreen(),
               ),
             ],
           ),

@@ -265,19 +265,23 @@ class _ListingRow extends StatelessWidget {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(18),
-                  child: Container(
+                  child: SizedBox(
                     height: 190,
-                    width: 210,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.12)],
-                      ),
-                    ),
-                    child: Center(
-                      child: Icon(Icons.eco_rounded, size: 48, color: accent.withValues(alpha: 0.8)),
-                    ),
+                    width: double.infinity,
+                    child: listing.imageAsset != null
+                        ? Image.asset(listing.imageAsset!, fit: BoxFit.cover)
+                        : DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.12)],
+                              ),
+                            ),
+                            child: Center(
+                              child: Icon(Icons.eco_rounded, size: 48, color: accent.withValues(alpha: 0.8)),
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 14),

@@ -21,6 +21,7 @@ class OrderNotification {
     required this.itemSummary,
     required this.amount,
     required this.escrowStatus,
+    this.imageAsset,
   });
 
   final String id;
@@ -30,6 +31,7 @@ class OrderNotification {
   final String itemSummary;
   final double amount;
   final String escrowStatus; // Escrowed | Released | Refunded
+  final String? imageAsset;
 
   OrderNotification copyWith({DispatchStatus? status, String? escrowStatus}) {
     return OrderNotification(
@@ -40,6 +42,7 @@ class OrderNotification {
       itemSummary: itemSummary,
       amount: amount,
       escrowStatus: escrowStatus ?? this.escrowStatus,
+      imageAsset: imageAsset,
     );
   }
 }
@@ -53,6 +56,7 @@ const mockOrderNotifications = [
     itemSummary: '50kg Yellow Maize',
     amount: 450,
     escrowStatus: 'Escrowed',
+    imageAsset: 'assets/images/yellow maize.png',
   ),
   OrderNotification(
     id: 'o2',
@@ -62,6 +66,7 @@ const mockOrderNotifications = [
     itemSummary: '12 Crates Organic Tomatoes',
     amount: 1200,
     escrowStatus: 'Escrowed',
+    imageAsset: 'assets/images/roma tomatoes.png',
   ),
   OrderNotification(
     id: 'o3',
@@ -71,6 +76,7 @@ const mockOrderNotifications = [
     itemSummary: '30 Bags Cassava',
     amount: 540,
     escrowStatus: 'Released',
+    imageAsset: 'assets/images/cassava.png',
   ),
   OrderNotification(
     id: 'o4',
@@ -80,5 +86,6 @@ const mockOrderNotifications = [
     itemSummary: '5kg Pepper',
     amount: 75,
     escrowStatus: 'Refunded',
+    imageAsset: 'assets/images/belll pepper.png',
   ),
 ];

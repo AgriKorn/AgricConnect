@@ -292,17 +292,21 @@ class _NotificationCard extends ConsumerWidget {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(14),
-                child: Container(
+                child: SizedBox(
                   width: 56,
                   height: 56,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [colorScheme.primary.withValues(alpha: 0.35), colorScheme.primary.withValues(alpha: 0.12)],
-                    ),
-                  ),
-                  child: Icon(Icons.eco_rounded, size: 24, color: colorScheme.primary.withValues(alpha: 0.8)),
+                  child: notification.imageAsset != null
+                      ? Image.asset(notification.imageAsset!, fit: BoxFit.cover)
+                      : DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [colorScheme.primary.withValues(alpha: 0.35), colorScheme.primary.withValues(alpha: 0.12)],
+                            ),
+                          ),
+                          child: Icon(Icons.eco_rounded, size: 24, color: colorScheme.primary.withValues(alpha: 0.8)),
+                        ),
                 ),
               ),
               const SizedBox(width: 12),
