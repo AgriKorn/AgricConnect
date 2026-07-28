@@ -1,7 +1,7 @@
 import { AdminService } from './admin.service';
 import { IUserRepository } from '../user/user.repository';
 import { User } from '../user/user.types';
-import { transactionRepository } from '../transaction/transaction.repository.memory';
+import { transactionRepository } from '../transaction/transaction.repository.prisma';
 import { Transaction } from '../transaction/transaction.types';
 import { BadRequestError, NotFoundError } from '../../utils/errors';
 

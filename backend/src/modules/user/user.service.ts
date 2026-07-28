@@ -1,6 +1,6 @@
 import { NotFoundError } from '../../utils/errors';
 import { IUserRepository } from './user.repository';
-import { userRepository } from './user.repository.memory';
+import { userRepository } from './user.repository.prisma';
 import { SafeUser, toSafeUser } from './user.types';
 import { UpdateProfileInput } from './user.schema';
 

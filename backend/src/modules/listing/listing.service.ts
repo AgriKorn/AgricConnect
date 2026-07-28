@@ -5,7 +5,7 @@ import { auditService } from '../audit/audit.service';
 import logger from '../../utils/logger';
 import { CreateListingInput, UpdateListingInput } from './listing.schema';
 import { IListingRepository } from './listing.repository';
-import { listingRepository } from './listing.repository.memory';
+import { listingRepository } from './listing.repository.prisma';
 import { Listing } from './listing.types';
 
 /**
@@ -29,18 +29,20 @@ const generateListingProof = async (farmerId: string, data: CreateListingInput) 
 /**
  * Records an audit entry without letting its failure undo work already committed.
  *
- * Listings live in the in-memory repository while the audit trail is already on
- * Prisma, so the two writes cannot share a transaction — by the time the audit
- * entry is attempted the listing is durable and visible in the marketplace.
- * Rethrowing here returned a 500 for a listing that had in fact been created,
- * so farmers retried and produced duplicates.
+ * The listing is written and committed before the audit entry is attempted, so
+ * by that point it is durable and already visible in the marketplace. Rethrowing
+ * returned a 500 for a listing that had in fact been created, and farmers
+ * retried and produced duplicates.
  *
  * The audit gap is logged at error level rather than swallowed: a missing entry
- * breaks the hash chain and someone has to know. Once listings move onto Prisma
- * (see README, "Persistence: split state"), both writes belong in a single
- * `prisma.$transaction` and this wrapper should be deleted.
+ * breaks the hash chain and someone has to know.
  *
- * Deliberately NOT applied to transaction/dispute/dispatch — those call
+ * Now that listings and the audit trail share a database, the better fix is to
+ * write both inside one `prisma.$transaction` and delete this wrapper. That
+ * needs AuditService.log to accept a transaction client, which it does not yet —
+ * tracked as follow-up work rather than folded into the persistence migration.
+ *
+ * Deliberately NOT applied to transaction/dispute/dispatch — those already call
  * auditService.log inside a `prisma.$transaction`, where a failed audit write
  * must roll the whole operation back.
  */
