@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/theme_mode_controller.dart';
 import '../../../core/utils/currency.dart';
 import '../../../core/widgets/agri_dialog.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
+import '../../../core/widgets/help_support_screen.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/models/account_status.dart';
 import '../../auth/data/models/user_model.dart';
@@ -34,9 +36,38 @@ void _openComingSoon(BuildContext context, String title, IconData icon) {
   );
 }
 
+void _openFarmerHelp(BuildContext context) {
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (context) => HelpSupportScreen(
+        roleLabel: 'Farmers',
+        heroSubtitle:
+            'Our AI assistant and support team are ready to assist you with your agricultural needs.',
+        onNotificationsTap: () => context.go('/farmer/alerts'),
+        contactMethods: const [
+          HelpContactMethod(icon: Icons.chat_bubble_outline_rounded, label: 'Live Chat', detail: 'Chat with our support team'),
+          HelpContactMethod(icon: Icons.call_rounded, label: 'Call Support', detail: '+233 30 123 4567'),
+          HelpContactMethod(icon: Icons.email_outlined, label: 'Email Us', detail: 'support@agriconnect.com'),
+        ],
+        faqItems: const [
+          'How do I list my produce for sale?',
+          'When will I receive payment after a sale?',
+          'How does the freshness score work?',
+          'How do I use the Scan feature to price my harvest?',
+        ],
+        resourceLinks: const [
+          HelpResourceLink(icon: Icons.description_outlined, label: 'Terms of Service'),
+          HelpResourceLink(icon: Icons.verified_user_outlined, label: 'Privacy Policy'),
+          HelpResourceLink(icon: Icons.groups_outlined, label: 'Farmer Community Guidelines'),
+        ],
+      ),
+    ),
+  );
+}
+
 /// Farmer-specific Profile tab: hero card (rating/sales), Farm Details,
-/// Account & Support, and Log Out. Buyer/Driver still use the generic
-/// [ProfileScreen] — this one replicates the farmer-specific reference.
+/// Account & Support, and Log Out. Driver/Buyer have their own equivalent
+/// screens — this one replicates the farmer-specific reference.
 class FarmerProfileScreen extends ConsumerWidget {
   const FarmerProfileScreen({super.key});
 
@@ -112,7 +143,7 @@ class FarmerProfileScreen extends ConsumerWidget {
                         _ActionRow(
                           colorScheme: colorScheme,
                           label: 'Help & Support',
-                          onTap: () => _openComingSoon(context, 'Help & Support', Icons.help_outline_rounded),
+                          onTap: () => _openFarmerHelp(context),
                           isLast: true,
                         ),
                       ],

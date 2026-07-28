@@ -8,6 +8,7 @@ import '../../../core/widgets/agri_bottom_sheet.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../checkout/presentation/checkout_screen.dart';
 import '../application/marketplace_providers.dart';
 import '../data/marketplace_mock.dart';
 
@@ -309,7 +310,9 @@ class _ListingTile extends StatelessWidget {
       child: Material(
         color: colorScheme.surface.withValues(alpha: 0.6),
         child: InkWell(
-          onTap: () {},
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (context) => CheckoutScreen(listing: listing)),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -317,18 +320,20 @@ class _ListingTile extends StatelessWidget {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.12)],
-                          ),
-                        ),
-                        child: Center(
-                          child: Icon(listing.category.icon, size: 44, color: accent.withValues(alpha: 0.8)),
-                        ),
-                      ),
+                      child: listing.imageAsset != null
+                          ? Image.asset(listing.imageAsset!, fit: BoxFit.cover)
+                          : DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.12)],
+                                ),
+                              ),
+                              child: Center(
+                                child: Icon(listing.category.icon, size: 44, color: accent.withValues(alpha: 0.8)),
+                              ),
+                            ),
                     ),
                     Positioned(
                       top: 8,

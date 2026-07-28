@@ -10,7 +10,6 @@ import '../../features/auth/data/models/user_role.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/pending_verification_screen.dart';
-import '../../features/auth/presentation/profile_screen.dart';
 import '../../features/auth/presentation/registration_screen.dart';
 import '../../features/auth/presentation/role_selection_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
@@ -22,6 +21,7 @@ import '../../features/home/presentation/farmer_dashboard_screen.dart';
 import '../../features/home/presentation/farmer_profile_screen.dart';
 import '../../features/listings/presentation/add_listing_screen.dart';
 import '../../features/listings/presentation/my_listings_screen.dart';
+import '../../features/marketplace/presentation/buyer_profile_screen.dart';
 import '../../features/marketplace/presentation/marketplace_screen.dart';
 import '../../features/marketplace/presentation/search_screen.dart';
 import '../../features/notifications/presentation/alerts_screen.dart';
@@ -284,7 +284,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/buyer/profile',
-                builder: (context, state) => const ProfileScreen(),
+                builder: (context, state) => const BuyerProfileScreen(),
               ),
             ],
           ),

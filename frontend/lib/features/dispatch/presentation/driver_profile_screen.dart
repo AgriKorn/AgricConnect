@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/currency.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
+import '../../../core/widgets/help_support_screen.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../../core/widgets/agri_dialog.dart';
 import '../application/dispatch_providers.dart';
@@ -15,6 +16,34 @@ void _openComingSoon(BuildContext context, String title, IconData icon) {
         title: title,
         icon: icon,
         message: '$title will be available in a future update.',
+      ),
+    ),
+  );
+}
+
+void _openDriverHelp(BuildContext context) {
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (context) => HelpSupportScreen(
+        roleLabel: 'Drivers',
+        heroSubtitle:
+            'Our AI assistant and support team are ready to assist you with your delivery and logistics needs.',
+        contactMethods: const [
+          HelpContactMethod(icon: Icons.chat_bubble_outline_rounded, label: 'Live Chat', detail: 'Chat with our support team'),
+          HelpContactMethod(icon: Icons.call_rounded, label: 'Call Dispatch Support', detail: '+233 30 123 4567'),
+          HelpContactMethod(icon: Icons.email_outlined, label: 'Email Us', detail: 'support@agriconnect.com'),
+        ],
+        faqItems: const [
+          'How do I accept or decline a job?',
+          "What happens if I'm delayed on a delivery?",
+          'How is my payout calculated?',
+          'How do I update my vehicle details?',
+        ],
+        resourceLinks: const [
+          HelpResourceLink(icon: Icons.description_outlined, label: 'Terms of Service'),
+          HelpResourceLink(icon: Icons.verified_user_outlined, label: 'Privacy Policy'),
+          HelpResourceLink(icon: Icons.shield_outlined, label: 'Driver Safety Guidelines'),
+        ],
       ),
     ),
   );
@@ -112,6 +141,13 @@ class DriverProfileScreen extends ConsumerWidget {
                             activeThumbColor: colorScheme.primary,
                             onChanged: (_) => ref.read(driverNotificationsProvider.notifier).toggle(),
                           ),
+                        ),
+                        _SettingsRow(
+                          colorScheme: colorScheme,
+                          icon: Icons.help_outline_rounded,
+                          label: 'Help & Support',
+                          trailing: Icon(Icons.chevron_right_rounded, color: colorScheme.onSurfaceVariant),
+                          onTap: () => _openDriverHelp(context),
                         ),
                         _SignOutRow(colorScheme: colorScheme),
                       ],

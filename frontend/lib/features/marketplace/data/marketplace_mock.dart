@@ -28,6 +28,7 @@ class MarketplaceListing {
     required this.pricePerUnit,
     required this.unit,
     required this.farmerName,
+    this.imageAsset,
   });
 
   final String id;
@@ -37,6 +38,7 @@ class MarketplaceListing {
   final double pricePerUnit;
   final String unit;
   final String farmerName;
+  final String? imageAsset;
 }
 
 const mockMarketplaceListings = [
@@ -48,6 +50,7 @@ const mockMarketplaceListings = [
     pricePerUnit: 18,
     unit: 'kg',
     farmerName: 'Ama Boateng',
+    imageAsset: 'assets/images/roma tomatoes.png',
   ),
   MarketplaceListing(
     id: 'mp2',
@@ -57,6 +60,7 @@ const mockMarketplaceListings = [
     pricePerUnit: 22,
     unit: 'kg',
     farmerName: 'Kojo Mensah',
+    imageAsset: 'assets/images/belll pepper.png',
   ),
   MarketplaceListing(
     id: 'mp3',
@@ -66,6 +70,7 @@ const mockMarketplaceListings = [
     pricePerUnit: 12,
     unit: 'bunch',
     farmerName: 'Efua Asante',
+    imageAsset: 'assets/images/freah_spinach.webp',
   ),
   MarketplaceListing(
     id: 'mp4',
@@ -75,6 +80,7 @@ const mockMarketplaceListings = [
     pricePerUnit: 15,
     unit: 'piece',
     farmerName: 'Yaw Owusu',
+    imageAsset: 'assets/images/golden_pineapples.webp',
   ),
   MarketplaceListing(
     id: 'mp5',
@@ -84,6 +90,7 @@ const mockMarketplaceListings = [
     pricePerUnit: 14,
     unit: 'kg',
     farmerName: 'Abena Darko',
+    imageAsset: 'assets/images/White_onion.webp',
   ),
   MarketplaceListing(
     id: 'mp6',
@@ -93,6 +100,7 @@ const mockMarketplaceListings = [
     pricePerUnit: 16,
     unit: 'kg',
     farmerName: 'Kwame Adjei',
+    imageAsset: 'assets/images/carrots.jpg',
   ),
   MarketplaceListing(
     id: 'mp7',
@@ -102,6 +110,7 @@ const mockMarketplaceListings = [
     pricePerUnit: 20,
     unit: 'kg',
     farmerName: 'Adjoa Frimpong',
+    imageAsset: 'assets/images/riped_mangoes.webp',
   ),
   MarketplaceListing(
     id: 'mp8',
@@ -111,5 +120,6 @@ const mockMarketplaceListings = [
     pricePerUnit: 9,
     unit: 'kg',
     farmerName: 'Kwabena Osei',
+    imageAsset: 'assets/images/white_maize.jpg',
   ),
 ];
