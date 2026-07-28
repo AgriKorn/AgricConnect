@@ -20,6 +20,8 @@ import '../../features/home/presentation/farmer_dashboard_screen.dart';
 import '../../features/home/presentation/farmer_profile_screen.dart';
 import '../../features/listings/presentation/add_listing_screen.dart';
 import '../../features/listings/presentation/my_listings_screen.dart';
+import '../../features/marketplace/data/marketplace_mock.dart';
+import '../../features/marketplace/presentation/listing_detail_screen.dart';
 import '../../features/marketplace/presentation/marketplace_screen.dart';
 import '../../features/marketplace/presentation/search_screen.dart';
 import '../../features/notifications/presentation/alerts_screen.dart';
@@ -228,6 +230,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             ],
           ),
         ],
+      ),
+
+      GoRoute(
+        path: '/buyer/marketplace/listing',
+        builder: (context, state) => ListingDetailScreen(listing: state.extra as MarketplaceListing),
       ),
 
       // Buyer: Marketplace · Search · Orders · Profile (checklist 2.2)

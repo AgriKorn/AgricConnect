@@ -12,7 +12,6 @@ class OrderItemModel {
     required this.amount,
     required this.status,
     required this.createdAt,
-    this.paystackUrl,
   });
 
   final String id;
@@ -20,19 +19,26 @@ class OrderItemModel {
   final double amount;
   final String status;
   final DateTime createdAt;
-  final String? paystackUrl;
+}
+
+class PurchaseResult {
+  const PurchaseResult({
+    required this.transactionId,
+    required this.amount,
+    required this.hasOwnTransport,
+    required this.authorizationUrl,
+  });
+
+  final String transactionId;
+  final double amount;
+  final bool hasOwnTransport;
+  final String authorizationUrl;
 }
 
 abstract class OrdersRepository {
-  Future<OrderItemModel> createOrder({
+  Future<PurchaseResult> purchaseListing({
     required String listingId,
-    required double quantity,
-  });
-
-  Future<String> initializePaystackCheckout({
-    required String transactionId,
-    required String email,
-    required double amount,
+    required bool hasOwnTransport,
   });
 
   Future<List<OrderItemModel>> fetchUserOrders();
@@ -44,56 +50,30 @@ class HttpOrdersRepository implements OrdersRepository {
   final Dio _dio;
 
   @override
-  Future<OrderItemModel> createOrder({
+  Future<PurchaseResult> purchaseListing({
     required String listingId,
-    required double quantity,
+    required bool hasOwnTransport,
   }) async {
     try {
       final response = await _dio.post(
-        ApiEndpoints.transactions,
+        ApiEndpoints.transactionPurchase,
         data: {
           'listingId': listingId,
-          'quantity': quantity,
+          'hasOwnTransport': hasOwnTransport,
         },
       );
 
       final data = response.data['data'] ?? response.data;
-      return OrderItemModel(
-        id: data['id']?.toString() ?? 'tx-${DateTime.now().millisecondsSinceEpoch}',
-        listingName: data['listing']?['cropName']?.toString() ?? 'AgriConnect Order',
-        amount: double.tryParse(data['totalAmount']?.toString() ?? data['amount']?.toString() ?? '') ?? 150.0,
-        status: data['status']?.toString() ?? 'PENDING_PAYMENT',
-        createdAt: DateTime.now(),
+      final transaction = data['transaction'] ?? {};
+      return PurchaseResult(
+        transactionId: transaction['id']?.toString() ?? '',
+        amount: double.tryParse(transaction['amountGhs']?.toString() ?? '') ?? 0.0,
+        hasOwnTransport: transaction['hasOwnTransport'] as bool? ?? hasOwnTransport,
+        authorizationUrl: data['authorizationUrl']?.toString() ?? '',
       );
     } on DioException catch (e) {
-      throw ApiException(e.message ?? 'Failed to place order.');
-    }
-  }
-
-  @override
-  Future<String> initializePaystackCheckout({
-    required String transactionId,
-    required String email,
-    required double amount,
-  }) async {
-    try {
-      final response = await _dio.post(
-        ApiEndpoints.paystackInitialize,
-        data: {
-          'transactionId': transactionId,
-          'email': email,
-          'amount': amount,
-        },
-      );
-
-      final data = response.data['data'] ?? response.data;
-      final url = data['authorizationUrl']?.toString() ?? data['authorization_url']?.toString();
-      if (url == null || url.isEmpty) {
-        throw const ApiException('Paystack authorization URL missing.');
-      }
-      return url;
-    } on DioException catch (e) {
-      throw ApiException(e.message ?? 'Paystack initialization failed.');
+      final serverMessage = e.response?.data?['error']?['message']?.toString();
+      throw ApiException(serverMessage ?? e.message ?? 'Failed to complete purchase.');
     }
   }
 
@@ -101,25 +81,17 @@ class HttpOrdersRepository implements OrdersRepository {
   Future<List<OrderItemModel>> fetchUserOrders() async {
     try {
       final response = await _dio.get(ApiEndpoints.transactions);
-      final rawList = response.data['data'] as List? ?? [];
-      
+      final rawList = response.data['data']?['transactions'] as List? ?? [];
+
       return rawList.map((item) => OrderItemModel(
         id: item['id']?.toString() ?? '',
-        listingName: item['listing']?['cropName']?.toString() ?? 'Produce Order',
-        amount: double.tryParse(item['totalAmount']?.toString() ?? '') ?? 0.0,
-        status: item['status']?.toString() ?? 'ESCROW_HELD',
+        listingName: item['cropType']?.toString() ?? 'Produce Order',
+        amount: double.tryParse(item['amountGhs']?.toString() ?? '') ?? 0.0,
+        status: item['status']?.toString() ?? 'PAYMENT_HELD',
         createdAt: DateTime.tryParse(item['createdAt']?.toString() ?? '') ?? DateTime.now(),
       )).toList();
-    } catch (_) {
-      return [
-        OrderItemModel(
-          id: 'ord-101',
-          listingName: 'Organic Roma Tomatoes (50kg)',
-          amount: 900.0,
-          status: 'ESCROW_HELD',
-          createdAt: DateTime.now().subtract(const Duration(hours: 2)),
-        ),
-      ];
+    } on DioException {
+      return const [];
     }
   }
 }

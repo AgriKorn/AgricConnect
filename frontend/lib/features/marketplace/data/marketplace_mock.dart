@@ -28,6 +28,8 @@ class MarketplaceListing {
     required this.pricePerUnit,
     required this.unit,
     required this.farmerName,
+    this.farmerId,
+    this.quantityAvailable,
   });
 
   final String id;
@@ -37,6 +39,8 @@ class MarketplaceListing {
   final double pricePerUnit;
   final String unit;
   final String farmerName;
+  final String? farmerId;
+  final double? quantityAvailable;
 }
 
 const mockMarketplaceListings = [

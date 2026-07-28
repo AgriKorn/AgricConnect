@@ -25,9 +25,10 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
   @override
   Future<List<MarketplaceListing>> fetchListings() async {
     try {
-      final response = await _dio.get(ApiEndpoints.listings);
-      final rawList = response.data['data'] as List? ?? [];
-      
+      final response = await _dio.get(ApiEndpoints.marketplace);
+      final data = response.data['data'];
+      final rawList = data?['listings'] as List? ?? [];
+
       if (rawList.isEmpty) {
         return mockMarketplaceListings;
       }
@@ -78,16 +79,18 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
   }
 
   MarketplaceListing _parseListing(dynamic json) {
-    final categoryStr = json['category']?.toString().toUpperCase() ?? 'VEGETABLES';
-    
+    final cropType = json['cropType']?.toString() ?? 'crop';
+
     return MarketplaceListing(
       id: json['id']?.toString() ?? 'id-${json.hashCode}',
-      name: json['cropName']?.toString() ?? json['name']?.toString() ?? 'Fresh Crop',
-      category: _stringToCategory(categoryStr),
-      freshnessScore: int.tryParse(json['freshnessScore']?.toString() ?? '') ?? 90,
-      pricePerUnit: double.tryParse(json['pricePerUnit']?.toString() ?? json['price']?.toString() ?? '') ?? 15.0,
-      unit: json['unit']?.toString() ?? 'kg',
-      farmerName: json['farmer']?['name']?.toString() ?? json['farmerName']?.toString() ?? 'Local Farmer',
+      name: cropType[0].toUpperCase() + cropType.substring(1),
+      category: _stringToCategory(cropType.toUpperCase()),
+      freshnessScore: double.tryParse(json['freshnessScore']?.toString() ?? '')?.round() ?? 90,
+      pricePerUnit: double.tryParse(json['pricePerKg']?.toString() ?? '') ?? 15.0,
+      unit: 'kg',
+      farmerName: json['farmerName']?.toString() ?? 'Local Farmer',
+      farmerId: json['farmerId']?.toString(),
+      quantityAvailable: double.tryParse(json['quantityKg']?.toString() ?? ''),
     );
   }
 

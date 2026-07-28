@@ -309,7 +309,7 @@ class _ListingTile extends StatelessWidget {
       child: Material(
         color: colorScheme.surface.withValues(alpha: 0.6),
         child: InkWell(
-          onTap: () {},
+          onTap: () => context.push('/buyer/marketplace/listing', extra: listing),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

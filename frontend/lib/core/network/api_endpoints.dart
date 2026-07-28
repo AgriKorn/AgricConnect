@@ -15,15 +15,15 @@ class ApiEndpoints {
   static const String userProfile = '/users/profile';
   static const String userDeviceToken = '/users/device-token';
 
-  // Produce Listings
+  // Produce Listings (farmer-only create/list)
   static const String listings = '/listings';
+
+  // Marketplace (public browse/detail — what buyers see)
+  static const String marketplace = '/marketplace';
 
   // Transactions & Escrow
   static const String transactions = '/transactions';
-
-  // Payments
-  static const String paystackInitialize = '/payments/paystack/initialize';
-  static const String paystackWebhook = '/payments/paystack/webhook';
+  static const String transactionPurchase = '/transactions/purchase';
 
   // Storage
   static const String s3PresignedUrl = '/s3/presigned-url';
