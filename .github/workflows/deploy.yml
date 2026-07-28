@@ -61,16 +61,15 @@ jobs:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: agriconnect-backend
           IMAGE_TAG: ${{ github.sha }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL || 'postgresql://postgres.elqvrqydxpykxurmziky:AgriConnect%409@aws-0-eu-west-1.pooler.supabase.com:6543/postgres?pgbouncer=true' }}
-          DIRECT_URL: ${{ secrets.DIRECT_URL || 'postgresql://postgres.elqvrqydxpykxurmziky:AgriConnect%409@aws-0-eu-west-1.pooler.supabase.com:5432/postgres' }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET || 'dev-jwt-secret-change-in-production' }}
-          PAYSTACK_SECRET_KEY: ${{ secrets.PAYSTACK_SECRET_KEY || '' }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://elqvrqydxpykxurmziky.supabase.co' }}
-          AWS_S3_BUCKET_PUBLIC: ${{ secrets.AWS_S3_BUCKET_PUBLIC || 'agriconnect-public-assets' }}
-          AWS_S3_BUCKET_PRIVATE: ${{ secrets.AWS_S3_BUCKET_PRIVATE || 'agriconnect-private-docs' }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          PAYSTACK_SECRET_KEY: ${{ secrets.PAYSTACK_SECRET_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          AWS_S3_BUCKET_PUBLIC: ${{ secrets.AWS_S3_BUCKET_PUBLIC }}
+          AWS_S3_BUCKET_PRIVATE: ${{ secrets.AWS_S3_BUCKET_PRIVATE }}
         run: |
           aws lightsail create-container-service-deployment \
             --service-name container-service-1 \
-            --containers "{\"backend\":{\"image\":\"$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\",\"environment\":{\"NODE_ENV\":\"production\",\"PORT\":\"3000\",\"DATABASE_URL\":\"$DATABASE_URL\",\"DIRECT_URL\":\"$DIRECT_URL\",\"JWT_SECRET\":\"$JWT_SECRET\",\"PAYSTACK_SECRET_KEY\":\"$PAYSTACK_SECRET_KEY\",\"SUPABASE_URL\":\"$SUPABASE_URL\",\"AWS_S3_BUCKET_PUBLIC\":\"$AWS_S3_BUCKET_PUBLIC\",\"AWS_S3_BUCKET_PRIVATE\":\"$AWS_S3_BUCKET_PRIVATE\"},\"ports\":{\"3000\":\"HTTP\"}}}" \
+            --containers "{\"backend\":{\"image\":\"$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\",\"environment\":{\"NODE_ENV\":\"production\",\"PORT\":\"3000\",\"DATABASE_URL\":\"$DATABASE_URL\",\"JWT_SECRET\":\"$JWT_SECRET\",\"PAYSTACK_SECRET_KEY\":\"$PAYSTACK_SECRET_KEY\",\"SUPABASE_URL\":\"$SUPABASE_URL\",\"AWS_S3_BUCKET_PUBLIC\":\"$AWS_S3_BUCKET_PUBLIC\",\"AWS_S3_BUCKET_PRIVATE\":\"$AWS_S3_BUCKET_PRIVATE\"},\"ports\":{\"3000\":\"HTTP\"}}}" \
             --public-endpoint "{\"containerName\":\"backend\",\"containerPort\":3000,\"healthCheck\":{\"path\":\"/api/health\"}}"
 
