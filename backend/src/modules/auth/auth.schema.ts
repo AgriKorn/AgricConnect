@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+/** Preprocesses Ghana phone numbers (05X... or 233... to +233...) and role strings (FARMER to farmer) */
+
 const normalizePhone = (val: unknown): unknown => {
   if (typeof val !== 'string') return val;
   let p = val.trim().replace(/\s+/g, '');
