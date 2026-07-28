@@ -30,10 +30,10 @@ Map<String, dynamic> _$$AuthResponseModelImplToJson(
 };
 
 const _$UserRoleEnumMap = {
-  UserRole.farmer: 'FARMER',
-  UserRole.buyer: 'BUYER',
-  UserRole.driver: 'DRIVER',
-  UserRole.admin: 'ADMIN',
+  UserRole.farmer: 'farmer',
+  UserRole.buyer: 'buyer',
+  UserRole.driver: 'driver',
+  UserRole.admin: 'admin',
 };
 
 const _$AccountStatusEnumMap = {
