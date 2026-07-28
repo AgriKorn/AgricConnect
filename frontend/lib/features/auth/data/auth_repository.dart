@@ -23,6 +23,8 @@ abstract class AuthRepository {
   Future<RegisterResult> register(RegisterRequest request);
   Future<AuthResponseModel> login({required String phone, required String password});
   Future<UserModel> debugApprove(String phone);
+  Future<String> forgotPassword(String phone);
+  Future<void> resetPassword({required String token, required String newPassword});
 }
 
 /// Real HTTP implementation connecting to live AWS backend API
@@ -113,6 +115,32 @@ class HttpAuthRepository implements AuthRepository {
         name: 'Approved User',
         status: AccountStatus.verified,
       );
+    }
+  }
+
+  @override
+  Future<String> forgotPassword(String phone) async {
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.authForgotPassword,
+        data: {'phone': _formatGhanaPhone(phone)},
+      );
+      final data = response.data['data'] ?? response.data;
+      return data['message']?.toString() ?? 'If an account with that phone number exists, reset instructions have been sent.';
+    } on DioException catch (e) {
+      throw ApiException(_extractErrorMessage(e));
+    }
+  }
+
+  @override
+  Future<void> resetPassword({required String token, required String newPassword}) async {
+    try {
+      await _dio.post(
+        ApiEndpoints.authResetPassword,
+        data: {'token': token, 'newPassword': newPassword},
+      );
+    } on DioException catch (e) {
+      throw ApiException(_extractErrorMessage(e));
     }
   }
 
@@ -279,6 +307,17 @@ class MockAuthRepository implements AuthRepository {
     final approved = user.copyWith(status: AccountStatus.verified);
     _usersByPhone[phone] = approved;
     return approved;
+  }
+
+  @override
+  Future<String> forgotPassword(String phone) async {
+    await _simulateLatency();
+    return 'If an account with that phone number exists, reset instructions have been sent.';
+  }
+
+  @override
+  Future<void> resetPassword({required String token, required String newPassword}) async {
+    await _simulateLatency();
   }
 
   AuthResponseModel _tokensFor(UserModel user) {

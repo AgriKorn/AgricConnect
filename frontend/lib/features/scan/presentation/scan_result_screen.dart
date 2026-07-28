@@ -24,7 +24,7 @@ class ScanResultScreen extends ConsumerWidget {
 
     if (result == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('AI Analysis')),
+        appBar: AppBar(title: const Text('AI Analysis (Preview)')),
         body: SafeArea(
           child: Center(
             child: Padding(
@@ -147,10 +147,20 @@ class _ResultAppBar extends StatelessWidget {
             onPressed: () => context.canPop() ? context.pop() : context.go('/farmer/home'),
           ),
           Expanded(
-            child: Text(
-              'AI Analysis',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: colorScheme.onSurface, fontSize: 19, fontWeight: FontWeight.w800),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'AI Analysis',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: colorScheme.onSurface, fontSize: 19, fontWeight: FontWeight.w800),
+                ),
+                Text(
+                  'Preview — sample result, not a real scan',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600),
+                ),
+              ],
             ),
           ),
           _CircleIconButton(

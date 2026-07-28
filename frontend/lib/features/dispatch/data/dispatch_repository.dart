@@ -8,27 +8,38 @@ import '../../../core/network/dio_client.dart';
 class DispatchJobModel {
   const DispatchJobModel({
     required this.id,
-    required this.pickupAddress,
-    required this.deliveryAddress,
-    required this.cropName,
+    required this.transactionId,
+    required this.cropType,
     required this.quantityKg,
-    required this.earningsGhs,
     required this.status,
+    required this.createdAt,
   });
 
   final String id;
-  final String pickupAddress;
-  final String deliveryAddress;
-  final String cropName;
+  final String transactionId;
+  final String cropType;
   final double quantityKg;
-  final double earningsGhs;
   final String status;
+  final DateTime createdAt;
+
+  factory DispatchJobModel.fromJson(Map<String, dynamic> json) {
+    return DispatchJobModel(
+      id: json['id']?.toString() ?? '',
+      transactionId: json['transactionId']?.toString() ?? '',
+      cropType: json['cropType']?.toString() ?? 'Produce',
+      quantityKg: double.tryParse(json['quantityKg']?.toString() ?? '') ?? 0.0,
+      status: json['status']?.toString() ?? 'PENDING',
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now(),
+    );
+  }
 }
 
 abstract class DispatchRepository {
-  Future<List<DispatchJobModel>> fetchAvailableJobs();
-  Future<bool> acceptJob(String jobId);
-  Future<bool> updateJobStatus(String jobId, String status);
+  Future<List<DispatchJobModel>> fetchJobs({String? status});
+  Future<void> acceptJob(String jobId);
+  Future<void> declineJob(String jobId);
+  Future<bool> fetchIsAvailable();
+  Future<void> setAvailability(bool isAvailable);
 }
 
 class HttpDispatchRepository implements DispatchRepository {
@@ -37,55 +48,56 @@ class HttpDispatchRepository implements DispatchRepository {
   final Dio _dio;
 
   @override
-  Future<List<DispatchJobModel>> fetchAvailableJobs() async {
+  Future<List<DispatchJobModel>> fetchJobs({String? status}) async {
     try {
-      final response = await _dio.get('/dispatch/available');
-      final rawList = response.data['data'] as List? ?? [];
-
-      return rawList.map((item) => DispatchJobModel(
-        id: item['id']?.toString() ?? '',
-        pickupAddress: item['pickupAddress']?.toString() ?? 'Kumasi Central Market',
-        deliveryAddress: item['deliveryAddress']?.toString() ?? 'Accra Wholesale Hub',
-        cropName: item['cropName']?.toString() ?? 'Tomatoes (Bulk)',
-        quantityKg: double.tryParse(item['quantityKg']?.toString() ?? '') ?? 50.0,
-        earningsGhs: double.tryParse(item['earningsGhs']?.toString() ?? '') ?? 250.0,
-        status: item['status']?.toString() ?? 'ASSIGNED',
-      )).toList();
-    } catch (_) {
-      return const [
-        DispatchJobModel(
-          id: 'job-501',
-          pickupAddress: 'Techiman Farm Hub, Bono East',
-          deliveryAddress: 'Agbogbloshie Market, Accra',
-          cropName: 'Fresh Yam (100 Tubers)',
-          quantityKg: 200.0,
-          earningsGhs: 450.0,
-          status: 'AVAILABLE',
-        ),
-      ];
-    }
-  }
-
-  @override
-  Future<bool> acceptJob(String jobId) async {
-    try {
-      await _dio.post('/dispatch/$jobId/accept');
-      return true;
-    } on DioException catch (e) {
-      throw ApiException(e.message ?? 'Failed to accept dispatch job.');
-    }
-  }
-
-  @override
-  Future<bool> updateJobStatus(String jobId, String status) async {
-    try {
-      await _dio.post(
-        '/dispatch/$jobId/status',
-        data: {'status': status},
+      final response = await _dio.get(
+        ApiEndpoints.dispatchJobs,
+        queryParameters: status == null ? null : {'status': status},
       );
-      return true;
+      final rawList = response.data['data']?['jobs'] as List? ?? [];
+      return rawList.map((item) => DispatchJobModel.fromJson(item as Map<String, dynamic>)).toList();
+    } on DioException {
+      return const [];
+    }
+  }
+
+  @override
+  Future<void> acceptJob(String jobId) async {
+    try {
+      await _dio.patch('/dispatch/$jobId/accept');
     } on DioException catch (e) {
-      throw ApiException(e.message ?? 'Failed to update job status.');
+      final serverMessage = e.response?.data?['error']?['message']?.toString();
+      throw ApiException(serverMessage ?? e.message ?? 'Failed to accept job.');
+    }
+  }
+
+  @override
+  Future<void> declineJob(String jobId) async {
+    try {
+      await _dio.patch('/dispatch/$jobId/decline');
+    } on DioException catch (e) {
+      final serverMessage = e.response?.data?['error']?['message']?.toString();
+      throw ApiException(serverMessage ?? e.message ?? 'Failed to decline job.');
+    }
+  }
+
+  @override
+  Future<bool> fetchIsAvailable() async {
+    try {
+      final response = await _dio.get(ApiEndpoints.userProfile);
+      final data = response.data['data'] ?? response.data;
+      return data['profile']?['isAvailable'] as bool? ?? true;
+    } on DioException {
+      return true;
+    }
+  }
+
+  @override
+  Future<void> setAvailability(bool isAvailable) async {
+    try {
+      await _dio.patch(ApiEndpoints.userProfile, data: {'isAvailable': isAvailable});
+    } on DioException catch (e) {
+      throw ApiException(e.message ?? 'Failed to update availability.');
     }
   }
 }

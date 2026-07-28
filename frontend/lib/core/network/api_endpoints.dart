@@ -9,11 +9,15 @@ class ApiEndpoints {
   static const String authLogin = '/auth/login';
   static const String authVerifyOtp = '/auth/verify-otp';
   static const String authForgotPassword = '/auth/forgot-password';
+  static const String authResetPassword = '/auth/reset-password';
   static const String authRefresh = '/auth/refresh';
 
   // User & Profile Endpoints
   static const String userProfile = '/users/profile';
   static const String userDeviceToken = '/users/device-token';
+
+  // Dispatch (driver job offers)
+  static const String dispatchJobs = '/dispatch/jobs';
 
   // Produce Listings (farmer-only create/list)
   static const String listings = '/listings';

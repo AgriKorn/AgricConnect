@@ -16,9 +16,9 @@ class ScanCaptureScreen extends ConsumerWidget {
   Future<void> _capture(BuildContext context, WidgetRef ref) async {
     final confirmed = await showAgriDialog(
       context,
-      title: 'Allow camera access?',
+      title: 'Preview feature',
       message:
-          'AgriConnect uses the camera to inspect produce. The analysis runs on-device and works offline, so no image leaves the phone.',
+          'Freshness Scan is a preview — it shows sample results so you can see how the feature will work. It does not analyze a real photo yet.',
       confirmLabel: 'Continue',
       cancelLabel: 'Not now',
     );
@@ -45,13 +45,20 @@ class ScanCaptureScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            Text(
-              'Scan produce offline',
-              style: Theme.of(context).textTheme.headlineMedium,
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Scan produce',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                ),
+                const StatusChip(label: 'Preview', tone: AgriStatusTone.warning),
+              ],
             ),
             const SizedBox(height: 8),
             Text(
-              'Capture a clean image and let the on-device model score freshness without network access.',
+              'This feature is in preview and shows sample results — it does not yet analyze a real photo.',
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: 20),
@@ -99,7 +106,7 @@ class ScanCaptureScreen extends ConsumerWidget {
                       child: Row(
                         children: [
                           const StatusChip(
-                            label: 'Offline scan',
+                            label: 'Preview',
                             tone: AgriStatusTone.neutral,
                           ),
                           const Spacer(),
@@ -128,7 +135,7 @@ class ScanCaptureScreen extends ConsumerWidget {
                               ),
                               const SizedBox(height: 14),
                               Text(
-                                'Analyzing image on device...',
+                                'Generating sample result...',
                                 style: Theme.of(context).textTheme.titleMedium,
                               ),
                             ],
