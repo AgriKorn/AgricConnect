@@ -12,7 +12,7 @@ import {
   UnauthorizedError,
 } from '../../utils/errors';
 import { IUserRepository } from '../user/user.repository';
-import { userRepository } from '../user/user.repository.memory';
+import { userRepository } from '../user/user.repository.prisma';
 import { supabase } from '../../config/supabase';
 import { SafeUser, toSafeUser, UserStatus } from '../user/user.types';
 import { ForgotPasswordInput, GoogleAuthInput, LoginInput, RegisterInput, ResetPasswordInput } from './auth.schema';

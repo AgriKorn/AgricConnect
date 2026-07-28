@@ -1,6 +1,8 @@
 import 'package:json_annotation/json_annotation.dart';
 
-/// Matches the JWT `verificationStatus` claim (claude.md Auth contract, FR-14).
+/// Matches the backend user status values. The backend uses
+/// ACTIVE / PENDING_APPROVAL / REJECTED while the frontend maps them
+/// to verified / pendingVerification / rejected.
 enum AccountStatus {
   @JsonValue('PENDING_VERIFICATION')
   pendingVerification,

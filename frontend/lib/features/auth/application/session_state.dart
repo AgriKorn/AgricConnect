@@ -12,6 +12,7 @@ class SessionState with _$SessionState {
     required AuthStatus status,
     UserModel? user,
     String? errorMessage,
+    String? successMessage,
     @Default(false) bool isSubmitting,
   }) = _SessionState;
 

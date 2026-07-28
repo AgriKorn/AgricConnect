@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { userRepository } from '../modules/user/user.repository.memory';
+import { userRepository } from '../modules/user/user.repository.prisma';
 import { ForbiddenError, UnauthorizedError } from '../utils/errors';
 
 /**

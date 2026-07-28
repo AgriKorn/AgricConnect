@@ -2,7 +2,7 @@
 class ApiEndpoints {
   ApiEndpoints._();
 
-  static const String defaultBaseUrl = 'https://container-service-1.veg2jxqsfcbm.eu-west-1.cs.amazonlightsail.com/api';
+  static const String defaultBaseUrl = 'https://container-service-1.veg2jxqsfecbm.eu-west-1.cs.amazonlightsail.com/api';
 
   // Auth Endpoints
   static const String authRegister = '/auth/register';

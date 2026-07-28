@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import logger from '../../utils/logger';
-import { userRepository } from './user.repository.memory';
+import { userRepository } from './user.repository.prisma';
 
 const DEV_ADMIN_PHONE = '+233200000000';
 const DEV_ADMIN_PASSWORD = 'admin12345';

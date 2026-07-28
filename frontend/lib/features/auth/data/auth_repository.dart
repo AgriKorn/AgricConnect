@@ -10,8 +10,17 @@ import 'models/register_request.dart';
 import 'models/user_model.dart';
 import 'models/user_role.dart';
 
+/// Result from POST /auth/register — the backend returns { userId, message }
+/// (no tokens) because non-buyer accounts need admin approval first.
+class RegisterResult {
+  const RegisterResult({required this.userId, required this.message, required this.isBuyer});
+  final String userId;
+  final String message;
+  final bool isBuyer;
+}
+
 abstract class AuthRepository {
-  Future<AuthResponseModel> register(RegisterRequest request);
+  Future<RegisterResult> register(RegisterRequest request);
   Future<AuthResponseModel> login({required String phone, required String password});
   Future<UserModel> debugApprove(String phone);
 }
@@ -34,13 +43,14 @@ class HttpAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<AuthResponseModel> register(RegisterRequest request) async {
+  Future<RegisterResult> register(RegisterRequest request) async {
     try {
+      final roleStr = _userRoleToString(request.role);
       final payload = {
         'name': request.name.trim(),
         'phone': _formatGhanaPhone(request.phone),
         'password': request.password,
-        'role': _userRoleToString(request.role),
+        'role': roleStr,
         if (request.region != null) 'region': request.region,
         if (request.businessName != null) 'businessName': request.businessName,
         if (request.businessType != null) 'businessType': request.businessType,
@@ -53,7 +63,12 @@ class HttpAuthRepository implements AuthRepository {
         data: payload,
       );
 
-      return _parseAuthResponse(response.data);
+      final data = response.data['data'] ?? response.data;
+      return RegisterResult(
+        userId: data['userId']?.toString() ?? '',
+        message: data['message']?.toString() ?? 'Registration successful.',
+        isBuyer: roleStr == 'buyer',
+      );
     } on DioException catch (e) {
       throw ApiException(_extractErrorMessage(e));
     } catch (e) {
@@ -167,10 +182,13 @@ class HttpAuthRepository implements AuthRepository {
   AccountStatus _stringToAccountStatus(String str) {
     switch (str) {
       case 'VERIFIED':
+      case 'ACTIVE':
         return AccountStatus.verified;
       case 'REJECTED':
         return AccountStatus.rejected;
       case 'PENDING_VERIFICATION':
+      case 'PENDING_APPROVAL':
+      case 'PENDING_OTP':
       default:
         return AccountStatus.pendingVerification;
     }
@@ -206,19 +224,20 @@ class MockAuthRepository implements AuthRepository {
   Future<void> _simulateLatency() => Future.delayed(const Duration(milliseconds: 700));
 
   @override
-  Future<AuthResponseModel> register(RegisterRequest request) async {
+  Future<RegisterResult> register(RegisterRequest request) async {
     await _simulateLatency();
 
     if (_usersByPhone.containsKey(request.phone)) {
       throw const ApiException('An account with this phone number already exists.');
     }
 
+    final isBuyer = request.role == UserRole.buyer;
     final user = UserModel(
       id: 'mock-${_nextId++}',
       role: request.role,
       name: request.name,
       phone: request.phone,
-      status: AccountStatus.pendingVerification,
+      status: isBuyer ? AccountStatus.verified : AccountStatus.pendingVerification,
       region: request.region,
       businessName: request.businessName,
       businessType: request.businessType,
@@ -229,7 +248,13 @@ class MockAuthRepository implements AuthRepository {
     _usersByPhone[request.phone] = user;
     _passwordsByPhone[request.phone] = request.password;
 
-    return _tokensFor(user);
+    return RegisterResult(
+      userId: user.id,
+      message: isBuyer
+          ? 'Registration successful. Welcome to AgriConnect!'
+          : 'Registration successful. Your account is pending admin approval.',
+      isBuyer: isBuyer,
+    );
   }
 
   @override

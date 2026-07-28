@@ -74,9 +74,20 @@ class AuthController extends Notifier<SessionState> {
   Future<void> register(RegisterRequest request) async {
     state = state.copyWith(isSubmitting: true, errorMessage: null);
     try {
-      final response = await ref.read(authRepositoryProvider).register(request);
+      final result = await ref.read(authRepositoryProvider).register(request);
       _phoneForDebugApproval = request.phone;
-      await _applyAuthResponse(response);
+
+      // Registration succeeded. The backend does NOT return tokens on
+      // registration, so we set a success message and direct the user to log
+      // in (buyers) or wait for approval (farmers/drivers).
+      state = SessionState(
+        status: result.isBuyer
+            ? AuthStatus.unauthenticated
+            : AuthStatus.pendingVerification,
+        isSubmitting: false,
+        errorMessage: null,
+        successMessage: result.message,
+      );
     } on ApiException catch (e) {
       state = state.copyWith(isSubmitting: false, errorMessage: e.message);
     }

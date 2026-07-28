@@ -2,7 +2,7 @@ import { NotFoundError } from '../../utils/errors';
 import { IListingRepository, ListingFilters } from '../listing/listing.repository';
 import { listingRepository } from '../listing/listing.repository.memory';
 import { IUserRepository } from '../user/user.repository';
-import { userRepository } from '../user/user.repository.memory';
+import { userRepository } from '../user/user.repository.prisma';
 import { BrowseMarketplaceQuery } from './marketplace.schema';
 
 export class MarketplaceService {

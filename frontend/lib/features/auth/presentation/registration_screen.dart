@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../application/auth_controller.dart';
+import '../application/session_state.dart';
 import '../data/models/register_request.dart';
 import '../data/models/user_role.dart';
 import 'widgets/auth_visuals.dart';
@@ -91,6 +92,32 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text(next.errorMessage!)));
+      }
+      // Registration success: show dialog then navigate to login
+      if (next.successMessage != null &&
+          next.successMessage != previous?.successMessage) {
+        if (next.status == AuthStatus.unauthenticated) {
+          // Buyer: auto-approved, direct to login
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (_) => AlertDialog(
+              title: const Text('Account Created! 🎉'),
+              content: Text(next.successMessage!),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    context.go('/login');
+                  },
+                  child: const Text('Go to Login'),
+                ),
+              ],
+            ),
+          );
+        }
+        // For farmers/drivers (pendingVerification), the router's redirect
+        // guard will automatically navigate to /pending-verification.
       }
     });
 

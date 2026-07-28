@@ -20,6 +20,7 @@ mixin _$SessionState {
   AuthStatus get status => throw _privateConstructorUsedError;
   UserModel? get user => throw _privateConstructorUsedError;
   String? get errorMessage => throw _privateConstructorUsedError;
+  String? get successMessage => throw _privateConstructorUsedError;
   bool get isSubmitting => throw _privateConstructorUsedError;
 
   /// Create a copy of SessionState
@@ -40,6 +41,7 @@ abstract class $SessionStateCopyWith<$Res> {
     AuthStatus status,
     UserModel? user,
     String? errorMessage,
+    String? successMessage,
     bool isSubmitting,
   });
 
@@ -64,6 +66,7 @@ class _$SessionStateCopyWithImpl<$Res, $Val extends SessionState>
     Object? status = null,
     Object? user = freezed,
     Object? errorMessage = freezed,
+    Object? successMessage = freezed,
     Object? isSubmitting = null,
   }) {
     return _then(
@@ -79,6 +82,10 @@ class _$SessionStateCopyWithImpl<$Res, $Val extends SessionState>
             errorMessage: freezed == errorMessage
                 ? _value.errorMessage
                 : errorMessage // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            successMessage: freezed == successMessage
+                ? _value.successMessage
+                : successMessage // ignore: cast_nullable_to_non_nullable
                       as String?,
             isSubmitting: null == isSubmitting
                 ? _value.isSubmitting
@@ -117,6 +124,7 @@ abstract class _$$SessionStateImplCopyWith<$Res>
     AuthStatus status,
     UserModel? user,
     String? errorMessage,
+    String? successMessage,
     bool isSubmitting,
   });
 
@@ -141,6 +149,7 @@ class __$$SessionStateImplCopyWithImpl<$Res>
     Object? status = null,
     Object? user = freezed,
     Object? errorMessage = freezed,
+    Object? successMessage = freezed,
     Object? isSubmitting = null,
   }) {
     return _then(
@@ -156,6 +165,10 @@ class __$$SessionStateImplCopyWithImpl<$Res>
         errorMessage: freezed == errorMessage
             ? _value.errorMessage
             : errorMessage // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        successMessage: freezed == successMessage
+            ? _value.successMessage
+            : successMessage // ignore: cast_nullable_to_non_nullable
                   as String?,
         isSubmitting: null == isSubmitting
             ? _value.isSubmitting
@@ -173,6 +186,7 @@ class _$SessionStateImpl implements _SessionState {
     required this.status,
     this.user,
     this.errorMessage,
+    this.successMessage,
     this.isSubmitting = false,
   });
 
@@ -183,12 +197,14 @@ class _$SessionStateImpl implements _SessionState {
   @override
   final String? errorMessage;
   @override
+  final String? successMessage;
+  @override
   @JsonKey()
   final bool isSubmitting;
 
   @override
   String toString() {
-    return 'SessionState(status: $status, user: $user, errorMessage: $errorMessage, isSubmitting: $isSubmitting)';
+    return 'SessionState(status: $status, user: $user, errorMessage: $errorMessage, successMessage: $successMessage, isSubmitting: $isSubmitting)';
   }
 
   @override
@@ -200,13 +216,15 @@ class _$SessionStateImpl implements _SessionState {
             (identical(other.user, user) || other.user == user) &&
             (identical(other.errorMessage, errorMessage) ||
                 other.errorMessage == errorMessage) &&
+            (identical(other.successMessage, successMessage) ||
+                other.successMessage == successMessage) &&
             (identical(other.isSubmitting, isSubmitting) ||
                 other.isSubmitting == isSubmitting));
   }
 
   @override
   int get hashCode =>
-      Object.hash(runtimeType, status, user, errorMessage, isSubmitting);
+      Object.hash(runtimeType, status, user, errorMessage, successMessage, isSubmitting);
 
   /// Create a copy of SessionState
   /// with the given fields replaced by the non-null parameter values.
@@ -222,6 +240,7 @@ abstract class _SessionState implements SessionState {
     required final AuthStatus status,
     final UserModel? user,
     final String? errorMessage,
+    final String? successMessage,
     final bool isSubmitting,
   }) = _$SessionStateImpl;
 
@@ -231,6 +250,8 @@ abstract class _SessionState implements SessionState {
   UserModel? get user;
   @override
   String? get errorMessage;
+  @override
+  String? get successMessage;
   @override
   bool get isSubmitting;
 
