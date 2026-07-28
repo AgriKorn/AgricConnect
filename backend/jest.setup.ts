@@ -18,3 +18,15 @@ process.env.JWT_REFRESH_SECRET =
 process.env.DATABASE_URL =
   process.env.DATABASE_URL ||
   'postgresql://postgres:postgres@localhost:5432/agriconnect_test';
+
+// DIRECT_URL must be pinned too, and it matters more than DATABASE_URL:
+// config/db.ts resolves its connection as
+//   process.env.DIRECT_URL || process.env.DATABASE_URL || env.DATABASE_URL
+// so DIRECT_URL wins. Leaving it unset let dotenv.config() populate it from the
+// developer's .env when config/env.ts loaded, which pointed the Prisma client in
+// tests at the real development database. Suites are expected to mock Prisma, so
+// this is a backstop: if one ever does reach for a live connection, it must not
+// be able to find the dev data.
+process.env.DIRECT_URL =
+  process.env.DIRECT_URL ||
+  'postgresql://postgres:postgres@localhost:5432/agriconnect_test';
