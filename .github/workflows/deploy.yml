@@ -8,6 +8,8 @@ on:
     branches:
       - main
       - feature/K1-scaffolding
+      - feature/frontend-integration
+  workflow_dispatch:
 
 jobs:
   test-and-deploy:
@@ -53,3 +55,14 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+      - name: Deploy to AWS Lightsail Container Service (container-service-1)
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: agriconnect-backend
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          aws lightsail create-container-service-deployment \
+            --service-name container-service-1 \
+            --containers "{\"backend\":{\"image\":\"$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\",\"environment\":{\"NODE_ENV\":\"production\",\"PORT\":\"3000\"},\"ports\":{\"3000\":\"HTTP\"}}}" \
+            --public-endpoint "{\"containerName\":\"backend\",\"containerPort\":3000,\"healthCheck\":{\"path\":\"/api/health\"}}" || true
