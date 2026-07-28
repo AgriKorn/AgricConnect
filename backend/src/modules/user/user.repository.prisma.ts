@@ -57,6 +57,7 @@ export class PrismaUserRepository implements IUserRepository {
       data: {
         phone_number: data.phone,
         full_name: data.name,
+        password_hash: data.passwordHash,
         role: data.role as user_role,
         region: 'Greater Accra',
         account_status: data.role === 'buyer' ? 'approved' : 'pending',

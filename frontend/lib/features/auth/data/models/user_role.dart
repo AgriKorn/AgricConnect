@@ -5,13 +5,13 @@ import 'package:json_annotation/json_annotation.dart';
 /// Reference / Auth contract). Admin has no self-registration path but is
 /// still a valid role value the client must be able to read from a token.
 enum UserRole {
-  @JsonValue('FARMER')
+  @JsonValue('farmer')
   farmer,
-  @JsonValue('BUYER')
+  @JsonValue('buyer')
   buyer,
-  @JsonValue('DRIVER')
+  @JsonValue('driver')
   driver,
-  @JsonValue('ADMIN')
+  @JsonValue('admin')
   admin,
 }
 

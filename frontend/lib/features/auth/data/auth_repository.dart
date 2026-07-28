@@ -22,12 +22,23 @@ class HttpAuthRepository implements AuthRepository {
 
   final Dio _dio;
 
+  String _formatGhanaPhone(String raw) {
+    final trimmed = raw.trim().replaceAll(RegExp(r'\s+'), '');
+    if (RegExp(r'^0\d{9}$').hasMatch(trimmed)) {
+      return '+233${trimmed.substring(1)}';
+    }
+    if (RegExp(r'^233\d{9}$').hasMatch(trimmed)) {
+      return '+$trimmed';
+    }
+    return trimmed;
+  }
+
   @override
   Future<AuthResponseModel> register(RegisterRequest request) async {
     try {
       final payload = {
-        'name': request.name,
-        'phone': request.phone,
+        'name': request.name.trim(),
+        'phone': _formatGhanaPhone(request.phone),
         'password': request.password,
         'role': _userRoleToString(request.role),
         if (request.region != null) 'region': request.region,
@@ -56,7 +67,7 @@ class HttpAuthRepository implements AuthRepository {
       final response = await _dio.post(
         ApiEndpoints.authLogin,
         data: {
-          'phone': phone,
+          'phone': _formatGhanaPhone(phone),
           'password': password,
         },
       );
@@ -74,7 +85,7 @@ class HttpAuthRepository implements AuthRepository {
     try {
       final response = await _dio.post(
         '/users/approve-dev',
-        data: {'phone': phone},
+        data: {'phone': _formatGhanaPhone(phone)},
       );
       final userData = response.data['data'] ?? response.data;
       return _parseUserModel(userData);
@@ -108,7 +119,7 @@ class HttpAuthRepository implements AuthRepository {
   }
 
   UserModel _parseUserModel(dynamic json) {
-    final roleStr = json['role']?.toString().toUpperCase() ?? 'FARMER';
+    final roleStr = json['role']?.toString().toLowerCase() ?? 'farmer';
     final statusStr = json['status']?.toString().toUpperCase() ?? 'PENDING_VERIFICATION';
 
     return UserModel(
@@ -126,14 +137,14 @@ class HttpAuthRepository implements AuthRepository {
   }
 
   UserRole _stringToUserRole(String str) {
-    switch (str) {
-      case 'BUYER':
+    switch (str.toLowerCase()) {
+      case 'buyer':
         return UserRole.buyer;
-      case 'DRIVER':
+      case 'driver':
         return UserRole.driver;
-      case 'ADMIN':
+      case 'admin':
         return UserRole.admin;
-      case 'FARMER':
+      case 'farmer':
       default:
         return UserRole.farmer;
     }
@@ -142,14 +153,14 @@ class HttpAuthRepository implements AuthRepository {
   String _userRoleToString(UserRole role) {
     switch (role) {
       case UserRole.buyer:
-        return 'BUYER';
+        return 'buyer';
       case UserRole.driver:
-        return 'DRIVER';
+        return 'driver';
       case UserRole.admin:
-        return 'ADMIN';
+        return 'admin';
       case UserRole.farmer:
       default:
-        return 'FARMER';
+        return 'farmer';
     }
   }
 

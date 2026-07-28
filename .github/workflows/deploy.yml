@@ -1,17 +1,17 @@
-name: Backend CD (AWS ECR & App Runner)
+name: Backend CD (AWS ECR & Lightsail Containers)
 
 on:
   push:
     paths:
       - 'backend/**'
-      - '.github/workflows/**'
+      - '.github/workflows/deploy.yml'
     branches:
       - main
       - feature/K1-scaffolding
 
 jobs:
   test-and-deploy:
-    name: Test, Build Docker & Deploy to AWS App Runner
+    name: Test, Build Docker & Deploy to AWS Lightsail
     runs-on: ubuntu-latest
 
     defaults:
