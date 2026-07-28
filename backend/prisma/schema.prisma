@@ -21,6 +21,7 @@ model User {
   momo_number                          String?                 @db.VarChar(20)
   momo_network                         String?                 @db.VarChar(20)
   password_hash                        String?                 @db.VarChar(255)
+  refresh_token                        String?                 @db.Text
   created_at                           DateTime                @default(now()) @db.Timestamptz(6)
   updated_at                           DateTime                @default(now()) @db.Timestamptz(6)
   audit_trail                          AuditTrail[]
