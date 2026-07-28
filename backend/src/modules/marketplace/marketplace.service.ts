@@ -1,6 +1,6 @@
 import { NotFoundError } from '../../utils/errors';
 import { IListingRepository, ListingFilters } from '../listing/listing.repository';
-import { listingRepository } from '../listing/listing.repository.memory';
+import { listingRepository } from '../listing/listing.repository.prisma';
 import { IUserRepository } from '../user/user.repository';
 import { userRepository } from '../user/user.repository.prisma';
 import { BrowseMarketplaceQuery } from './marketplace.schema';
@@ -49,7 +49,7 @@ export class MarketplaceService {
 
   private async withFarmerRegion<T extends { farmerId: string }>(listing: T) {
     const farmer = await this.users.findById(listing.farmerId);
-    return { ...listing, farmerRegion: farmer?.profile.farmRegion ?? null };
+    return { ...listing, farmerName: farmer?.name ?? null, farmerRegion: farmer?.profile.farmRegion ?? null };
   }
 }
 

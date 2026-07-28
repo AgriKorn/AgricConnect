@@ -4,7 +4,7 @@ import { ForbiddenError, NotFoundError } from '../../utils/errors';
 import { auditService } from '../audit/audit.service';
 import { CreateListingInput, UpdateListingInput } from './listing.schema';
 import { IListingRepository } from './listing.repository';
-import { listingRepository } from './listing.repository.memory';
+import { listingRepository } from './listing.repository.prisma';
 import { Listing } from './listing.types';
 
 /**

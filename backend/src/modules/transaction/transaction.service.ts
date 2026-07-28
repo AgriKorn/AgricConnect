@@ -14,6 +14,7 @@ import { outboxService } from '../outbox/outbox.service';
 export interface PurchaseResult {
   transaction: Transaction;
   dispatch: DriverJob | null;
+  authorizationUrl: string;
 }
 
 export class TransactionService {
@@ -28,12 +29,14 @@ export class TransactionService {
     const recent = await this.repo.findRecentOrderByBuyerAndListing(buyerId, listingId, 60);
     if (recent) {
       const activeDispatch = await dispatchService.findActiveForTransaction(recent.id);
-      return { transaction: recent, dispatch: activeDispatch };
+      // Duplicate request within the idempotency window reuses the original order;
+      // the original authorizationUrl was only returned once and isn't persisted.
+      return { transaction: recent, dispatch: activeDispatch, authorizationUrl: '' };
     }
 
     const amountGhs = listing.pricePerKg * listing.quantityKg;
     const buyer = await userRepository.findById(buyerId);
-    const { reference } = await paymentService.initializeTransaction(amountGhs, buyer?.phone ?? 'unknown', { listingId });
+    const { reference, authorizationUrl } = await paymentService.initializeTransaction(amountGhs, buyer?.phone ?? 'unknown', { listingId });
 
     return await prisma.$transaction(
       async (tx) => {
@@ -86,7 +89,7 @@ export class TransactionService {
           });
         }
 
-        return { transaction, dispatch };
+        return { transaction, dispatch, authorizationUrl };
       },
       { timeout: 15000 },
     );
