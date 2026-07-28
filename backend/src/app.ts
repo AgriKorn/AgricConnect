@@ -69,6 +69,21 @@ import docsRouter from './docs/docs.routes';
 app.use('/api/docs', docsRouter);
 
 /**
+ * Service index. Every route lives under /api, so a bare GET / previously hit
+ * Express's default handler and rendered "Cannot GET /" — which reads as a
+ * crashed server to anyone opening localhost:3000 in a browser. Point them at
+ * the docs instead.
+ */
+app.get('/', (_req, res) => {
+  sendSuccess(res, {
+    service: 'AgriConnect API',
+    version: process.env.npm_package_version ?? '1.0.1',
+    docs: '/api/docs',
+    health: '/api/health',
+  });
+});
+
+/**
  * @swagger
  * /health:
  *   get:
@@ -101,6 +116,17 @@ app.use('/api/dispatch', dispatchRoutes);
 app.use('/api/disputes', disputeRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/payments', paymentRoutes);
+
+// --------------- Unmatched Routes ---------------
+// Without this, an unknown path falls through to Express's default handler and
+// returns an HTML error page, which breaks every client that expects the JSON
+// { success, error } envelope. Must sit after all routes, before errorHandler.
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: { code: 'NOT_FOUND', message: `Cannot ${req.method} ${req.path}` },
+  });
+});
 
 // --------------- Global Error Handler (must be last) ---------------
 app.use(errorHandler);
