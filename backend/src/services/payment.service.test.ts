@@ -1,4 +1,5 @@
 import axios from 'axios';
+import crypto from 'crypto';
 import { PaystackPaymentService } from './payment.service';
 
 jest.mock('axios');
@@ -98,7 +99,6 @@ describe('PaystackPaymentService', () => {
     it('should verify valid HMAC SHA-512 webhook signature', () => {
       const secret = 'sk_test_mock_key';
       const body = '{"event":"charge.success"}';
-      const crypto = require('crypto');
       const validSig = crypto.createHmac('sha512', secret).update(body).digest('hex');
 
       const isValid = liveService.verifyWebhookSignature(validSig, body);
