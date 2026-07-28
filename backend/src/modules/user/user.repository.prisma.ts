@@ -57,7 +57,14 @@ export class PrismaUserRepository implements IUserRepository {
       data: {
         phone_number: data.phone,
         full_name: data.name,
+        // Without this the row is created with a null password_hash and the
+        // account can never log in — bcrypt.compare fails against an empty
+        // string, surfacing as "Invalid credentials" for a registration that
+        // reported success.
+        password_hash: data.passwordHash,
         role: data.role as user_role,
+        // Registration does not collect a region and the column is NOT NULL.
+        // Overwritten by the first PATCH /api/users/profile.
         region: 'Greater Accra',
         account_status: 'pending',
       },
@@ -131,6 +138,9 @@ export class PrismaUserRepository implements IUserRepository {
     if (data.name) updateData.full_name = data.name;
     if (data.status) updateData.account_status = statusToPrisma(data.status);
     if (data.refreshToken !== undefined) updateData.refresh_token = data.refreshToken;
+    // AuthService.resetPassword writes the new hash through this method; without
+    // this line the reset reports success and silently changes nothing.
+    if (data.passwordHash !== undefined) updateData.password_hash = data.passwordHash;
 
     await prisma.user.update({
       where: { id },
