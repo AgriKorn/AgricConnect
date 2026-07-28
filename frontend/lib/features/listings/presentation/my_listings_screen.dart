@@ -67,8 +67,8 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final listings = ref
-        .watch(farmerListingsProvider)
+    final listingsAsync = ref.watch(farmerListingsProvider);
+    final listings = (listingsAsync.valueOrNull ?? const [])
         .where((listing) => listing.status == _selectedTab)
         .toList()
       ..sort((a, b) => switch (_sort) {
@@ -123,17 +123,31 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
                   ),
                 ),
                 Expanded(
-                  child: listings.isEmpty
-                      ? EmptyState(
-                          icon: Icons.grass_outlined,
-                          message: 'No ${_selectedTab.toLowerCase()} listings yet.',
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
-                          itemCount: listings.length,
-                          separatorBuilder: (context, index) => const SizedBox(height: 16),
-                          itemBuilder: (context, index) => _ListingRow(listing: listings[index], colorScheme: colorScheme),
-                        ),
+                  child: RefreshIndicator(
+                    onRefresh: () => ref.refresh(farmerListingsProvider.future),
+                    child: listingsAsync.isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : listingsAsync.hasError
+                        ? EmptyState(
+                            icon: Icons.error_outline_rounded,
+                            message: 'Could not load your listings. Pull down to retry.',
+                          )
+                        : listings.isEmpty
+                        ? ListView(
+                            children: [
+                              EmptyState(
+                                icon: Icons.grass_outlined,
+                                message: 'No ${_selectedTab.toLowerCase()} listings yet.',
+                              ),
+                            ],
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
+                            itemCount: listings.length,
+                            separatorBuilder: (context, index) => const SizedBox(height: 16),
+                            itemBuilder: (context, index) => _ListingRow(listing: listings[index], colorScheme: colorScheme),
+                          ),
+                  ),
                 ),
               ],
             ),

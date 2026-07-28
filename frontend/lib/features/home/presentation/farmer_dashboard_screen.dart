@@ -22,7 +22,8 @@ class FarmerDashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final summary = ref.watch(farmerDashboardSummaryProvider);
-    final listings = ref.watch(farmerListingsProvider).where((listing) => listing.status == 'Active').toList();
+    final listingsAsync = ref.watch(farmerListingsProvider);
+    final listings = listingsAsync.valueOrNull?.where((listing) => listing.status == 'Active').toList() ?? const [];
     final alertCount = ref.watch(freshnessAlertsProvider).length;
     final rawName = ref.watch(authControllerProvider).user?.name.trim();
     final firstName = (rawName != null && rawName.isNotEmpty) ? rawName.split(RegExp(r'\s+')).first : 'Farmer';
@@ -66,7 +67,9 @@ class FarmerDashboardScreen extends ConsumerWidget {
                 const SizedBox(height: 12),
                 SizedBox(
                   height: 210,
-                  child: listings.isEmpty
+                  child: listingsAsync.isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : listings.isEmpty
                       ? EmptyState(
                           icon: Icons.grass_outlined,
                           message: 'You have no active listings yet.',

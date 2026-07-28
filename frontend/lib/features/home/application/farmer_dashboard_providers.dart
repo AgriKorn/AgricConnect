@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../marketplace/data/marketplace_repository.dart';
 import '../data/farmer_dashboard_mock.dart';
 
 final farmerDashboardSummaryProvider = Provider<FarmerDashboardSummary>((ref) {
@@ -10,18 +11,37 @@ final farmerProfileDetailsProvider = Provider<FarmerProfileDetails>((ref) {
   return mockFarmerProfileDetails;
 });
 
-/// Mutable so [AddListingScreen] (scan-assisted or manual entry) can append
-/// a real listing that then shows up in My Listings — not just a static mock.
-class FarmerListingsController extends Notifier<List<FarmerListingSummary>> {
+/// Backed by GET/POST /listings — a farmer's real, persisted listings.
+class FarmerListingsController extends AsyncNotifier<List<FarmerListingSummary>> {
   @override
-  List<FarmerListingSummary> build() => List.of(mockFarmerListings);
+  Future<List<FarmerListingSummary>> build() {
+    return ref.read(marketplaceRepositoryProvider).fetchMyListings();
+  }
 
-  void addListing(FarmerListingSummary listing) {
-    state = [listing, ...state];
+  Future<void> addListing({
+    required String cropType,
+    required double quantityKg,
+    required int freshnessScore,
+    required int shelfLifeDays,
+    required double farmerLat,
+    required double farmerLong,
+    required double pricePerKg,
+  }) async {
+    await ref.read(marketplaceRepositoryProvider).createListing(
+          cropType: cropType,
+          quantityKg: quantityKg,
+          freshnessScore: freshnessScore,
+          shelfLifeDays: shelfLifeDays,
+          farmerLat: farmerLat,
+          farmerLong: farmerLong,
+          pricePerKg: pricePerKg,
+        );
+    ref.invalidateSelf();
+    await future;
   }
 }
 
-final farmerListingsProvider = NotifierProvider<FarmerListingsController, List<FarmerListingSummary>>(
+final farmerListingsProvider = AsyncNotifierProvider<FarmerListingsController, List<FarmerListingSummary>>(
   FarmerListingsController.new,
 );
 

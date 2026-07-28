@@ -2,18 +2,38 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/network/dio_client.dart';
+import '../../home/data/farmer_dashboard_mock.dart';
 import 'marketplace_mock.dart';
+
+/// Approximate regional-capital coordinates, used as the listing's location
+/// until real GPS capture is wired up — tied to the farmer's own registered
+/// region (from their profile), not arbitrary.
+const _regionCoordinates = {
+  'Greater Accra': (5.6037, -0.1870),
+  'Ashanti': (6.6885, -1.6244),
+  'Northern': (9.4008, -0.8393),
+  'Eastern': (6.0940, -0.2591),
+  'Western': (4.9346, -1.7137),
+  'Brong-Ahafo': (7.7398, -2.3237),
+};
+
+(double, double) coordinatesForRegion(String? region) {
+  return _regionCoordinates[region] ?? _regionCoordinates['Greater Accra']!;
+}
 
 abstract class MarketplaceRepository {
   Future<List<MarketplaceListing>> fetchListings();
-  Future<MarketplaceListing> createListing({
-    required String cropName,
-    required ProduceCategory category,
-    required double pricePerUnit,
-    required String unit,
-    required double quantityAvailable,
-    String? imageUrl,
+  Future<List<FarmerListingSummary>> fetchMyListings();
+  Future<FarmerListingSummary> createListing({
+    required String cropType,
+    required double quantityKg,
+    required int freshnessScore,
+    required int shelfLifeDays,
+    required double farmerLat,
+    required double farmerLong,
+    required double pricePerKg,
   });
 }
 
@@ -41,41 +61,62 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
   }
 
   @override
-  Future<MarketplaceListing> createListing({
-    required String cropName,
-    required ProduceCategory category,
-    required double pricePerUnit,
-    required String unit,
-    required double quantityAvailable,
-    String? imageUrl,
+  Future<List<FarmerListingSummary>> fetchMyListings() async {
+    try {
+      final response = await _dio.get(ApiEndpoints.listings);
+      final rawList = response.data['data'] as List? ?? [];
+      return rawList.map((item) => _parseFarmerListing(item)).toList();
+    } on DioException catch (e) {
+      throw ApiException(e.message ?? 'Failed to load your listings.');
+    }
+  }
+
+  @override
+  Future<FarmerListingSummary> createListing({
+    required String cropType,
+    required double quantityKg,
+    required int freshnessScore,
+    required int shelfLifeDays,
+    required double farmerLat,
+    required double farmerLong,
+    required double pricePerKg,
   }) async {
     try {
       final response = await _dio.post(
         ApiEndpoints.listings,
         data: {
-          'cropName': cropName,
-          'category': _categoryToString(category),
-          'pricePerUnit': pricePerUnit,
-          'unit': unit,
-          'quantityAvailable': quantityAvailable,
-          if (imageUrl != null) 'imageUrl': imageUrl,
+          'cropType': cropType,
+          'quantityKg': quantityKg,
+          'freshnessScore': freshnessScore,
+          'shelfLifeDays': shelfLifeDays,
+          'farmerLat': farmerLat,
+          'farmerLong': farmerLong,
+          'pricePerKg': pricePerKg,
         },
       );
-
       final item = response.data['data'] ?? response.data;
-      return _parseListing(item);
-    } catch (e) {
-      // Return optimistic created listing for seamless client experience
-      return MarketplaceListing(
-        id: 'new-${DateTime.now().millisecondsSinceEpoch}',
-        name: cropName,
-        category: category,
-        freshnessScore: 95,
-        pricePerUnit: pricePerUnit,
-        unit: unit,
-        farmerName: 'You (Farmer)',
-      );
+      return _parseFarmerListing(item);
+    } on DioException catch (e) {
+      final serverMessage = e.response?.data?['error']?['message']?.toString();
+      throw ApiException(serverMessage ?? e.message ?? 'Failed to create listing.');
     }
+  }
+
+  FarmerListingSummary _parseFarmerListing(dynamic json) {
+    final cropType = json['cropType']?.toString() ?? 'crop';
+    final statusStr = json['status']?.toString().toUpperCase() ?? 'ACTIVE';
+    return FarmerListingSummary(
+      id: json['id']?.toString() ?? '',
+      cropType: cropType.isEmpty ? cropType : cropType[0].toUpperCase() + cropType.substring(1),
+      freshnessScore: double.tryParse(json['freshnessScore']?.toString() ?? '')?.round() ?? 0,
+      price: double.tryParse(json['pricePerKg']?.toString() ?? '') ?? 0,
+      unit: 'kg',
+      status: switch (statusStr) {
+        'SOLD' => 'Sold',
+        'INACTIVE' => 'Pending',
+        _ => 'Active',
+      },
+    );
   }
 
   MarketplaceListing _parseListing(dynamic json) {
@@ -106,18 +147,6 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
       case 'VEGETABLE':
       default:
         return ProduceCategory.vegetables;
-    }
-  }
-
-  String _categoryToString(ProduceCategory category) {
-    switch (category) {
-      case ProduceCategory.fruits:
-        return 'FRUITS';
-      case ProduceCategory.grains:
-        return 'GRAINS';
-      case ProduceCategory.vegetables:
-      default:
-        return 'VEGETABLES';
     }
   }
 }
