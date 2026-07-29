@@ -1,16 +1,21 @@
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import app from '../../app';
-import { userRepository } from './user.repository.memory';
+import { userRepository } from './user.repository.prisma';
+
+jest.setTimeout(20000);
 
 describe('Multi-Device Token Registration & Removal Integration Tests', () => {
   let userId: string;
   let userToken: string;
 
   beforeEach(async () => {
+    // Unique phone per run: this suite hits the real database (no test-DB
+    // isolation in this project), so a fixed phone collides on rerun.
+    const uniquePhone = `+2335${Math.floor(10000000 + Math.random() * 89999999)}`;
     const user = await userRepository.create({
       name: 'Farmer Joe',
-      phone: '+233540000111',
+      phone: uniquePhone,
       passwordHash: 'hashed_pwd',
       role: 'farmer',
       otp: '123456',

@@ -36,3 +36,9 @@ jobs:
 
       - name: Compile TypeScript (Build)
         run: npm run build
+
+      - name: Run Tests
+        run: npm test
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
