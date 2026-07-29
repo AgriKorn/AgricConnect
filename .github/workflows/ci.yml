@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - 'backend/**'
+      # Changes to the workflow itself must run it, otherwise CI configuration
+      # can be broken by a pull request that CI never executes — which is how
+      # the missing `prisma generate` step survived until the first PR.
+      - '.github/workflows/ci.yml'
     branches:
       - dev
       - main
