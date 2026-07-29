@@ -28,7 +28,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Must match the Dockerfile (node:22-alpine) and deploy.yml. The
+          # Supabase client needs native WebSocket, which arrives in Node 22 —
+          # on Node 20 config/supabase.ts throws at import time and every suite
+          # that reaches it fails to run. da8e587 fixed this for the Docker
+          # runtime; ci.yml was left behind, and it went unnoticed because CI
+          # did not run the tests.
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: './backend/package-lock.json'
 
