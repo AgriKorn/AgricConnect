@@ -10,7 +10,7 @@ on:
 
 jobs:
   ci:
-    name: Backend Lint and Build
+    name: Backend Lint, Build and Test
     runs-on: ubuntu-latest
 
     defaults:
@@ -45,3 +45,16 @@ jobs:
 
       - name: Compile TypeScript (Build)
         run: npm run build
+
+      # Runs after the build so a type error is reported by tsc, which explains
+      # it clearly, rather than surfacing as a confusing test failure.
+      #
+      # No database service is needed: every suite mocks ../../config/db with
+      # jest-mock-extended, and jest.setup.ts pins DATABASE_URL and DIRECT_URL
+      # at a throwaway value so a suite that does reach for a live connection
+      # fails loudly here instead of quietly finding a real database.
+      #
+      # npm test runs jest with --runInBand and --coverage; the serial run is
+      # deliberate, since the parallel workers exhausted memory on the runner.
+      - name: Run Tests
+        run: npm test
