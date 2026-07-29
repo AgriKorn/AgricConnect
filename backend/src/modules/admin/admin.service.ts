@@ -1,8 +1,8 @@
 import { BadRequestError, NotFoundError } from '../../utils/errors';
-import { transactionRepository } from '../transaction/transaction.repository.memory';
+import { transactionRepository } from '../transaction/transaction.repository.prisma';
 import { Transaction } from '../transaction/transaction.types';
 import { IUserRepository } from '../user/user.repository';
-import { userRepository } from '../user/user.repository.memory';
+import { userRepository } from '../user/user.repository.prisma';
 import { SafeUser, toSafeUser } from '../user/user.types';
 
 export class AdminService {

@@ -31,6 +31,15 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      # src/generated/prisma is gitignored, so the client does not exist in a
+      # fresh checkout. Without this every import of it fails to resolve and the
+      # build reports "Cannot find module '../../generated/prisma/client'",
+      # followed by a cascade of implicit-any errors on the Prisma callbacks.
+      # deploy.yml already does this; ci.yml did not, and only noticed on the
+      # first pull request to actually run it.
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
       - name: Run Linting
         run: npm run lint
 

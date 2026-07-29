@@ -1,7 +1,7 @@
 import { NotFoundError } from '../../utils/errors';
 import { projectFreshness } from './freshnessDecay';
 import { IMofaPriceRepository } from './pricing.repository';
-import { mofaPriceRepository } from './pricing.repository.memory';
+import { mofaPriceRepository } from './pricing.repository.prisma';
 import { RecommendPriceQuery } from './pricing.schema';
 
 const SOFT_FLOOR_RATIO = 0.6;
