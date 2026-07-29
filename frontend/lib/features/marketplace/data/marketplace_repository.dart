@@ -64,7 +64,7 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
   Future<List<FarmerListingSummary>> fetchMyListings() async {
     try {
       final response = await _dio.get(ApiEndpoints.listings);
-      final rawList = response.data['data'] as List? ?? [];
+      final rawList = response.data['data']?['listings'] as List? ?? [];
       return rawList.map((item) => _parseFarmerListing(item)).toList();
     } on DioException catch (e) {
       throw ApiException(e.message ?? 'Failed to load your listings.');
