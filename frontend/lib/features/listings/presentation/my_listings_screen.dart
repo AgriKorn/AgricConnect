@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -304,6 +307,18 @@ class _ListingRow extends StatelessWidget {
                   '${formatGhs(listing.price)} / ${listing.unit}',
                   style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w700, fontSize: 14),
                 ),
+                if (listing.status == 'Active' && listing.qrCodeData != null) ...[
+                  const SizedBox(height: 10),
+                  TextButton.icon(
+                    onPressed: () => _showQrDialog(context, listing),
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0)),
+                    icon: Icon(Icons.qr_code_2_rounded, size: 16, color: colorScheme.primary),
+                    label: Text(
+                      'Show delivery QR',
+                      style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w700, fontSize: 12.5),
+                    ),
+                  ),
+                ],
                 if (listing.tag != null) ...[
                   const SizedBox(height: 8),
                   Row(
@@ -343,4 +358,34 @@ class _ListingRow extends StatelessWidget {
       ),
     );
   }
+}
+
+void _showQrDialog(BuildContext context, FarmerListingSummary listing) {
+  final data = listing.qrCodeData ?? '';
+  final isImage = data.startsWith('data:image');
+  Uint8List? imageBytes;
+  if (isImage) {
+    final base64Part = data.split(',').last;
+    try {
+      imageBytes = base64Decode(base64Part);
+    } catch (_) {
+      imageBytes = null;
+    }
+  }
+
+  showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Show this at delivery'),
+      content: SizedBox(
+        width: 240,
+        child: imageBytes != null
+            ? Image.memory(imageBytes)
+            : SelectableText(data, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close')),
+      ],
+    ),
+  );
 }

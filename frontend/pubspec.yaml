@@ -55,6 +55,8 @@ dependencies:
   hive_flutter: ^1.1.0
   # Opens the Paystack checkout link in an external browser (buyer checkout)
   url_launcher: ^6.3.1
+  # QR scanning for delivery confirmation (Android/iOS/Web camera support)
+  mobile_scanner: ^6.0.2
 
 dev_dependencies:
   flutter_test:

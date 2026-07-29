@@ -3,7 +3,53 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/network/dio_client.dart';
-import 'notifications_mock.dart';
+
+String _titleForType(String type) {
+  final words = type.split('_').map((w) => w.isEmpty ? w : '${w[0]}${w.substring(1).toLowerCase()}');
+  return words.join(' ');
+}
+
+String _relativeTime(DateTime time) {
+  final diff = DateTime.now().difference(time);
+  if (diff.inMinutes < 1) return 'Just now';
+  if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+  if (diff.inHours < 24) return '${diff.inHours}h ago';
+  return '${diff.inDays}d ago';
+}
+
+class AppNotification {
+  const AppNotification({
+    required this.id,
+    required this.title,
+    required this.message,
+    required this.timeAgo,
+    required this.isRead,
+    this.orderId,
+    this.listingId,
+  });
+
+  final String id;
+  final String title;
+  final String message;
+  final String timeAgo;
+  final bool isRead;
+  final String? orderId;
+  final String? listingId;
+
+  factory AppNotification.fromJson(Map<String, dynamic> json) {
+    final type = json['type']?.toString() ?? 'ALERT';
+    final createdAt = DateTime.tryParse(json['createdAt']?.toString() ?? '');
+    return AppNotification(
+      id: json['id']?.toString() ?? '',
+      title: _titleForType(type),
+      message: json['message']?.toString() ?? '',
+      timeAgo: createdAt == null ? '' : _relativeTime(createdAt),
+      isRead: json['isRead'] == true,
+      orderId: json['orderId']?.toString(),
+      listingId: json['listingId']?.toString(),
+    );
+  }
+}
 
 abstract class NotificationsRepository {
   Future<List<AppNotification>> fetchNotifications();
@@ -20,21 +66,10 @@ class HttpNotificationsRepository implements NotificationsRepository {
   Future<List<AppNotification>> fetchNotifications() async {
     try {
       final response = await _dio.get('/notifications');
-      final rawList = response.data['data'] as List? ?? [];
-
-      if (rawList.isEmpty) {
-        return mockNotifications;
-      }
-
-      return rawList.map((item) => AppNotification(
-        id: item['id']?.toString() ?? '',
-        title: item['title']?.toString() ?? 'AgriConnect Alert',
-        message: item['message']?.toString() ?? '',
-        timeAgo: 'Just now',
-        isRead: item['isRead'] == true,
-      )).toList();
-    } catch (_) {
-      return mockNotifications;
+      final rawList = response.data['data']?['notifications'] as List? ?? [];
+      return rawList.map((item) => AppNotification.fromJson(item as Map<String, dynamic>)).toList();
+    } on DioException {
+      return const [];
     }
   }
 
@@ -44,7 +79,7 @@ class HttpNotificationsRepository implements NotificationsRepository {
       await _dio.post(
         ApiEndpoints.userDeviceToken,
         data: {
-          'token': fcmToken,
+          'fcmToken': fcmToken,
           'platform': platform,
         },
       );
@@ -56,7 +91,7 @@ class HttpNotificationsRepository implements NotificationsRepository {
   @override
   Future<void> markAsRead(String notificationId) async {
     try {
-      await _dio.post('/notifications/$notificationId/read');
+      await _dio.patch('/notifications/$notificationId/read');
     } catch (_) {}
   }
 }

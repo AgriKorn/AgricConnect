@@ -29,6 +29,9 @@ class ApiEndpoints {
   static const String transactions = '/transactions';
   static const String transactionPurchase = '/transactions/purchase';
 
+  // Disputes
+  static const String disputes = '/disputes';
+
   // Storage
   static const String s3PresignedUrl = '/s3/presigned-url';
 

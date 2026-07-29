@@ -116,6 +116,7 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
         'INACTIVE' => 'Pending',
         _ => 'Active',
       },
+      qrCodeData: json['qrCodeData']?.toString(),
     );
   }
 

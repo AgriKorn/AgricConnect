@@ -19,12 +19,41 @@ class RegisterResult {
   final bool isBuyer;
 }
 
+/// GET /users/profile's `profile` sub-object — fields vary by role.
+class ProfileData {
+  const ProfileData({
+    this.farmRegion,
+    this.businessName,
+    this.deliveryAddress,
+    this.truckCapacity,
+    this.operatingRegion,
+  });
+
+  final String? farmRegion;
+  final String? businessName;
+  final String? deliveryAddress;
+  final double? truckCapacity;
+  final String? operatingRegion;
+
+  factory ProfileData.fromJson(Map<String, dynamic> json) {
+    return ProfileData(
+      farmRegion: json['farmRegion']?.toString(),
+      businessName: json['businessName']?.toString(),
+      deliveryAddress: json['deliveryAddress']?.toString(),
+      truckCapacity: double.tryParse(json['truckCapacity']?.toString() ?? ''),
+      operatingRegion: json['operatingRegion']?.toString(),
+    );
+  }
+}
+
 abstract class AuthRepository {
   Future<RegisterResult> register(RegisterRequest request);
   Future<AuthResponseModel> login({required String phone, required String password});
   Future<UserModel> debugApprove(String phone);
   Future<String> forgotPassword(String phone);
   Future<void> resetPassword({required String token, required String newPassword});
+  Future<ProfileData> fetchProfile();
+  Future<void> updateProfile(Map<String, dynamic> fields);
 }
 
 /// Real HTTP implementation connecting to live AWS backend API
@@ -139,6 +168,26 @@ class HttpAuthRepository implements AuthRepository {
         ApiEndpoints.authResetPassword,
         data: {'token': token, 'newPassword': newPassword},
       );
+    } on DioException catch (e) {
+      throw ApiException(_extractErrorMessage(e));
+    }
+  }
+
+  @override
+  Future<ProfileData> fetchProfile() async {
+    try {
+      final response = await _dio.get(ApiEndpoints.userProfile);
+      final data = response.data['data'] ?? response.data;
+      return ProfileData.fromJson((data['profile'] as Map?)?.cast<String, dynamic>() ?? {});
+    } on DioException catch (e) {
+      throw ApiException(_extractErrorMessage(e));
+    }
+  }
+
+  @override
+  Future<void> updateProfile(Map<String, dynamic> fields) async {
+    try {
+      await _dio.patch(ApiEndpoints.userProfile, data: fields);
     } on DioException catch (e) {
       throw ApiException(_extractErrorMessage(e));
     }
@@ -317,6 +366,17 @@ class MockAuthRepository implements AuthRepository {
 
   @override
   Future<void> resetPassword({required String token, required String newPassword}) async {
+    await _simulateLatency();
+  }
+
+  @override
+  Future<ProfileData> fetchProfile() async {
+    await _simulateLatency();
+    return const ProfileData();
+  }
+
+  @override
+  Future<void> updateProfile(Map<String, dynamic> fields) async {
     await _simulateLatency();
   }
 

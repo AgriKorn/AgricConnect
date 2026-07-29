@@ -66,6 +66,7 @@ class FarmerListingSummary {
     required this.unit,
     required this.status,
     this.tag,
+    this.qrCodeData,
   });
 
   final String id;
@@ -75,6 +76,7 @@ class FarmerListingSummary {
   final String unit;
   final String status; // Active | Pending | Sold
   final String? tag; // Premium | Verified
+  final String? qrCodeData; // data:image/png;base64,... shown to buyers/drivers at delivery
 }
 
 class FreshnessAlertItem {

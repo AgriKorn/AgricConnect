@@ -42,6 +42,14 @@ abstract class OrdersRepository {
   });
 
   Future<List<OrderItemModel>> fetchUserOrders();
+
+  Future<void> confirmDelivery({required String transactionId, required String qrHash});
+
+  Future<void> raiseDispute({
+    required String transactionId,
+    required String type,
+    required String description,
+  });
 }
 
 class HttpOrdersRepository implements OrdersRepository {
@@ -92,6 +100,34 @@ class HttpOrdersRepository implements OrdersRepository {
       )).toList();
     } on DioException {
       return const [];
+    }
+  }
+
+  @override
+  Future<void> confirmDelivery({required String transactionId, required String qrHash}) async {
+    try {
+      await _dio.post('${ApiEndpoints.transactions}/$transactionId/confirm-delivery', data: {'qrHash': qrHash});
+    } on DioException catch (e) {
+      final serverMessage = e.response?.data?['error']?['message']?.toString();
+      throw ApiException(serverMessage ?? e.message ?? 'Failed to confirm delivery.');
+    }
+  }
+
+  @override
+  Future<void> raiseDispute({
+    required String transactionId,
+    required String type,
+    required String description,
+  }) async {
+    try {
+      await _dio.post(ApiEndpoints.disputes, data: {
+        'transactionId': transactionId,
+        'type': type,
+        'description': description,
+      });
+    } on DioException catch (e) {
+      final serverMessage = e.response?.data?['error']?['message']?.toString();
+      throw ApiException(serverMessage ?? e.message ?? 'Failed to submit dispute.');
     }
   }
 }
