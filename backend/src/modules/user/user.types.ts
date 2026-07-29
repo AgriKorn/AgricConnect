@@ -5,6 +5,10 @@ export interface FarmerProfile {
   farmRegion?: string;
   gpsLatitude?: number;
   gpsLongitude?: number;
+  /** Mobile Money payout number — must be set before a farmer can create listings. */
+  momoNumber?: string;
+  /** Paystack Ghana mobile-money bank code: 'MTN' | 'VOD' | 'ATL'. */
+  momoNetwork?: string;
 }
 
 export interface BuyerProfile {
@@ -22,6 +26,7 @@ export interface User {
   id: string;
   name: string;
   phone: string;
+  email: string | null;
   passwordHash: string;
   role: UserRole;
   status: UserStatus;

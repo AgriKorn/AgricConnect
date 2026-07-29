@@ -10,6 +10,7 @@ import '../data/models/account_status.dart';
 import '../data/models/auth_response_model.dart';
 import '../data/models/register_request.dart';
 import '../data/models/user_model.dart';
+import '../data/models/user_role.dart';
 import 'session_state.dart';
 
 const _sessionSnapshotKey = 'auth_session_snapshot';
@@ -100,6 +101,17 @@ class AuthController extends Notifier<SessionState> {
           .read(authRepositoryProvider)
           .login(phone: phone, password: password);
       _phoneForDebugApproval = phone;
+      await _applyAuthResponse(response);
+    } on ApiException catch (e) {
+      state = state.copyWith(isSubmitting: false, errorMessage: e.message);
+    }
+  }
+
+  Future<void> loginWithGoogle({UserRole? role}) async {
+    state = state.copyWith(isSubmitting: true, errorMessage: null);
+    try {
+      final response = await ref.read(authRepositoryProvider).loginWithGoogle(role: role);
+      _phoneForDebugApproval = response.user.phone;
       await _applyAuthResponse(response);
     } on ApiException catch (e) {
       state = state.copyWith(isSubmitting: false, errorMessage: e.message);

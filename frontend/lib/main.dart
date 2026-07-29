@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/config/supabase_config.dart';
 import 'core/router/app_router.dart';
 import 'core/storage/local_prefs.dart';
 import 'core/theme/app_theme.dart';
@@ -16,6 +18,9 @@ void main() async {
   GoogleFonts.config.allowRuntimeFetching = true;
   await Hive.initFlutter();
   final localPrefs = await LocalPrefs.open();
+  // Only used to broker native Google Sign-In (see core/config/supabase_config.dart)
+  // — AgriConnect's own JWTs are still the source of truth for every API call.
+  await Supabase.initialize(url: SupabaseConfig.url, anonKey: SupabaseConfig.anonKey);
 
   runApp(ProviderScope(
     overrides: [localPrefsProvider.overrideWithValue(localPrefs)],

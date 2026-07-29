@@ -20,7 +20,7 @@ describe('PaystackPaymentService', () => {
     });
 
     it('should initiate transfer returning stub transferCode and success status', async () => {
-      const result = await paymentService.initiateTransfer('+233541234567', 150, 'Escrow Payout');
+      const result = await paymentService.initiateTransfer('+233541234567', 150, 'Escrow Payout', 'MTN');
       expect(result.transferCode).toContain('stub_transfer_');
       expect(result.status).toBe('success');
     });
@@ -75,9 +75,14 @@ describe('PaystackPaymentService', () => {
         .mockResolvedValueOnce({ data: { data: { recipient_code: 'RCP_123' } } } as any)
         .mockResolvedValueOnce({ data: { data: { transfer_code: 'TRF_456', status: 'success' } } } as any);
 
-      const res = await liveService.initiateTransfer('+233541234567', 100, 'Escrow payout');
+      const res = await liveService.initiateTransfer('+233541234567', 100, 'Escrow payout', 'VOD');
       expect(res.transferCode).toBe('TRF_456');
       expect(res.status).toBe('success');
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        'https://api.paystack.co/transferrecipient',
+        expect.objectContaining({ bank_code: 'VOD' }),
+        expect.any(Object),
+      );
     });
 
     it('should resolve MoMo account via Paystack REST API', async () => {

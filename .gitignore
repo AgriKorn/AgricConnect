@@ -44,6 +44,7 @@ app.*.map.json
 frontend/android/app/debug
 frontend/android/app/profile
 frontend/android/app/release
+AgriConnect-Android-Release/
 
 # Node modules
 node_modules/

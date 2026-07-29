@@ -10,6 +10,7 @@ datasource db {
 model User {
   id                                   String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   phone_number                         String                  @unique @db.VarChar(20)
+  email                                String?                 @unique @db.VarChar(255)
   full_name                            String                  @db.VarChar(150)
   role                                 user_role
   region                               String                  @db.VarChar(100)
@@ -189,6 +190,7 @@ model payments {
   status             payment_status @default(held)
   provider           String         @default("paystack") @db.VarChar(50)
   provider_reference String?        @db.VarChar(150)
+  payout_reference   String?        @db.VarChar(150)
   held_at            DateTime       @default(now()) @db.Timestamptz(6)
   released_at        DateTime?      @db.Timestamptz(6)
   refunded_at        DateTime?      @db.Timestamptz(6)

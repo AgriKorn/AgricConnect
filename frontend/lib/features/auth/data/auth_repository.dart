@@ -1,6 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide Provider, AuthResponse;
 
+import '../../../core/config/supabase_config.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/dio_client.dart';
@@ -27,6 +30,8 @@ class ProfileData {
     this.deliveryAddress,
     this.truckCapacity,
     this.operatingRegion,
+    this.momoNumber,
+    this.momoNetwork,
   });
 
   final String? farmRegion;
@@ -34,6 +39,8 @@ class ProfileData {
   final String? deliveryAddress;
   final double? truckCapacity;
   final String? operatingRegion;
+  final String? momoNumber;
+  final String? momoNetwork;
 
   factory ProfileData.fromJson(Map<String, dynamic> json) {
     return ProfileData(
@@ -42,6 +49,8 @@ class ProfileData {
       deliveryAddress: json['deliveryAddress']?.toString(),
       truckCapacity: double.tryParse(json['truckCapacity']?.toString() ?? ''),
       operatingRegion: json['operatingRegion']?.toString(),
+      momoNumber: json['momoNumber']?.toString(),
+      momoNetwork: json['momoNetwork']?.toString(),
     );
   }
 }
@@ -49,11 +58,15 @@ class ProfileData {
 abstract class AuthRepository {
   Future<RegisterResult> register(RegisterRequest request);
   Future<AuthResponseModel> login({required String phone, required String password});
+  /// [role] is only sent for a brand-new sign-up (defaults to buyer on the
+  /// backend if omitted); existing accounts are matched by email regardless.
+  Future<AuthResponseModel> loginWithGoogle({UserRole? role});
   Future<UserModel> debugApprove(String phone);
   Future<String> forgotPassword(String phone);
   Future<void> resetPassword({required String token, required String newPassword});
   Future<ProfileData> fetchProfile();
   Future<void> updateProfile(Map<String, dynamic> fields);
+  Future<String> resolveMomoAccount({required String accountNumber, required String bankCode});
 }
 
 /// Real HTTP implementation connecting to live AWS backend API
@@ -127,6 +140,47 @@ class HttpAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AuthResponseModel> loginWithGoogle({UserRole? role}) async {
+    try {
+      final googleUser = await GoogleSignIn(serverClientId: SupabaseConfig.googleWebClientId).signIn();
+      if (googleUser == null) {
+        throw const ApiException('Google sign-in was cancelled.');
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      if (idToken == null) {
+        throw const ApiException('Google did not return an ID token — check the Web Client ID configuration.');
+      }
+
+      final supabaseSession = await Supabase.instance.client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: idToken,
+        accessToken: googleAuth.accessToken,
+      );
+      final supabaseAccessToken = supabaseSession.session?.accessToken;
+      if (supabaseAccessToken == null) {
+        throw const ApiException('Could not establish a Google session.');
+      }
+
+      final response = await _dio.post(
+        ApiEndpoints.authGoogle,
+        data: {
+          'token': supabaseAccessToken,
+          if (role != null) 'role': _userRoleToString(role),
+        },
+      );
+      return _parseAuthResponse(response.data);
+    } on DioException catch (e) {
+      throw ApiException(_extractErrorMessage(e));
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException(e.toString());
+    }
+  }
+
+  @override
   Future<UserModel> debugApprove(String phone) async {
     try {
       final response = await _dio.post(
@@ -188,6 +242,20 @@ class HttpAuthRepository implements AuthRepository {
   Future<void> updateProfile(Map<String, dynamic> fields) async {
     try {
       await _dio.patch(ApiEndpoints.userProfile, data: fields);
+    } on DioException catch (e) {
+      throw ApiException(_extractErrorMessage(e));
+    }
+  }
+
+  @override
+  Future<String> resolveMomoAccount({required String accountNumber, required String bankCode}) async {
+    try {
+      final response = await _dio.get(
+        ApiEndpoints.paystackResolveMomo,
+        queryParameters: {'accountNumber': accountNumber, 'bankCode': bankCode},
+      );
+      final data = response.data['data'] ?? response.data;
+      return data['accountName']?.toString() ?? '';
     } on DioException catch (e) {
       throw ApiException(_extractErrorMessage(e));
     }
@@ -347,6 +415,12 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
+  Future<AuthResponseModel> loginWithGoogle({UserRole? role}) async {
+    await _simulateLatency();
+    throw const ApiException('Google sign-in is not available in offline/mock mode.');
+  }
+
+  @override
   Future<UserModel> debugApprove(String phone) async {
     await _simulateLatency();
     final user = _usersByPhone[phone];
@@ -378,6 +452,12 @@ class MockAuthRepository implements AuthRepository {
   @override
   Future<void> updateProfile(Map<String, dynamic> fields) async {
     await _simulateLatency();
+  }
+
+  @override
+  Future<String> resolveMomoAccount({required String accountNumber, required String bankCode}) async {
+    await _simulateLatency();
+    return 'Mock Account Holder';
   }
 
   AuthResponseModel _tokensFor(UserModel user) {

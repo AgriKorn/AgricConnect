@@ -34,6 +34,7 @@ const mapPrismaToUser = (p: any): User => {
     id: p.id,
     name: p.full_name,
     phone: p.phone_number,
+    email: p.email || null,
     passwordHash: p.password_hash || '',
     role: p.role as UserRole,
     status: statusFromPrisma(p.account_status),
@@ -45,6 +46,8 @@ const mapPrismaToUser = (p: any): User => {
       operatingRegion: driver?.operating_region || p.region || undefined,
       truckCapacity: driver ? Number(driver.truck_capacity_kg) : undefined,
       isAvailable: driver ? driver.availability_status === 'available' : undefined,
+      momoNumber: p.momo_number || undefined,
+      momoNetwork: p.momo_network || undefined,
     },
     createdAt: p.created_at,
     updatedAt: p.updated_at,
@@ -61,6 +64,7 @@ export class PrismaUserRepository implements IUserRepository {
         role: data.role as user_role,
         region: 'Greater Accra',
         account_status: data.role === 'buyer' ? 'approved' : 'pending',
+        ...(data.email && { email: data.email }),
       },
     });
 
@@ -82,6 +86,14 @@ export class PrismaUserRepository implements IUserRepository {
   async findByPhone(phone: string): Promise<User | null> {
     const found = await prisma.user.findUnique({
       where: { phone_number: phone },
+      include: { driver_details: true },
+    });
+    return found ? mapPrismaToUser(found) : null;
+  }
+
+  async findByEmail(email: string): Promise<User | null> {
+    const found = await prisma.user.findUnique({
+      where: { email },
       include: { driver_details: true },
     });
     return found ? mapPrismaToUser(found) : null;
@@ -130,6 +142,7 @@ export class PrismaUserRepository implements IUserRepository {
   async update(id: string, data: Partial<User>): Promise<User> {
     const updateData: any = {};
     if (data.name) updateData.full_name = data.name;
+    if (data.email !== undefined) updateData.email = data.email;
     if (data.status) updateData.account_status = statusToPrisma(data.status);
     if (data.refreshToken !== undefined) updateData.refresh_token = data.refreshToken;
 
@@ -143,10 +156,14 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   async updateProfile(id: string, profile: Partial<User['profile']>): Promise<User> {
-    if (profile.farmRegion || profile.operatingRegion) {
+    if (profile.farmRegion || profile.operatingRegion || profile.momoNumber || profile.momoNetwork) {
       await prisma.user.update({
         where: { id },
-        data: { region: profile.farmRegion || profile.operatingRegion },
+        data: {
+          ...((profile.farmRegion || profile.operatingRegion) && { region: profile.farmRegion || profile.operatingRegion }),
+          ...(profile.momoNumber && { momo_number: profile.momoNumber }),
+          ...(profile.momoNetwork && { momo_network: profile.momoNetwork }),
+        },
       });
     }
 

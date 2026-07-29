@@ -1,5 +1,5 @@
 import { prisma } from '../../config/db';
-import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../utils/errors';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError, PayoutNotConfiguredError } from '../../utils/errors';
 import { auditService } from '../audit/audit.service';
 import { dispatchService } from '../dispatch/dispatch.service';
 import { DriverJob } from '../dispatch/dispatch.types';
@@ -133,6 +133,18 @@ export class TransactionService {
       throw new BadRequestError('QR hash does not match this listing — cannot verify delivery');
     }
 
+    const farmer = await userRepository.findById(transaction.farmerId);
+    if (!farmer?.profile?.momoNumber || !farmer.profile.momoNetwork) {
+      throw new PayoutNotConfiguredError('Cannot release payment — the farmer has not set up Mobile Money payout details');
+    }
+
+    const { transferCode } = await paymentService.initiateTransfer(
+      farmer.profile.momoNumber,
+      transaction.amountGhs,
+      `Escrow release for order ${transaction.id}`,
+      farmer.profile.momoNetwork,
+    );
+
     return await prisma.$transaction(
       async (tx) => {
         await tx.qr_scans.create({
@@ -144,7 +156,7 @@ export class TransactionService {
           },
         });
 
-        const updated = await this.repo.update(transaction.id, { status: 'RELEASED' });
+        const updated = await this.repo.update(transaction.id, { status: 'RELEASED', transferCode });
 
         await auditService.log('DELIVERY_CONFIRMED', transaction.id, { qrHash, confirmedBy }, confirmedBy);
         await auditService.log('PAYMENT_RELEASED', transaction.id, { amountGhs: transaction.amountGhs }, confirmedBy);

@@ -254,6 +254,16 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                             onPressed: _submit,
                             colorScheme: colorScheme,
                           ),
+                          const SizedBox(height: 18),
+                          AuthOrDivider(colorScheme: colorScheme),
+                          const SizedBox(height: 18),
+                          AuthGoogleButton(
+                            loading: session.isSubmitting,
+                            colorScheme: colorScheme,
+                            onPressed: () => ref
+                                .read(authControllerProvider.notifier)
+                                .loginWithGoogle(role: widget.role),
+                          ),
                         ],
                       ),
                     ),

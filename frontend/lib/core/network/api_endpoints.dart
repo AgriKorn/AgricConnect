@@ -11,6 +11,7 @@ class ApiEndpoints {
   static const String authForgotPassword = '/auth/forgot-password';
   static const String authResetPassword = '/auth/reset-password';
   static const String authRefresh = '/auth/refresh';
+  static const String authGoogle = '/auth/google';
 
   // User & Profile Endpoints
   static const String userProfile = '/users/profile';
@@ -31,6 +32,9 @@ class ApiEndpoints {
 
   // Disputes
   static const String disputes = '/disputes';
+
+  // Payments (Paystack)
+  static const String paystackResolveMomo = '/payments/paystack/resolve-momo';
 
   // Storage
   static const String s3PresignedUrl = '/s3/presigned-url';

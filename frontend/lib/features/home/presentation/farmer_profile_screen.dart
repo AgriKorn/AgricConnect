@@ -10,6 +10,7 @@ import '../../auth/data/models/account_status.dart';
 import '../../auth/data/models/user_model.dart';
 import '../application/farmer_dashboard_providers.dart';
 import '../data/farmer_dashboard_mock.dart';
+import 'momo_payout_screen.dart';
 
 const _heroImage = 'assets/images/farmer_hero.jpeg';
 
@@ -107,7 +108,9 @@ class FarmerProfileScreen extends ConsumerWidget {
                         _ActionRow(
                           colorScheme: colorScheme,
                           label: 'Payment Methods',
-                          onTap: () => _openComingSoon(context, 'Payment Methods', Icons.payments_outlined),
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (context) => const MomoPayoutScreen()),
+                          ),
                         ),
                         _ActionRow(
                           colorScheme: colorScheme,

@@ -20,7 +20,7 @@ export interface ResolveMomoResult {
 
 export interface IPaymentService {
   initializeTransaction(amountGhs: number, payerPhone: string, metadata: Record<string, unknown>): Promise<InitializeTransactionResult>;
-  initiateTransfer(recipientPhone: string, amountGhs: number, reason: string): Promise<TransferResult>;
+  initiateTransfer(recipientPhone: string, amountGhs: number, reason: string, bankCode: string): Promise<TransferResult>;
   resolveMomoAccount(accountNumber: string, bankCode: string): Promise<ResolveMomoResult>;
   verifyWebhookSignature(signature: string, rawBody: string | Buffer): boolean;
 }
@@ -67,7 +67,7 @@ export class PaystackPaymentService implements IPaymentService {
     }
   }
 
-  async initiateTransfer(recipientPhone: string, amountGhs: number, reason: string): Promise<TransferResult> {
+  async initiateTransfer(recipientPhone: string, amountGhs: number, reason: string, bankCode: string): Promise<TransferResult> {
     if (!this.secretKey) {
       const transferCode = `stub_transfer_${randomUUID()}`;
       logger.info(`[Payment Stub] Released GHS ${amountGhs.toFixed(2)} to ${recipientPhone} (${reason}) — ${transferCode}`);
@@ -82,7 +82,7 @@ export class PaystackPaymentService implements IPaymentService {
           type: 'mobile_money',
           name: `Recipient ${recipientPhone}`,
           account_number: recipientPhone,
-          bank_code: 'MTN', // Default Mobile Money operator
+          bank_code: bankCode,
           currency: 'GHS',
         },
         { headers: { Authorization: `Bearer ${this.secretKey}` } },

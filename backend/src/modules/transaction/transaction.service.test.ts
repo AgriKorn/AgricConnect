@@ -13,6 +13,7 @@ import { listingRepository } from '../listing/listing.repository.prisma';
 import { userRepository } from '../user/user.repository.prisma';
 import { notificationService } from '../notification/notification.service';
 import { dispatchService } from '../dispatch/dispatch.service';
+import { paymentService } from '../../services/payment.service';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../utils/errors';
 import { Transaction } from './transaction.types';
 
@@ -250,6 +251,12 @@ describe('TransactionService', () => {
         listingHash: validHash,
       } as any);
 
+      jest.spyOn(userRepository, 'findById').mockResolvedValue({
+        id: 'farmer-789',
+        profile: { momoNumber: '+233541234567', momoNetwork: 'MTN' },
+      } as any);
+      jest.spyOn(paymentService, 'initiateTransfer').mockResolvedValue({ transferCode: 'trf_test123', status: 'success' });
+
       // Failure injection: qr_scans write fails
       mockPrisma.qr_scans.create.mockRejectedValue(new Error('QR Scan DB insert failure'));
       const markCompletedSpy = jest.spyOn(dispatchService, 'markCompleted');
@@ -271,8 +278,14 @@ describe('TransactionService', () => {
       jest.spyOn(dispatchService, 'getDriverJobs').mockResolvedValue([]);
       jest.spyOn(listingRepository, 'findById').mockResolvedValue({ id: 'listing-1', listingHash: validHash } as any);
 
+      jest.spyOn(userRepository, 'findById').mockResolvedValue({
+        id: 'farmer-789',
+        profile: { momoNumber: '+233541234567', momoNetwork: 'MTN' },
+      } as any);
+      jest.spyOn(paymentService, 'initiateTransfer').mockResolvedValue({ transferCode: 'trf_test123', status: 'success' });
+
       mockPrisma.qr_scans.create.mockResolvedValue({} as any);
-      const releasedTx = { ...mockTx, status: 'RELEASED' as const };
+      const releasedTx = { ...mockTx, status: 'RELEASED' as const, transferCode: 'trf_test123' };
       mockRepo.update.mockResolvedValue(releasedTx);
 
       jest.spyOn(notificationService, 'sendNotification').mockResolvedValue({} as any);
@@ -280,7 +293,8 @@ describe('TransactionService', () => {
 
       const result = await transactionService.confirmDelivery(transactionId, validHash, 'buyer-1');
 
-      expect(mockRepo.update).toHaveBeenCalledWith(transactionId, { status: 'RELEASED' });
+      expect(paymentService.initiateTransfer).toHaveBeenCalledWith('+233541234567', mockTx.amountGhs, expect.any(String), 'MTN');
+      expect(mockRepo.update).toHaveBeenCalledWith(transactionId, { status: 'RELEASED', transferCode: 'trf_test123' });
       expect(dispatchService.markCompleted).toHaveBeenCalledWith(transactionId);
       expect(result).toEqual(releasedTx);
     });

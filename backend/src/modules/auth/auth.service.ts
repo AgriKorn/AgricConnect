@@ -170,33 +170,47 @@ export class AuthService {
     }
 
     const email = userData.email;
-    const phone = userData.phone || userData.user_metadata?.phone || `+233${Math.floor(100000000 + Math.random() * 900000000)}`;
+    // Google almost never shares a phone number, so a fresh one is minted for
+    // brand-new sign-ups only. Returning users MUST be found by email — phone
+    // can't be the lookup key here since there is no stable phone to look up.
+    const googlePhone = userData.phone || userData.user_metadata?.phone;
     const name = userData.user_metadata?.full_name || userData.user_metadata?.name || email?.split('@')[0] || 'Google User';
 
-    let user = await this.users.findByPhone(phone);
+    let user = email ? await this.users.findByEmail(email) : null;
+    if (!user && googlePhone) {
+      user = await this.users.findByPhone(googlePhone);
+    }
 
     if (!user) {
-      // Create new user account via OAuth — auto-activated for OAuth providers
+      // Create new user account via OAuth. Same approval rule as phone
+      // registration: buyers auto-activate, farmers/drivers need an admin.
+      const phone = googlePhone || `+233${Math.floor(100000000 + Math.random() * 900000000)}`;
       const passwordHash = await bcrypt.hash(`oauth_google_${userData.id}`, 10);
+      const role = data.role || 'buyer';
       user = await this.users.create({
         name,
         phone,
+        email,
         passwordHash,
-        role: data.role || 'buyer',
+        role,
         otp: '',
         otpExpiry: new Date(),
       });
-      user = await this.users.update(user.id, { status: 'ACTIVE' });
+      user = await this.users.update(user.id, { status: role === 'buyer' ? 'ACTIVE' : 'PENDING_APPROVAL' });
       logger.info(`[auth-oauth] Created new user ${user.id} via Google OAuth`);
     } else {
       // Account linking / merging: existing user logging in via OAuth
-      if (!user.name || user.name === 'Google User') {
-        user = await this.users.update(user.id, { name });
+      const updates: Partial<SafeUser> = {};
+      if (!user.email && email) updates.email = email;
+      if (!user.name || user.name === 'Google User') updates.name = name;
+      if (Object.keys(updates).length > 0) {
+        user = await this.users.update(user.id, updates);
       }
       logger.info(`[auth-oauth] Linked Google OAuth sign-in for existing user ${user.id}`);
     }
 
     if (user.status === 'REJECTED') throw new AccountRejectedError();
+    if (user.status === 'PENDING_APPROVAL') throw new AccountPendingApprovalError();
 
     const accessToken = jwt.sign({ userId: user.id, role: user.role }, env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
     const refreshToken = jwt.sign({ userId: user.id }, env.JWT_REFRESH_SECRET, { expiresIn: REFRESH_TOKEN_TTL });

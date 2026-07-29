@@ -2,7 +2,8 @@ import { ListingService } from './listing.service';
 import { PrismaListingRepository } from './listing.repository.prisma';
 import { mofaPriceRepository } from '../pricing/pricing.repository.prisma';
 import { auditService } from '../audit/audit.service';
-import { ForbiddenError } from '../../utils/errors';
+import { userRepository } from '../user/user.repository.prisma';
+import { ForbiddenError, PayoutNotConfiguredError } from '../../utils/errors';
 
 describe('ListingService', () => {
   let listingService: ListingService;
@@ -24,7 +25,23 @@ describe('ListingService', () => {
   });
 
   describe('createListing', () => {
+    it('should throw PayoutNotConfiguredError if the farmer has no MoMo payout number on file', async () => {
+      jest.spyOn(userRepository, 'findById').mockResolvedValue({ id: 'farmer-1', profile: {} } as any);
+
+      await expect(
+        listingService.createListing(
+          { cropType: 'tomato', quantityKg: 200, freshnessScore: 9.5, shelfLifeDays: 7, farmerLat: 5.6, farmerLong: -0.18, pricePerKg: 10.0 } as any,
+          'farmer-1',
+        ),
+      ).rejects.toThrow(PayoutNotConfiguredError);
+      expect(mockRepo.create).not.toHaveBeenCalled();
+    });
+
     it('should calculate price floor/ceiling against MOFA reference price if available', async () => {
+      jest.spyOn(userRepository, 'findById').mockResolvedValue({
+        id: 'farmer-1',
+        profile: { momoNumber: '+233541234567', momoNetwork: 'MTN' },
+      } as any);
       jest.spyOn(mofaPriceRepository, 'findLatest').mockResolvedValue({
         cropType: 'tomato',
         region: 'Greater Accra',

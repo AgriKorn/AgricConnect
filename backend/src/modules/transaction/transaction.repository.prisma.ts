@@ -20,7 +20,7 @@ const mapPrismaToTransaction = (order: any, farmerId?: string): Transaction => {
     status,
     hasOwnTransport: order.transport_mode === 'self_collect',
     paymentReference: order.payments?.provider_reference || `ref-${order.id.slice(0, 8)}`,
-    transferCode: null,
+    transferCode: order.payments?.payout_reference || null,
     createdAt: order.created_at,
     updatedAt: order.updated_at,
   };
@@ -112,7 +112,11 @@ export class PrismaTransactionRepository implements ITransactionRepository {
       updateData.completed_at = new Date();
       await prisma.payments.updateMany({
         where: { order_id: id },
-        data: { status: 'released', released_at: new Date() },
+        data: {
+          status: 'released',
+          released_at: new Date(),
+          ...(data.transferCode && { payout_reference: data.transferCode }),
+        },
       });
     } else if (data.status === 'CANCELLED') {
       updateData.order_status = 'cancelled';

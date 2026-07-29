@@ -142,6 +142,60 @@ class AuthPillButton extends StatelessWidget {
   }
 }
 
+/// "OR" divider between the password form and the Google sign-in option.
+class AuthOrDivider extends StatelessWidget {
+  const AuthOrDivider({super.key, required this.colorScheme});
+
+  final ColorScheme colorScheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final line = Expanded(child: Divider(color: colorScheme.outline.withValues(alpha: 0.3)));
+    return Row(
+      children: [
+        line,
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text('OR', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w700)),
+        ),
+        line,
+      ],
+    );
+  }
+}
+
+/// Outlined "Continue with Google" button sharing the pill shape of
+/// [AuthPillButton] but styled as a secondary action.
+class AuthGoogleButton extends StatelessWidget {
+  const AuthGoogleButton({super.key, required this.onPressed, required this.colorScheme, this.loading = false});
+
+  final VoidCallback? onPressed;
+  final ColorScheme colorScheme;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 54,
+      child: OutlinedButton(
+        onPressed: loading ? null : onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: colorScheme.onSurface,
+          side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.4)),
+          shape: const StadiumBorder(),
+        ),
+        child: loading
+            ? SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2.4, color: colorScheme.primary),
+              )
+            : const Text('Continue with Google', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+      ),
+    );
+  }
+}
+
 /// Floating circular back button used instead of a default opaque AppBar,
 /// so pushed auth screens keep the ambient/glass look edge-to-edge.
 class AuthBackButton extends StatelessWidget {

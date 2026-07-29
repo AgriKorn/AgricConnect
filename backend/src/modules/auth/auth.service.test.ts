@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { AuthService } from './auth.service';
 import { PrismaUserRepository } from '../user/user.repository.prisma';
-import { ConflictError, InvalidTokenError, NotFoundError, UnauthorizedError } from '../../utils/errors';
+import { AccountPendingApprovalError, ConflictError, InvalidTokenError, NotFoundError, UnauthorizedError } from '../../utils/errors';
 import { supabase } from '../../config/supabase';
 import { User } from '../user/user.types';
 import { env } from '../../config/env';
@@ -15,6 +15,7 @@ describe('AuthService', () => {
     id: 'user-uuid-1',
     name: 'Kofi Mensah',
     phone: '+233541234567',
+    email: null,
     passwordHash: '$2a$10$hashedpasswordstring',
     role: 'farmer',
     status: 'ACTIVE',
@@ -31,6 +32,7 @@ describe('AuthService', () => {
     jest.clearAllMocks();
     mockUserRepo = {
       findByPhone: jest.fn(),
+      findByEmail: jest.fn(),
       create: jest.fn(),
       findById: jest.fn(),
       update: jest.fn(),
@@ -169,26 +171,80 @@ describe('AuthService', () => {
       expect(result.url).toContain('google.com');
     });
 
-    it('should authenticate existing user via Supabase Google OAuth and return token pair', async () => {
+    it('should authenticate an existing user by email via Supabase Google OAuth and return token pair', async () => {
       jest.spyOn(supabase.auth, 'getUser').mockResolvedValue({
         data: {
           user: {
             id: 'supabase-user-id',
             email: 'kofi@gmail.com',
-            user_metadata: { full_name: 'Kofi OAuth', phone: '+233550000000' },
+            user_metadata: { full_name: 'Kofi OAuth' },
           } as any,
         },
         error: null,
       });
 
-      const mockUser = createMockUser({ id: 'user-uuid-oauth', name: 'Kofi OAuth', phone: '+233550000000' });
-      mockUserRepo.findByPhone.mockResolvedValue(mockUser);
+      const mockUser = createMockUser({ id: 'user-uuid-oauth', name: 'Kofi OAuth', email: 'kofi@gmail.com' });
+      mockUserRepo.findByEmail.mockResolvedValue(mockUser);
       mockUserRepo.update.mockResolvedValue(mockUser);
 
       const result = await authService.googleAuth({ token: 'mock-id-token', role: 'buyer' });
 
       expect(result.accessToken).toBeDefined();
       expect(result.user.id).toBe('user-uuid-oauth');
+      // Regression guard: Google never supplies a phone number, so the lookup
+      // must resolve by email — falling back to a randomly-generated phone
+      // here would never match, and would create a duplicate account on
+      // every single login.
+      expect(mockUserRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('should create a new user via Google OAuth when no matching email or phone exists', async () => {
+      jest.spyOn(supabase.auth, 'getUser').mockResolvedValue({
+        data: {
+          user: {
+            id: 'supabase-user-id-2',
+            email: 'ama@gmail.com',
+            user_metadata: { full_name: 'Ama OAuth' },
+          } as any,
+        },
+        error: null,
+      });
+
+      mockUserRepo.findByEmail.mockResolvedValue(null);
+      const created = createMockUser({ id: 'user-uuid-new', name: 'Ama OAuth', email: 'ama@gmail.com', status: 'PENDING_APPROVAL' });
+      const activated = { ...created, status: 'ACTIVE' as const };
+      mockUserRepo.create.mockResolvedValue(created);
+      mockUserRepo.update.mockResolvedValueOnce(activated).mockResolvedValueOnce(activated);
+
+      const result = await authService.googleAuth({ token: 'mock-id-token', role: 'buyer' });
+
+      expect(mockUserRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'ama@gmail.com', role: 'buyer' }),
+      );
+      expect(mockUserRepo.update).toHaveBeenCalledWith('user-uuid-new', { status: 'ACTIVE' });
+      expect(result.user.id).toBe('user-uuid-new');
+    });
+
+    it('should require admin approval for a brand-new farmer/driver signing up via Google, same as phone registration', async () => {
+      jest.spyOn(supabase.auth, 'getUser').mockResolvedValue({
+        data: {
+          user: {
+            id: 'supabase-user-id-3',
+            email: 'kwame-farmer@gmail.com',
+            user_metadata: { full_name: 'Kwame Farmer' },
+          } as any,
+        },
+        error: null,
+      });
+
+      mockUserRepo.findByEmail.mockResolvedValue(null);
+      const created = createMockUser({ id: 'user-uuid-farmer', name: 'Kwame Farmer', email: 'kwame-farmer@gmail.com', role: 'farmer', status: 'PENDING_APPROVAL' });
+      mockUserRepo.create.mockResolvedValue(created);
+      mockUserRepo.update.mockResolvedValue({ ...created, status: 'PENDING_APPROVAL' });
+
+      await expect(authService.googleAuth({ token: 'mock-id-token', role: 'farmer' })).rejects.toThrow(AccountPendingApprovalError);
+
+      expect(mockUserRepo.update).toHaveBeenCalledWith('user-uuid-farmer', { status: 'PENDING_APPROVAL' });
     });
   });
 });

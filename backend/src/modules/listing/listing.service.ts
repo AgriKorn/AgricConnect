@@ -1,7 +1,8 @@
 import crypto from 'crypto';
 import QRCode from 'qrcode';
-import { ForbiddenError, NotFoundError } from '../../utils/errors';
+import { ForbiddenError, NotFoundError, PayoutNotConfiguredError } from '../../utils/errors';
 import { auditService } from '../audit/audit.service';
+import { userRepository } from '../user/user.repository.prisma';
 import { CreateListingInput, UpdateListingInput } from './listing.schema';
 import { IListingRepository } from './listing.repository';
 import { listingRepository } from './listing.repository.prisma';
@@ -29,6 +30,11 @@ export class ListingService {
   constructor(private readonly repo: IListingRepository) {}
 
   async createListing(data: CreateListingInput, farmerId: string): Promise<Listing> {
+    const farmer = await userRepository.findById(farmerId);
+    if (!farmer?.profile.momoNumber) {
+      throw new PayoutNotConfiguredError();
+    }
+
     const { listingHash, qrCodeData } = await generateListingProof(farmerId, data);
 
     const listing = await this.repo.create({

@@ -11,6 +11,7 @@ import { CreateUserRecord, IUserRepository } from './user.repository';
 export class InMemoryUserRepository implements IUserRepository {
   private readonly usersById = new Map<string, User>();
   private readonly idByPhone = new Map<string, string>();
+  private readonly idByEmail = new Map<string, string>();
 
   async create(data: CreateUserRecord): Promise<User> {
     const now = new Date();
@@ -18,6 +19,7 @@ export class InMemoryUserRepository implements IUserRepository {
       id: randomUUID(),
       name: data.name,
       phone: data.phone,
+      email: data.email ?? null,
       passwordHash: data.passwordHash,
       role: data.role,
       status: 'PENDING_OTP',
@@ -30,11 +32,17 @@ export class InMemoryUserRepository implements IUserRepository {
     };
     this.usersById.set(user.id, user);
     this.idByPhone.set(user.phone, user.id);
+    if (user.email) this.idByEmail.set(user.email, user.id);
     return user;
   }
 
   async findByPhone(phone: string): Promise<User | null> {
     const id = this.idByPhone.get(phone);
+    return id ? this.usersById.get(id) ?? null : null;
+  }
+
+  async findByEmail(email: string): Promise<User | null> {
+    const id = this.idByEmail.get(email);
     return id ? this.usersById.get(id) ?? null : null;
   }
 
@@ -73,6 +81,7 @@ export class InMemoryUserRepository implements IUserRepository {
     if (!existing) throw new NotFoundError('User not found');
     const updated: User = { ...existing, ...data, updatedAt: new Date() };
     this.usersById.set(id, updated);
+    if (updated.email) this.idByEmail.set(updated.email, id);
     return updated;
   }
 
