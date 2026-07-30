@@ -22,9 +22,9 @@ const _onAccentContainer = Color(0xFF1A2E1A);
 const _lightBackground = Color(0xFFF4F7F2);
 const _lightSurface = Color(0xFFFFFFFF);
 const _lightOnSurface = Color(0xFF1A2E1A);
-const _lightSurfaceVariant = Color(0xFFF0F4EF);
+const _lightSurfaceVariant = Color(0xFFDCE5DA);
 const _lightOnSurfaceVariant = Color(0xFF5D6B5D);
-const _lightOutline = Color(0xFFD1DED1);
+const _lightOutline = _accent;
 const _lightDivider = Color(0xFFE2E8E2);
 
 const _darkBackground = Color(0xFF0D140D);

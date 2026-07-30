@@ -19,6 +19,11 @@ class ActiveShipment {
     this.farmerName,
     this.farmerInitials,
     this.farmerLocation,
+    this.etaMinutes,
+    this.driverName,
+    this.driverRating,
+    this.driverVehicle,
+    this.transitProgress,
   });
 
   final String id;
@@ -29,6 +34,14 @@ class ActiveShipment {
   final String? farmerName;
   final String? farmerInitials;
   final String? farmerLocation;
+
+  /// Live-tracking fields (Order Tracking screen) — only populated for
+  /// shipments that are actually en route.
+  final int? etaMinutes;
+  final String? driverName;
+  final double? driverRating;
+  final String? driverVehicle;
+  final double? transitProgress;
 }
 
 class OrderHistoryEntry {

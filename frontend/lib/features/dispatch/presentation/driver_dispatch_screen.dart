@@ -101,9 +101,18 @@ class DriverDispatchScreen extends ConsumerWidget {
                       onDecline: () async {
                         try {
                           await ref.read(availableJobsProvider.notifier).decline(job.id);
-                          if (context.mounted) showAgriToast(context, 'Declined ${job.cropSummary}');
+                          if (context.mounted) {
+                            showAgriToast(
+                              context,
+                              'Declined ${job.cropSummary}',
+                              icon: Icons.cancel_rounded,
+                              isError: true,
+                            );
+                          }
                         } catch (_) {
-                          if (context.mounted) showAgriToast(context, 'Could not decline this job. Try again.');
+                          if (context.mounted) {
+                            showAgriToast(context, 'Could not decline this job. Try again.', isError: true);
+                          }
                         }
                       },
                       onAccept: () async {
@@ -111,7 +120,9 @@ class DriverDispatchScreen extends ConsumerWidget {
                           await ref.read(availableJobsProvider.notifier).accept(job.id);
                           if (context.mounted) showAgriToast(context, 'Accepted ${job.cropSummary}');
                         } catch (_) {
-                          if (context.mounted) showAgriToast(context, 'Could not accept this job. Try again.');
+                          if (context.mounted) {
+                            showAgriToast(context, 'Could not accept this job. Try again.', isError: true);
+                          }
                         }
                       },
                     ),

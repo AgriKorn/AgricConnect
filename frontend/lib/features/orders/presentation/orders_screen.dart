@@ -9,6 +9,7 @@ import '../../../core/widgets/empty_state.dart';
 import '../application/orders_providers.dart';
 import '../data/orders_mock.dart';
 import 'confirm_delivery_screen.dart';
+import 'order_tracking_screen.dart';
 import 'raise_dispute_screen.dart';
 
 void _openComingSoon(BuildContext context, String title, IconData icon) {
@@ -356,6 +357,21 @@ class _ActiveShipmentCard extends StatelessWidget {
                     style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 15),
                   ),
                 ),
+                GestureDetector(
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (context) => OrderTrackingScreen(shipment: shipment)),
+                  ),
+                  child: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.map_outlined, color: colorScheme.primary, size: 18),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 GestureDetector(
                   onTap: () => _openComingSoon(context, 'Chat', Icons.chat_bubble_outline_rounded),
                   child: Container(

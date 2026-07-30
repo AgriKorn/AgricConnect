@@ -25,6 +25,15 @@ JobRequest _toJobRequest(DispatchJobModel job) {
   );
 }
 
+String _initialsOf(String name) {
+  final trimmed = name.trim();
+  if (trimmed.isEmpty) return '?';
+  final parts = trimmed.split(RegExp(r'\s+'));
+  final first = parts.first[0];
+  final last = parts.length > 1 ? parts.last[0] : '';
+  return (first + last).toUpperCase();
+}
+
 /// Real driver online/offline availability — backed by the same
 /// isAvailable flag the profile endpoint reads and writes.
 class DriverOnlineController extends Notifier<bool> {
@@ -173,13 +182,10 @@ final driverProfileProvider = Provider<DriverProfileSummary>((ref) {
   final name = ref.watch(authControllerProvider).user?.name ?? 'Driver';
   final history = ref.watch(dispatchHistoryProvider).valueOrNull ?? const [];
   final totalEarnings = history.fold<double>(0, (sum, entry) => sum + entry.amount);
-  final initials = name.trim().isEmpty
-      ? '?'
-      : name.trim().split(RegExp(r'\s+')).map((p) => p[0]).take(2).join().toUpperCase();
 
   return DriverProfileSummary(
     name: name,
-    initials: initials,
+    initials: _initialsOf(name),
     badge: 'AgriConnect Driver',
     totalEarnings: totalEarnings,
     completedJobs: history.length,
@@ -199,7 +205,20 @@ final driverStatusProvider = Provider<DriverStatusSummary>((ref) {
 /// deliberately rather than fabricating numbers for a feature that hasn't
 /// been built; only the actionable dispatch flow above (toggle, accept,
 /// decline, earnings) is wired to real data.
-final driverProfileDetailsProvider = Provider<DriverProfileDetails>((ref) => mockDriverProfileDetails);
+final driverProfileDetailsProvider = Provider<DriverProfileDetails>((ref) {
+  final name = ref.watch(authControllerProvider).user?.name;
+  if (name == null) return mockDriverProfileDetails;
+  return DriverProfileDetails(
+    name: name,
+    verified: mockDriverProfileDetails.verified,
+    rating: mockDriverProfileDetails.rating,
+    deliveriesCount: mockDriverProfileDetails.deliveriesCount,
+    onTimePercent: mockDriverProfileDetails.onTimePercent,
+    totalEarnings: mockDriverProfileDetails.totalEarnings,
+    vehicle: mockDriverProfileDetails.vehicle,
+    documents: mockDriverProfileDetails.documents,
+  );
+});
 
 class DriverNotificationsController extends Notifier<bool> {
   @override
