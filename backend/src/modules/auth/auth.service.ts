@@ -29,11 +29,17 @@ export class AuthService {
     const existing = await this.users.findByPhone(data.phone);
     if (existing) throw new ConflictError('Phone number already registered', 'PHONE_ALREADY_REGISTERED');
 
+    if (data.email) {
+      const existingEmail = await this.users.findByEmail(data.email);
+      if (existingEmail) throw new ConflictError('Email already registered', 'EMAIL_ALREADY_REGISTERED');
+    }
+
     const passwordHash = await bcrypt.hash(data.password, 10);
 
     const user = await this.users.create({
       name: data.name,
       phone: data.phone,
+      email: data.email ?? null,
       passwordHash,
       role: data.role,
       otp: '',
