@@ -435,7 +435,6 @@ class _ListingTile extends ConsumerWidget {
                           color: colorScheme.onSurface,
                           fontWeight: FontWeight.w700,
                           fontSize: 14,
-                          letterSpacing: -1,
                         ),
                       ),
                       const SizedBox(height: 2),

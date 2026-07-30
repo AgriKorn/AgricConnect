@@ -77,6 +77,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
         context,
         'Please agree to the Terms of Service and Privacy Policy',
         icon: Icons.error_outline_rounded,
+        isError: true,
       );
       return;
     }
@@ -116,7 +117,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
     ref.listen(authControllerProvider, (previous, next) {
       if (next.errorMessage != null &&
           next.errorMessage != previous?.errorMessage) {
-        showAgriToast(context, next.errorMessage!, icon: Icons.error_outline_rounded);
+        showAgriToast(context, next.errorMessage!, icon: Icons.error_outline_rounded, isError: true);
       }
     });
 

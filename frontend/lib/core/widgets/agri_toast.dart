@@ -3,18 +3,23 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 /// App-wide toast: replaces the default (bottom, opaque) [SnackBar] with a
-/// top-right glassmorphic pill — a translucent blurred card with a green
-/// outline, sliding/fading in over whatever's on screen via the root
-/// [Overlay] (so it isn't clipped by the current Scaffold). Fire-and-forget,
-/// same call shape as `ScaffoldMessenger.showSnackBar` (checklist
-/// Non-Negotiable Rules: no raw/ad-hoc feedback widgets — this is the one
-/// shared implementation every screen should use instead).
+/// top-right glassmorphic pill — a translucent blurred card sliding/fading
+/// in over whatever's on screen via the root [Overlay] (so it isn't clipped
+/// by the current Scaffold). Green-outlined by default; pass [isError] for
+/// negative outcomes (declined, cancelled, failed) to switch it to a red
+/// outline with a light red tint instead. Fire-and-forget, same call shape
+/// as `ScaffoldMessenger.showSnackBar` (checklist Non-Negotiable Rules: no
+/// raw/ad-hoc feedback widgets — this is the one shared implementation
+/// every screen should use instead).
 void showAgriToast(
   BuildContext context,
   String message, {
   IconData icon = Icons.check_circle_rounded,
   Duration duration = const Duration(seconds: 3),
+  bool isError = false,
 }) {
   final overlay = Overlay.of(context, rootOverlay: true);
   final colorScheme = Theme.of(context).colorScheme;
@@ -25,6 +30,7 @@ void showAgriToast(
       icon: icon,
       duration: duration,
       colorScheme: colorScheme,
+      isError: isError,
       onDismissed: () => entry.remove(),
     ),
   );
@@ -37,6 +43,7 @@ class _AgriToast extends StatefulWidget {
     required this.icon,
     required this.duration,
     required this.colorScheme,
+    required this.isError,
     required this.onDismissed,
   });
 
@@ -44,6 +51,7 @@ class _AgriToast extends StatefulWidget {
   final IconData icon;
   final Duration duration;
   final ColorScheme colorScheme;
+  final bool isError;
   final VoidCallback onDismissed;
 
   @override
@@ -86,6 +94,7 @@ class _AgriToastState extends State<_AgriToast> with SingleTickerProviderStateMi
   @override
   Widget build(BuildContext context) {
     final colorScheme = widget.colorScheme;
+    final accent = widget.isError ? AgriStatusColors.error(colorScheme.brightness) : colorScheme.primary;
     return Positioned(
       top: MediaQuery.of(context).padding.top + 12,
       right: 16,
@@ -106,9 +115,9 @@ class _AgriToastState extends State<_AgriToast> with SingleTickerProviderStateMi
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       decoration: BoxDecoration(
-                        color: colorScheme.surface.withValues(alpha: 0.65),
+                        color: widget.isError ? accent.withValues(alpha: 0.14) : colorScheme.surface.withValues(alpha: 0.65),
                         borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: colorScheme.primary, width: 1.5),
+                        border: Border.all(color: accent, width: 1.5),
                         boxShadow: [
                           BoxShadow(color: Colors.black.withValues(alpha: 0.18), blurRadius: 18, offset: const Offset(0, 8)),
                         ],
@@ -116,7 +125,7 @@ class _AgriToastState extends State<_AgriToast> with SingleTickerProviderStateMi
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(widget.icon, color: colorScheme.primary, size: 20),
+                          Icon(widget.icon, color: accent, size: 20),
                           const SizedBox(width: 10),
                           Flexible(
                             child: Text(

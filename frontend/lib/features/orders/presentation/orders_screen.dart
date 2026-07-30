@@ -8,6 +8,7 @@ import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../application/orders_providers.dart';
 import '../data/orders_mock.dart';
+import 'order_tracking_screen.dart';
 
 void _openComingSoon(BuildContext context, String title, IconData icon) {
   Navigator.of(context).push(
@@ -48,6 +49,7 @@ class OrdersScreen extends ConsumerWidget {
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -367,7 +369,9 @@ class _ActiveShipmentCard extends StatelessWidget {
               const SizedBox(width: 10),
               if (hasFarmer)
                 FilledButton.icon(
-                  onPressed: () => _openComingSoon(context, 'Track Live', Icons.map_rounded),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (context) => OrderTrackingScreen(shipment: shipment)),
+                  ),
                   style: FilledButton.styleFrom(
                     backgroundColor: colorScheme.primary,
                     foregroundColor: colorScheme.onPrimary,

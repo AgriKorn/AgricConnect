@@ -56,7 +56,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ref.listen(authControllerProvider, (previous, next) {
       if (next.errorMessage != null &&
           next.errorMessage != previous?.errorMessage) {
-        showAgriToast(context, next.errorMessage!, icon: Icons.error_outline_rounded);
+        showAgriToast(context, next.errorMessage!, icon: Icons.error_outline_rounded, isError: true);
       }
     });
 

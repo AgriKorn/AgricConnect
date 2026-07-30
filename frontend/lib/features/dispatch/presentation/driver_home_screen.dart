@@ -79,7 +79,12 @@ class DriverHomeScreen extends ConsumerWidget {
                           colorScheme: colorScheme,
                           onDecline: () {
                             ref.read(activeTripProvider.notifier).complete();
-                            showAgriToast(context, 'Declined ${activeTrip.job.cropSummary}');
+                            showAgriToast(
+                              context,
+                              'Declined ${activeTrip.job.cropSummary}',
+                              icon: Icons.cancel_rounded,
+                              isError: true,
+                            );
                           },
                           onAccept: () {
                             showAgriToast(context, 'Accepted ${activeTrip.job.cropSummary}');
@@ -91,13 +96,6 @@ class DriverHomeScreen extends ConsumerWidget {
                             message: 'Turn-by-turn navigation will be available in a future update.',
                           ),
                         ),
-                  const SizedBox(height: 28),
-                  Text(
-                    'Logistics Tools',
-                    style: TextStyle(color: colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 12),
-                  _LogisticsToolsGrid(colorScheme: colorScheme),
                 ],
               ),
             ),
@@ -177,33 +175,23 @@ class _HeroHeader extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _StatPill(
-                  colorScheme: colorScheme,
-                  dotColor: colorScheme.onPrimary.withValues(alpha: 0.7),
-                  value: formatGhs(profile.totalEarnings),
-                  label: 'Earnings',
-                ),
-                const SizedBox(width: 10),
-                _StatPill(
-                  colorScheme: colorScheme,
-                  dotColor: colorScheme.onPrimary.withValues(alpha: 0.7),
-                  value: '${profile.completedJobs}',
-                  label: 'Completed',
-                ),
-                const SizedBox(width: 10),
-                _StatPill(
-                  colorScheme: colorScheme,
-                  dotColor: AgriStatusColors.warning(Theme.of(context).brightness),
-                  value: '${profile.onlineHours}h',
-                  label: 'Online',
-                  highlighted: online,
-                ),
-              ],
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _StatPill(
+                colorScheme: colorScheme,
+                dotColor: colorScheme.onPrimary.withValues(alpha: 0.7),
+                value: formatGhs(profile.totalEarnings),
+                label: 'Earnings',
+                width: 168,
+              ),
+              _StatPill(
+                colorScheme: colorScheme,
+                dotColor: colorScheme.onPrimary.withValues(alpha: 0.7),
+                value: '${profile.completedJobs}',
+                label: 'Completed',
+              ),
+            ],
           ),
         ],
       ),
@@ -217,24 +205,23 @@ class _StatPill extends StatelessWidget {
     required this.dotColor,
     required this.value,
     required this.label,
-    this.highlighted = false,
+    this.width = 128,
   });
 
   final ColorScheme colorScheme;
   final Color dotColor;
   final String value;
   final String label;
-  final bool highlighted;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 128,
+      width: width,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.22),
         borderRadius: BorderRadius.circular(20),
-        border: highlighted ? Border.all(color: dotColor, width: 1.5) : null,
       ),
       child: Row(
         children: [
@@ -413,114 +400,3 @@ class _ActiveDeliveryCard extends StatelessWidget {
   }
 }
 
-class _LogisticsToolsGrid extends StatelessWidget {
-  const _LogisticsToolsGrid({required this.colorScheme});
-
-  final ColorScheme colorScheme;
-
-  @override
-  Widget build(BuildContext context) {
-    final warning = AgriStatusColors.warning(Theme.of(context).brightness);
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
-      mainAxisSpacing: 14,
-      crossAxisSpacing: 14,
-      childAspectRatio: 1.5,
-      children: [
-        _ToolTile(
-          colorScheme: colorScheme,
-          icon: Icons.history_rounded,
-          label: 'Job History',
-          onTap: () => context.go('/driver/history'),
-        ),
-        _ToolTile(
-          colorScheme: colorScheme,
-          icon: Icons.local_gas_station_rounded,
-          label: 'Fuel Log',
-          accent: colorScheme.tertiary,
-          onTap: () => _pushComingSoon(
-            context,
-            title: 'Fuel Log',
-            icon: Icons.local_gas_station_rounded,
-            message: 'Fuel expense tracking will be available in a future update.',
-          ),
-        ),
-        _ToolTile(
-          colorScheme: colorScheme,
-          icon: Icons.local_shipping_outlined,
-          label: 'Vehicle',
-          onTap: () => _pushComingSoon(
-            context,
-            title: 'Vehicle',
-            icon: Icons.local_shipping_outlined,
-            message: 'Vehicle details and maintenance logs will be available in a future update.',
-          ),
-        ),
-        _ToolTile(
-          colorScheme: colorScheme,
-          icon: Icons.warning_amber_rounded,
-          label: 'Report Delay',
-          accent: warning,
-          emphasized: true,
-          onTap: () => _pushComingSoon(
-            context,
-            title: 'Report Delay',
-            icon: Icons.warning_amber_rounded,
-            message: 'Delay reporting will be available in a future update.',
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ToolTile extends StatelessWidget {
-  const _ToolTile({
-    required this.colorScheme,
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.accent,
-    this.emphasized = false,
-  });
-
-  final ColorScheme colorScheme;
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final Color? accent;
-  final bool emphasized;
-
-  @override
-  Widget build(BuildContext context) {
-    final tint = accent ?? colorScheme.onSurfaceVariant;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: (accent ?? colorScheme.outline).withValues(alpha: emphasized ? 0.5 : 0.2)),
-        ),
-        alignment: Alignment.center,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: emphasized ? tint : colorScheme.onSurfaceVariant, size: 26),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: emphasized ? colorScheme.onSurface : colorScheme.onSurfaceVariant,
-                fontWeight: emphasized ? FontWeight.w800 : FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

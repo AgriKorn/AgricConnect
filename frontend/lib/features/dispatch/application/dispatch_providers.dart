@@ -1,13 +1,50 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/application/auth_controller.dart';
 import '../data/dispatch_mock.dart';
 import '../data/driver_profile_mock.dart';
 
+String _initialsOf(String name) {
+  final trimmed = name.trim();
+  if (trimmed.isEmpty) return '?';
+  final parts = trimmed.split(RegExp(r'\s+'));
+  final first = parts.first[0];
+  final last = parts.length > 1 ? parts.last[0] : '';
+  return (first + last).toUpperCase();
+}
+
 final driverStatusProvider = Provider<DriverStatusSummary>((ref) => mockDriverStatus);
 
-final driverProfileProvider = Provider<DriverProfileSummary>((ref) => mockDriverProfile);
+/// Overlays the real signed-in user's name/initials onto the mock profile
+/// so the Driver Home "Welcome back" header and Driver Profile screen never
+/// disagree with what the driver actually signed up with.
+final driverProfileProvider = Provider<DriverProfileSummary>((ref) {
+  final user = ref.watch(authControllerProvider).user;
+  if (user == null) return mockDriverProfile;
+  return DriverProfileSummary(
+    name: user.name,
+    initials: _initialsOf(user.name),
+    badge: mockDriverProfile.badge,
+    totalEarnings: mockDriverProfile.totalEarnings,
+    completedJobs: mockDriverProfile.completedJobs,
+    onlineHours: mockDriverProfile.onlineHours,
+  );
+});
 
-final driverProfileDetailsProvider = Provider<DriverProfileDetails>((ref) => mockDriverProfileDetails);
+final driverProfileDetailsProvider = Provider<DriverProfileDetails>((ref) {
+  final user = ref.watch(authControllerProvider).user;
+  if (user == null) return mockDriverProfileDetails;
+  return DriverProfileDetails(
+    name: user.name,
+    verified: mockDriverProfileDetails.verified,
+    rating: mockDriverProfileDetails.rating,
+    deliveriesCount: mockDriverProfileDetails.deliveriesCount,
+    onTimePercent: mockDriverProfileDetails.onTimePercent,
+    totalEarnings: mockDriverProfileDetails.totalEarnings,
+    vehicle: mockDriverProfileDetails.vehicle,
+    documents: mockDriverProfileDetails.documents,
+  );
+});
 
 class DriverNotificationsController extends Notifier<bool> {
   @override
@@ -38,6 +75,18 @@ class ActiveTripController extends Notifier<ActiveTrip?> {
   ActiveTrip? build() => mockActiveTrip;
 
   void complete() => state = null;
+
+  /// Accepting a job from the dispatch list makes it the driver's current
+  /// active delivery — surfaced on both Driver Home and Driver Dispatch.
+  void start(JobRequest job) {
+    state = ActiveTrip(
+      tripNumber: (DateTime.now().millisecondsSinceEpoch % 9000 + 1000).toString(),
+      etaMinutes: job.isShortHaul ? 12 : 25,
+      destination: 'Deliver to ${job.dropoffLocation}',
+      distanceRemainingKm: job.isShortHaul ? 2.4 : 8.5,
+      job: job,
+    );
+  }
 }
 
 final activeTripProvider = NotifierProvider<ActiveTripController, ActiveTrip?>(

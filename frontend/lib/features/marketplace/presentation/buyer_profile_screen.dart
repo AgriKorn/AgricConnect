@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/theme/theme_mode_controller.dart';
 import '../../../core/widgets/account_settings_screen.dart';
 import '../../../core/widgets/agri_dialog.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
@@ -115,6 +116,7 @@ class BuyerProfileScreen extends ConsumerWidget {
     final paymentMethods = ref.watch(savedPaymentMethodsProvider);
     final preferences = ref.watch(buyerPreferencesProvider);
     final verified = ref.watch(authControllerProvider).user?.status == AccountStatus.verified;
+    final themeMode = ref.watch(themeModeControllerProvider);
 
     return Scaffold(
       body: ColoredBox(
@@ -219,6 +221,30 @@ class BuyerProfileScreen extends ConsumerWidget {
                           value: preferences.marketingOffers,
                           onChanged: (_) => ref.read(buyerPreferencesProvider.notifier).toggleMarketingOffers(),
                           isLast: true,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 28),
+                    Text(
+                      'Appearance',
+                      style: TextStyle(color: colorScheme.onSurface, fontSize: 19, fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 12),
+                    _InfoCard(
+                      colorScheme: colorScheme,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: SegmentedButton<ThemeMode>(
+                            segments: const [
+                              ButtonSegment(value: ThemeMode.system, label: Text('System'), icon: Icon(Icons.brightness_auto_outlined)),
+                              ButtonSegment(value: ThemeMode.light, label: Text('Light'), icon: Icon(Icons.light_mode_outlined)),
+                              ButtonSegment(value: ThemeMode.dark, label: Text('Dark'), icon: Icon(Icons.dark_mode_outlined)),
+                            ],
+                            selected: {themeMode},
+                            onSelectionChanged: (selection) =>
+                                ref.read(themeModeControllerProvider.notifier).setThemeMode(selection.first),
+                          ),
                         ),
                       ],
                     ),

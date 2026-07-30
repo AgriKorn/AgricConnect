@@ -100,10 +100,16 @@ class DriverDispatchScreen extends ConsumerWidget {
                       colorScheme: colorScheme,
                       onDecline: () {
                         ref.read(availableJobsProvider.notifier).remove(job.id);
-                        showAgriToast(context, 'Declined ${job.cropSummary}');
+                        showAgriToast(
+                          context,
+                          'Declined ${job.cropSummary}',
+                          icon: Icons.cancel_rounded,
+                          isError: true,
+                        );
                       },
                       onAccept: () {
                         ref.read(availableJobsProvider.notifier).remove(job.id);
+                        ref.read(activeTripProvider.notifier).start(job);
                         showAgriToast(context, 'Accepted ${job.cropSummary}');
                       },
                     ),

@@ -22,6 +22,11 @@ class ActiveShipment {
     this.farmerName,
     this.farmerInitials,
     this.farmerLocation,
+    this.etaMinutes,
+    this.driverName,
+    this.driverRating,
+    this.driverVehicle,
+    this.transitProgress,
   });
 
   final String id;
@@ -32,6 +37,14 @@ class ActiveShipment {
   final String? farmerName;
   final String? farmerInitials;
   final String? farmerLocation;
+
+  /// Live-tracking fields (Order Tracking screen) — only populated for
+  /// shipments that are actually en route.
+  final int? etaMinutes;
+  final String? driverName;
+  final double? driverRating;
+  final String? driverVehicle;
+  final double? transitProgress;
 }
 
 const mockActiveShipments = [
@@ -44,6 +57,11 @@ const mockActiveShipments = [
     farmerName: 'Kofi Mensah',
     farmerInitials: 'KW',
     farmerLocation: 'Kumasi Central Farm • 12km away',
+    etaMinutes: 18,
+    driverName: 'Kofi Mensah',
+    driverRating: 4.8,
+    driverVehicle: 'White Isuzu NPR',
+    transitProgress: 0.55,
   ),
   ActiveShipment(
     id: 'o2',
