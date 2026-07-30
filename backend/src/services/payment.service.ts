@@ -1,6 +1,7 @@
 import { randomUUID, createHmac, timingSafeEqual } from 'crypto';
 import axios from 'axios';
 import logger from '../utils/logger';
+import { BadRequestError } from '../utils/errors';
 
 export interface InitializeTransactionResult {
   reference: string;
@@ -136,7 +137,12 @@ export class PaystackPaymentService implements IPaymentService {
       };
     } catch (error: any) {
       logger.error('[Paystack Resolve MoMo Error]:', error?.response?.data || error.message);
-      throw new Error('Could not verify Mobile Money account holder with Paystack');
+      // Surface Paystack's own reason (invalid account, wrong bank code, test-mode
+      // rate limit, etc.) as a proper 400 instead of an opaque 500 — the caller
+      // can act on "wrong bank code" or "try again later" but not on a generic
+      // "Internal Server Error".
+      const paystackMessage = error?.response?.data?.message;
+      throw new BadRequestError(paystackMessage || 'Could not verify Mobile Money account holder with Paystack');
     }
   }
 

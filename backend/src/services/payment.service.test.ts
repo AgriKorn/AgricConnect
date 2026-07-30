@@ -100,6 +100,21 @@ describe('PaystackPaymentService', () => {
       expect(res.accountNumber).toBe('0541234567');
     });
 
+    it('should surface Paystack\'s own error message as a 400 instead of an opaque 500', async () => {
+      mockedAxios.get.mockRejectedValueOnce({
+        response: {
+          data: {
+            message: 'Test mode daily limit of 3 live bank resolves exceeded. Use test bank codes 001 or upgrade to live mode.',
+          },
+        },
+      });
+
+      await expect(liveService.resolveMomoAccount('0541234567', 'MTN')).rejects.toMatchObject({
+        statusCode: 400,
+        message: 'Test mode daily limit of 3 live bank resolves exceeded. Use test bank codes 001 or upgrade to live mode.',
+      });
+    });
+
     it('should verify valid HMAC SHA-512 webhook signature', () => {
       const secret = 'sk_test_mock_key';
       const body = '{"event":"charge.success"}';
