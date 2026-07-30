@@ -145,6 +145,9 @@ export class PrismaUserRepository implements IUserRepository {
     if (data.email !== undefined) updateData.email = data.email;
     if (data.status) updateData.account_status = statusToPrisma(data.status);
     if (data.refreshToken !== undefined) updateData.refresh_token = data.refreshToken;
+    // AuthService.resetPassword writes the new hash through this method; without
+    // this line the reset reports success and silently changes nothing.
+    if (data.passwordHash !== undefined) updateData.password_hash = data.passwordHash;
 
     await prisma.user.update({
       where: { id },

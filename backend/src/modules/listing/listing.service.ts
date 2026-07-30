@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import QRCode from 'qrcode';
 import { ForbiddenError, NotFoundError, PayoutNotConfiguredError } from '../../utils/errors';
 import { auditService } from '../audit/audit.service';
+import logger from '../../utils/logger';
 import { userRepository } from '../user/user.repository.prisma';
 import { CreateListingInput, UpdateListingInput } from './listing.schema';
 import { IListingRepository } from './listing.repository';
@@ -26,6 +27,37 @@ const generateListingProof = async (farmerId: string, data: CreateListingInput) 
   return { listingHash, qrCodeData };
 };
 
+/**
+ * Records an audit entry without letting its failure undo work already committed.
+ *
+ * The listing is written and committed before the audit entry is attempted, so
+ * by that point it is durable and already visible in the marketplace. Rethrowing
+ * returned a 500 for a listing that had in fact been created, and farmers
+ * retried and produced duplicates.
+ *
+ * The audit gap is logged at error level rather than swallowed: a missing entry
+ * breaks the hash chain and someone has to know.
+ *
+ * Now that listings and the audit trail share a database, the better fix is to
+ * write both inside one `prisma.$transaction` and delete this wrapper. That
+ * needs AuditService.log to accept a transaction client, which it does not yet —
+ * tracked as follow-up work rather than folded into the persistence migration.
+ *
+ * Deliberately NOT applied to transaction/dispute/dispatch — those already call
+ * auditService.log inside a `prisma.$transaction`, where a failed audit write
+ * must roll the whole operation back.
+ */
+const auditNonFatal = async (operation: string, entityId: string, run: () => Promise<unknown>): Promise<void> => {
+  try {
+    await run();
+  } catch (err) {
+    logger.error(
+      `[Audit] Failed to record ${operation} for ${entityId} — the operation succeeded but its audit entry is missing, breaking the hash chain:`,
+      err,
+    );
+  }
+};
+
 export class ListingService {
   constructor(private readonly repo: IListingRepository) {}
 
@@ -45,7 +77,9 @@ export class ListingService {
       status: 'ACTIVE',
     });
 
-    await auditService.log('LISTING_CREATED', listing.id, { cropType: data.cropType, quantityKg: data.quantityKg, pricePerKg: data.pricePerKg }, farmerId);
+    await auditNonFatal('LISTING_CREATED', listing.id, () =>
+      auditService.log('LISTING_CREATED', listing.id, { cropType: data.cropType, quantityKg: data.quantityKg, pricePerKg: data.pricePerKg }, farmerId),
+    );
 
     return listing;
   }
@@ -61,7 +95,7 @@ export class ListingService {
   async updateListing(id: string, farmerId: string, data: UpdateListingInput): Promise<Listing> {
     const listing = await this.assertOwnedListing(id, farmerId);
     const updated = await this.repo.update(listing.id, data);
-    await auditService.log('LISTING_UPDATED', listing.id, data, farmerId);
+    await auditNonFatal('LISTING_UPDATED', listing.id, () => auditService.log('LISTING_UPDATED', listing.id, data, farmerId));
     return updated;
   }
 
