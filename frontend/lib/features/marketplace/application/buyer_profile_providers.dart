@@ -1,8 +1,31 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../auth/application/auth_controller.dart';
 import '../data/buyer_profile_mock.dart';
 
-final buyerProfileProvider = Provider<BuyerProfileDetails>((ref) => mockBuyerProfile);
+String _initialsOf(String name) {
+  final trimmed = name.trim();
+  if (trimmed.isEmpty) return '?';
+  final parts = trimmed.split(RegExp(r'\s+'));
+  final first = parts.first[0];
+  final last = parts.length > 1 ? parts.last[0] : '';
+  return (first + last).toUpperCase();
+}
+
+/// Overlays the real signed-in user's name/initials/location onto the mock
+/// profile so the Marketplace header and Buyer Profile screen (which read
+/// from different sources) never disagree on who's logged in.
+final buyerProfileProvider = Provider<BuyerProfileDetails>((ref) {
+  final user = ref.watch(authControllerProvider).user;
+  if (user == null) return mockBuyerProfile;
+  final region = user.region?.trim();
+  return BuyerProfileDetails(
+    name: user.name,
+    initials: _initialsOf(user.name),
+    tier: mockBuyerProfile.tier,
+    location: (region != null && region.isNotEmpty) ? region : mockBuyerProfile.location,
+  );
+});
 
 final deliveryAddressesProvider = Provider<List<DeliveryAddress>>((ref) => mockDeliveryAddresses);
 

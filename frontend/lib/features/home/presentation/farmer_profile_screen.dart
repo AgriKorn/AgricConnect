@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/theme_mode_controller.dart';
 import '../../../core/utils/currency.dart';
+import '../../../core/widgets/account_settings_screen.dart';
 import '../../../core/widgets/agri_dialog.dart';
-import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/help_support_screen.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/models/account_status.dart';
@@ -24,13 +24,26 @@ const _grayscaleMatrix = <double>[
   0, 0, 0, 1, 0,
 ];
 
-void _openComingSoon(BuildContext context, String title, IconData icon) {
+Widget _farmerAvatar(double size) {
+  return ClipOval(
+    child: ColorFiltered(
+      colorFilter: const ColorFilter.matrix(_grayscaleMatrix),
+      child: Image.asset(_heroImage, fit: BoxFit.cover),
+    ),
+  );
+}
+
+void _openFarmerAccountSettings(BuildContext context, bool verified) {
   Navigator.of(context).push(
     MaterialPageRoute(
-      builder: (context) => ComingSoonScreen(
-        title: title,
-        icon: icon,
-        message: '$title will be available in a future update.',
+      builder: (context) => AccountSettingsScreen(
+        avatarBuilder: _farmerAvatar,
+        roleBadgeLabel: verified ? 'Verified Farmer' : 'Farmer',
+        onHelpTap: () => _openFarmerHelp(context),
+        locationLabel: 'Farm Location',
+        locationHint: 'e.g. Ashanti Region, Ghana',
+        bioHint: 'Tell buyers about your farm...',
+        verifiedSubtitle: 'Your profile badge is visible to all buyers.',
       ),
     ),
   );
@@ -133,12 +146,7 @@ class FarmerProfileScreen extends ConsumerWidget {
                         _ActionRow(
                           colorScheme: colorScheme,
                           label: 'Account Settings',
-                          onTap: () => _openComingSoon(context, 'Account Settings', Icons.settings_outlined),
-                        ),
-                        _ActionRow(
-                          colorScheme: colorScheme,
-                          label: 'Payment Methods',
-                          onTap: () => _openComingSoon(context, 'Payment Methods', Icons.payments_outlined),
+                          onTap: () => _openFarmerAccountSettings(context, user?.status == AccountStatus.verified),
                         ),
                         _ActionRow(
                           colorScheme: colorScheme,

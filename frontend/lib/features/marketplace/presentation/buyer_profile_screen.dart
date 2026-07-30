@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/utils/currency.dart';
+import '../../../core/widgets/account_settings_screen.dart';
 import '../../../core/widgets/agri_dialog.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
+import '../../../core/widgets/edit_profile_screen.dart';
 import '../../../core/widgets/help_support_screen.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../auth/data/models/account_status.dart';
 import '../application/buyer_profile_providers.dart';
 import '../data/buyer_profile_mock.dart';
 
@@ -16,6 +18,55 @@ void _openComingSoon(BuildContext context, String title, IconData icon) {
         title: title,
         icon: icon,
         message: '$title will be available in a future update.',
+      ),
+    ),
+  );
+}
+
+Widget Function(double size) _buyerAvatarBuilder(BuyerProfileDetails profile) {
+  return (size) => Builder(
+        builder: (context) {
+          final colorScheme = Theme.of(context).colorScheme;
+          return ClipOval(
+            child: ColoredBox(
+              color: colorScheme.primary,
+              child: Center(
+                child: Text(
+                  profile.initials,
+                  style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w800, fontSize: size * 0.34),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+}
+
+void _openBuyerAccountSettings(BuildContext context, BuyerProfileDetails profile, bool verified) {
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (context) => AccountSettingsScreen(
+        avatarBuilder: _buyerAvatarBuilder(profile),
+        roleBadgeLabel: verified ? 'Verified ${profile.tier}' : profile.tier,
+        onHelpTap: () => _openBuyerHelp(context),
+        locationLabel: 'Location',
+        locationHint: 'e.g. Accra, Ghana',
+        bioHint: 'Tell farmers about your business...',
+        verifiedSubtitle: 'Your profile badge is visible to all farmers.',
+      ),
+    ),
+  );
+}
+
+void _openBuyerEditProfile(BuildContext context, BuyerProfileDetails profile) {
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (context) => EditProfileScreen(
+        avatarBuilder: _buyerAvatarBuilder(profile),
+        locationLabel: 'Location',
+        locationHint: 'e.g. Accra, Ghana',
+        bioHint: 'Tell farmers about your business...',
+        verifiedSubtitle: 'Your profile badge is visible to all farmers.',
       ),
     ),
   );
@@ -49,10 +100,10 @@ void _openBuyerHelp(BuildContext context) {
   );
 }
 
-/// Buyer-specific Profile tab: hero (avatar/tier), Wallet Balance, Delivery
-/// Addresses, Payment Methods, Preferences (notification toggles), Help &
-/// Privacy links, and Log Out. Farmer/Driver have their own equivalents —
-/// this one replicates the buyer-specific reference.
+/// Buyer-specific Profile tab: hero (avatar/tier), Delivery Addresses,
+/// Payment Methods, Preferences (notification toggles), Help & Privacy
+/// links, and Log Out. Farmer/Driver have their own equivalents — this
+/// one replicates the buyer-specific reference.
 class BuyerProfileScreen extends ConsumerWidget {
   const BuyerProfileScreen({super.key});
 
@@ -63,6 +114,7 @@ class BuyerProfileScreen extends ConsumerWidget {
     final addresses = ref.watch(deliveryAddressesProvider);
     final paymentMethods = ref.watch(savedPaymentMethodsProvider);
     final preferences = ref.watch(buyerPreferencesProvider);
+    final verified = ref.watch(authControllerProvider).user?.status == AccountStatus.verified;
 
     return Scaffold(
       body: ColoredBox(
@@ -77,12 +129,6 @@ class BuyerProfileScreen extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _WalletCard(
-                      colorScheme: colorScheme,
-                      balance: profile.walletBalance,
-                      onTopUp: () => _openComingSoon(context, 'Top Up Wallet', Icons.account_balance_wallet_outlined),
-                    ),
-                    const SizedBox(height: 28),
                     Row(
                       children: [
                         Expanded(
@@ -182,6 +228,12 @@ class BuyerProfileScreen extends ConsumerWidget {
                       children: [
                         _LinkRow(
                           colorScheme: colorScheme,
+                          icon: Icons.settings_outlined,
+                          label: 'Account Settings',
+                          onTap: () => _openBuyerAccountSettings(context, profile, verified),
+                        ),
+                        _LinkRow(
+                          colorScheme: colorScheme,
                           icon: Icons.help_outline_rounded,
                           label: 'Help Center',
                           onTap: () => _openBuyerHelp(context),
@@ -229,12 +281,12 @@ class _ProfileHero extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               GestureDetector(
-                onTap: () => _openComingSoon(context, 'Edit Profile', Icons.edit_rounded),
+                onTap: () => _openBuyerEditProfile(context, profile),
                 child: Container(
                   width: 34,
                   height: 34,
-                  decoration: BoxDecoration(color: colorScheme.secondary, shape: BoxShape.circle),
-                  child: Icon(Icons.edit_rounded, color: colorScheme.onSecondary, size: 16),
+                  decoration: BoxDecoration(color: colorScheme.primary, shape: BoxShape.circle),
+                  child: Icon(Icons.edit_rounded, color: colorScheme.onPrimary, size: 16),
                 ),
               ),
             ],
@@ -263,55 +315,6 @@ class _ProfileHero extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _WalletCard extends StatelessWidget {
-  const _WalletCard({required this.colorScheme, required this.balance, required this.onTopUp});
-
-  final ColorScheme colorScheme;
-  final double balance;
-  final VoidCallback onTopUp;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: colorScheme.primary, borderRadius: BorderRadius.circular(24)),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Wallet Balance',
-                  style: TextStyle(color: colorScheme.onPrimary.withValues(alpha: 0.85), fontSize: 13),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  formatGhs(balance),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: colorScheme.onPrimary, fontSize: 26, fontWeight: FontWeight.w800),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          FilledButton(
-            onPressed: onTopUp,
-            style: FilledButton.styleFrom(
-              backgroundColor: colorScheme.secondary,
-              foregroundColor: colorScheme.onSecondary,
-              shape: const StadiumBorder(),
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            ),
-            child: const Text('Top Up', style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
       ),

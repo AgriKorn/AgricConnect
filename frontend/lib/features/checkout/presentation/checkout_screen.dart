@@ -3,26 +3,53 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/currency.dart';
 import '../../../core/utils/freshness.dart';
+import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../marketplace/data/marketplace_mock.dart';
 import '../application/checkout_providers.dart';
 import '../data/checkout_mock.dart';
 
 /// Secure Checkout: escrow explainer -> order summary -> payment method ->
-/// sticky "Pay & Confirm Escrow" footer. Not yet tied to a real cart —
-/// [quantity] stands in for whatever the buyer selected on the listing.
-class CheckoutScreen extends ConsumerWidget {
-  const CheckoutScreen({super.key, required this.listing, this.quantity = 25});
+/// sticky "Pay & Confirm Escrow" footer. Handles one or more listings
+/// selected together on the marketplace grid, each with its own +/-
+/// adjustable quantity (starting from [quantity] as the initial stand-in —
+/// there's no real cart quantity carried over from the marketplace yet).
+class CheckoutScreen extends ConsumerStatefulWidget {
+  const CheckoutScreen({super.key, required this.listings, this.quantity = 25});
 
-  final MarketplaceListing listing;
+  final List<MarketplaceListing> listings;
   final double quantity;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CheckoutScreen> createState() => _CheckoutScreenState();
+}
+
+class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
+  late final Map<String, double> _quantities;
+
+  @override
+  void initState() {
+    super.initState();
+    _quantities = {for (final listing in widget.listings) listing.id: widget.quantity};
+  }
+
+  void _adjustQuantity(String listingId, double delta) {
+    setState(() {
+      final next = (_quantities[listingId] ?? widget.quantity) + delta;
+      _quantities[listingId] = next.clamp(1, 999);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final method = ref.watch(selectedPaymentMethodProvider);
+    final listings = widget.listings;
 
-    final subtotal = listing.pricePerUnit * quantity;
+    final subtotal = listings.fold<double>(
+      0,
+      (sum, listing) => sum + listing.pricePerUnit * (_quantities[listing.id] ?? widget.quantity),
+    );
     final total = subtotal + mockDeliveryFee + mockEscrowServiceFee;
 
     return Scaffold(
@@ -66,8 +93,9 @@ class CheckoutScreen extends ConsumerWidget {
                       const SizedBox(height: 24),
                       _OrderSummaryCard(
                         colorScheme: colorScheme,
-                        listing: listing,
-                        quantity: quantity,
+                        listings: listings,
+                        quantities: _quantities,
+                        onAdjustQuantity: _adjustQuantity,
                         subtotal: subtotal,
                         total: total,
                       ),
@@ -123,9 +151,7 @@ class CheckoutScreen extends ConsumerWidget {
                   colorScheme: colorScheme,
                   total: total,
                   onPay: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Payment confirmed — funds are held in escrow until delivery.')),
-                    );
+                    showAgriToast(context, 'Payment confirmed — funds are held in escrow until delivery.');
                     Navigator.of(context).pop();
                   },
                 ),
@@ -182,23 +208,22 @@ class _EscrowBanner extends StatelessWidget {
 class _OrderSummaryCard extends StatelessWidget {
   const _OrderSummaryCard({
     required this.colorScheme,
-    required this.listing,
-    required this.quantity,
+    required this.listings,
+    required this.quantities,
+    required this.onAdjustQuantity,
     required this.subtotal,
     required this.total,
   });
 
   final ColorScheme colorScheme;
-  final MarketplaceListing listing;
-  final double quantity;
+  final List<MarketplaceListing> listings;
+  final Map<String, double> quantities;
+  final void Function(String listingId, double delta) onAdjustQuantity;
   final double subtotal;
   final double total;
 
   @override
   Widget build(BuildContext context) {
-    final freshness = freshnessColorFor(listing.freshnessScore, Theme.of(context).brightness);
-    final quantityLabel = quantity == quantity.roundToDouble() ? quantity.toStringAsFixed(0) : quantity.toString();
-
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -216,56 +241,16 @@ class _OrderSummaryCard extends StatelessWidget {
           const SizedBox(height: 14),
           Divider(color: colorScheme.outline.withValues(alpha: 0.2), height: 1),
           const SizedBox(height: 18),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: SizedBox(
-                  width: 64,
-                  height: 64,
-                  child: listing.imageAsset != null
-                      ? Image.asset(listing.imageAsset!, fit: BoxFit.cover)
-                      : DecoratedBox(
-                          decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest),
-                          child: Icon(listing.category.icon, color: colorScheme.primary),
-                        ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      listing.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w800, fontSize: 16),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(color: freshness, borderRadius: BorderRadius.circular(999)),
-                          child: Text(
-                            '${listing.freshnessScore}% Fresh',
-                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'x $quantityLabel ${listing.unit.toUpperCase()}',
-                          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13, fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+          for (var i = 0; i < listings.length; i++) ...[
+            _OrderItemRow(
+              colorScheme: colorScheme,
+              listing: listings[i],
+              quantity: quantities[listings[i].id]!,
+              onDecrement: () => onAdjustQuantity(listings[i].id, -1),
+              onIncrement: () => onAdjustQuantity(listings[i].id, 1),
+            ),
+            if (i != listings.length - 1) const SizedBox(height: 18),
+          ],
           const SizedBox(height: 20),
           _SummaryRow(colorScheme: colorScheme, label: 'Subtotal', value: formatGhs(subtotal)),
           const SizedBox(height: 12),
@@ -282,6 +267,147 @@ class _OrderSummaryCard extends StatelessWidget {
             emphasized: true,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _OrderItemRow extends StatelessWidget {
+  const _OrderItemRow({
+    required this.colorScheme,
+    required this.listing,
+    required this.quantity,
+    required this.onDecrement,
+    required this.onIncrement,
+  });
+
+  final ColorScheme colorScheme;
+  final MarketplaceListing listing;
+  final double quantity;
+  final VoidCallback onDecrement;
+  final VoidCallback onIncrement;
+
+  @override
+  Widget build(BuildContext context) {
+    final freshness = freshnessColorFor(listing.freshnessScore, Theme.of(context).brightness);
+    final quantityLabel = quantity == quantity.roundToDouble() ? quantity.toStringAsFixed(0) : quantity.toString();
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: SizedBox(
+            width: 64,
+            height: 64,
+            child: listing.imageAsset != null
+                ? Image.asset(listing.imageAsset!, fit: BoxFit.cover)
+                : DecoratedBox(
+                    decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest),
+                    child: Icon(listing.category.icon, color: colorScheme.primary),
+                  ),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      listing.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w800, fontSize: 16),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    formatGhs(listing.pricePerUnit * quantity),
+                    style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: freshness, borderRadius: BorderRadius.circular(999)),
+                child: Text(
+                  '${listing.freshnessScore}% Fresh',
+                  style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(height: 10),
+              _QuantityStepper(
+                colorScheme: colorScheme,
+                quantityLabel: '$quantityLabel ${listing.unit.toUpperCase()}',
+                onDecrement: onDecrement,
+                onIncrement: onIncrement,
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuantityStepper extends StatelessWidget {
+  const _QuantityStepper({
+    required this.colorScheme,
+    required this.quantityLabel,
+    required this.onDecrement,
+    required this.onIncrement,
+  });
+
+  final ColorScheme colorScheme;
+  final String quantityLabel;
+  final VoidCallback onDecrement;
+  final VoidCallback onIncrement;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _StepperButton(icon: Icons.remove_rounded, colorScheme: colorScheme, onTap: onDecrement),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              quantityLabel,
+              style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+          ),
+          _StepperButton(icon: Icons.add_rounded, colorScheme: colorScheme, onTap: onIncrement),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepperButton extends StatelessWidget {
+  const _StepperButton({required this.icon, required this.colorScheme, required this.onTap});
+
+  final IconData icon;
+  final ColorScheme colorScheme;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: SizedBox(width: 30, height: 30, child: Icon(icon, size: 16, color: colorScheme.primary)),
       ),
     );
   }
@@ -315,8 +441,9 @@ class _SummaryRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: labelStyle),
-        Text(value, style: valueStyle),
+        Flexible(child: Text(label, style: labelStyle)),
+        const SizedBox(width: 8),
+        Flexible(child: Text(value, style: valueStyle, textAlign: TextAlign.right)),
       ],
     );
   }

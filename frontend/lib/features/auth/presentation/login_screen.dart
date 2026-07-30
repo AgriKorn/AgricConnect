@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/motion.dart';
+import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/theme_toggle_button.dart';
 import '../application/auth_controller.dart';
 import 'widgets/auth_visuals.dart';
@@ -55,9 +56,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ref.listen(authControllerProvider, (previous, next) {
       if (next.errorMessage != null &&
           next.errorMessage != previous?.errorMessage) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(next.errorMessage!)));
+        showAgriToast(context, next.errorMessage!, icon: Icons.error_outline_rounded);
       }
     });
 
@@ -66,16 +65,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         fit: StackFit.expand,
         children: [
           AmbientBackground(colorScheme: colorScheme),
-          Positioned(
-            top: 0,
-            right: 0,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(0, 12, 20, 0),
-                child: const ThemeToggleButton(),
-              ),
-            ),
-          ),
           SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
@@ -184,6 +173,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ],
                   ],
                 ),
+              ),
+            ),
+          ),
+          // Painted last (on top of the scrollable form) so it actually
+          // receives taps — a full-screen SingleChildScrollView's viewport
+          // claims pointer events across its whole area, including "empty"
+          // space, so a same-position sibling stacked underneath it (as
+          // this used to be) never gets the tap.
+          Positioned(
+            top: 0,
+            right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(0, 12, 20, 0),
+                child: const ThemeToggleButton(),
               ),
             ),
           ),

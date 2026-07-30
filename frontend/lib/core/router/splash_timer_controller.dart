@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// How long the logo-only splash screen stays up before the router lets it
 /// move on to onboarding/login. Overridden to [Duration.zero] in widget
 /// tests so they don't pay a real wall-clock wait.
-final splashMinDurationProvider = Provider<Duration>((ref) => const Duration(seconds: 5));
+final splashMinDurationProvider = Provider<Duration>((ref) => const Duration(seconds: 2));
 
 /// True once [splashMinDurationProvider] has elapsed since app start. The
 /// router redirect guard (core/router/app_router.dart) holds on /splash

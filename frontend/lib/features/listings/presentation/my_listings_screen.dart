@@ -125,7 +125,7 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
                 Expanded(
                   child: listings.isEmpty
                       ? EmptyState(
-                          icon: Icons.grass_outlined,
+                          icon: Icons.inventory_2_outlined,
                           message: 'No ${_selectedTab.toLowerCase()} listings yet.',
                         )
                       : ListView.separated(

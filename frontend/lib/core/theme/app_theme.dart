@@ -13,9 +13,9 @@ const _onSecondary = Color(0xFFFFFFFF);
 const _secondaryContainer = Color(0xFFD2B48C);
 const _onSecondaryContainer = Color(0xFF1A2E1A);
 
-const _accent = Color(0xFFE67E22);
-const _onAccent = Color(0xFFFFFFFF);
-const _accentContainer = Color(0xFFE67E22);
+const _accent = Color(0xFFC8E6C9);
+const _onAccent = Color(0xFF1A2E1A);
+const _accentContainer = Color(0xFFC8E6C9);
 const _onAccentContainer = Color(0xFF1A2E1A);
 
 /// Surfaces & Content — agriconnect-theme.md (light) / agriconnect-theme-dark.md.

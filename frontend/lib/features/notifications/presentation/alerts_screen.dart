@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency.dart';
+import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/empty_state.dart';
@@ -377,9 +378,7 @@ class _NotificationCard extends ConsumerWidget {
                 child: FilledButton.icon(
                   onPressed: () {
                     ref.read(orderNotificationsProvider.notifier).confirmPickup(notification.id);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Pickup confirmed for ${notification.customerName}')),
-                    );
+                    showAgriToast(context, 'Pickup confirmed for ${notification.customerName}');
                   },
                   style: FilledButton.styleFrom(
                     backgroundColor: colorScheme.primary,

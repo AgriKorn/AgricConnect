@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/currency.dart';
+import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/empty_state.dart';
@@ -52,9 +53,7 @@ class DriverDispatchScreen extends ConsumerWidget {
                         colorScheme: colorScheme,
                         onComplete: () {
                           ref.read(activeTripProvider.notifier).complete();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Delivery marked complete')),
-                          );
+                          showAgriToast(context, 'Delivery marked complete');
                         },
                       ),
                 const SizedBox(height: 28),
@@ -101,15 +100,11 @@ class DriverDispatchScreen extends ConsumerWidget {
                       colorScheme: colorScheme,
                       onDecline: () {
                         ref.read(availableJobsProvider.notifier).remove(job.id);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Declined ${job.cropSummary}')),
-                        );
+                        showAgriToast(context, 'Declined ${job.cropSummary}');
                       },
                       onAccept: () {
                         ref.read(availableJobsProvider.notifier).remove(job.id);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Accepted ${job.cropSummary}')),
-                        );
+                        showAgriToast(context, 'Accepted ${job.cropSummary}');
                       },
                     ),
                     const SizedBox(height: 16),

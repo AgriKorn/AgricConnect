@@ -68,7 +68,7 @@ class FarmerDashboardScreen extends ConsumerWidget {
                   height: 210,
                   child: listings.isEmpty
                       ? EmptyState(
-                          icon: Icons.grass_outlined,
+                          icon: Icons.inventory_2_outlined,
                           message: 'You have no active listings yet.',
                           ctaLabel: 'Scan produce',
                           onCta: () => context.go('/farmer/scan'),

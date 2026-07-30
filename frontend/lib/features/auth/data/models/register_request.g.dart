@@ -11,6 +11,7 @@ _$RegisterRequestImpl _$$RegisterRequestImplFromJson(
 ) => _$RegisterRequestImpl(
   role: $enumDecode(_$UserRoleEnumMap, json['role']),
   name: json['name'] as String,
+  email: json['email'] as String,
   phone: json['phone'] as String,
   password: json['password'] as String,
   region: json['region'] as String?,
@@ -25,6 +26,7 @@ Map<String, dynamic> _$$RegisterRequestImplToJson(
 ) => <String, dynamic>{
   'role': _$UserRoleEnumMap[instance.role]!,
   'name': instance.name,
+  'email': instance.email,
   'phone': instance.phone,
   'password': instance.password,
   'region': instance.region,

@@ -23,7 +23,6 @@ import '../../features/listings/presentation/add_listing_screen.dart';
 import '../../features/listings/presentation/my_listings_screen.dart';
 import '../../features/marketplace/presentation/buyer_profile_screen.dart';
 import '../../features/marketplace/presentation/marketplace_screen.dart';
-import '../../features/marketplace/presentation/search_screen.dart';
 import '../../features/notifications/presentation/alerts_screen.dart';
 import '../../features/onboarding/application/onboarding_controller.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
@@ -184,8 +183,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               label: 'Home',
             ),
             NavigationDestination(
-              icon: Icon(Icons.grass_outlined),
-              selectedIcon: Icon(Icons.grass_rounded),
+              icon: Icon(Icons.inventory_2_outlined),
+              selectedIcon: Icon(Icons.inventory_2_rounded),
               label: 'Listings',
             ),
             NavigationDestination(
@@ -232,7 +231,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         ],
       ),
 
-      // Buyer: Marketplace · Search · Orders · Profile (checklist 2.2)
+      // Buyer: Marketplace · Orders · Profile (checklist 2.2)
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => RoleNavShell(
           navigationShell: navigationShell,
@@ -241,11 +240,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               icon: Icon(Icons.storefront_outlined),
               selectedIcon: Icon(Icons.storefront_rounded),
               label: 'Marketplace',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.search_outlined),
-              selectedIcon: Icon(Icons.search_rounded),
-              label: 'Search',
             ),
             NavigationDestination(
               icon: Icon(Icons.receipt_long_outlined),
@@ -261,14 +255,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/buyer/marketplace',
                 builder: (context, state) => const MarketplaceScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/buyer/search',
-                builder: (context, state) => const SearchScreen(),
               ),
             ],
           ),

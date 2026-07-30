@@ -15,13 +15,15 @@ class UserModel with _$UserModel {
     required String id,
     required UserRole role,
     required String name,
+    required String email,
     required String phone,
     required AccountStatus status,
-    String? region, // Farmer / Driver
+    String? region, // Farmer / Buyer / Driver — their operating location
     String? businessName, // Buyer
     String? businessType, // Buyer
     String? vehicleCapacity, // Driver
     String? operatingRegion, // Driver
+    String? bio, // Farmer / Buyer / Driver — free-text profile description
   }) = _UserModel;
 
   factory UserModel.fromJson(Map<String, dynamic> json) => _$UserModelFromJson(json);

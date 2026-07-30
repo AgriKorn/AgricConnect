@@ -11,6 +11,7 @@ _$UserModelImpl _$$UserModelImplFromJson(Map<String, dynamic> json) =>
       id: json['id'] as String,
       role: $enumDecode(_$UserRoleEnumMap, json['role']),
       name: json['name'] as String,
+      email: json['email'] as String,
       phone: json['phone'] as String,
       status: $enumDecode(_$AccountStatusEnumMap, json['status']),
       region: json['region'] as String?,
@@ -18,6 +19,7 @@ _$UserModelImpl _$$UserModelImplFromJson(Map<String, dynamic> json) =>
       businessType: json['businessType'] as String?,
       vehicleCapacity: json['vehicleCapacity'] as String?,
       operatingRegion: json['operatingRegion'] as String?,
+      bio: json['bio'] as String?,
     );
 
 Map<String, dynamic> _$$UserModelImplToJson(_$UserModelImpl instance) =>
@@ -25,6 +27,7 @@ Map<String, dynamic> _$$UserModelImplToJson(_$UserModelImpl instance) =>
       'id': instance.id,
       'role': _$UserRoleEnumMap[instance.role]!,
       'name': instance.name,
+      'email': instance.email,
       'phone': instance.phone,
       'status': _$AccountStatusEnumMap[instance.status]!,
       'region': instance.region,
@@ -32,6 +35,7 @@ Map<String, dynamic> _$$UserModelImplToJson(_$UserModelImpl instance) =>
       'businessType': instance.businessType,
       'vehicleCapacity': instance.vehicleCapacity,
       'operatingRegion': instance.operatingRegion,
+      'bio': instance.bio,
     };
 
 const _$UserRoleEnumMap = {

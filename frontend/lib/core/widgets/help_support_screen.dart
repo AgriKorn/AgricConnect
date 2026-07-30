@@ -246,7 +246,14 @@ class _HeroCard extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [colorScheme.primary, colorScheme.secondary],
+            // Blended rather than the raw (very pale) tertiary token — a
+            // full-strength stop there washes out the white text it sits
+            // under; this keeps the same light-green direction while
+            // staying legible.
+            colors: [
+              colorScheme.primary,
+              Color.lerp(colorScheme.primary, colorScheme.tertiary, 0.65)!,
+            ],
           ),
         ),
         child: Stack(

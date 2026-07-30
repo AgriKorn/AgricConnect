@@ -9,14 +9,12 @@ class BuyerProfileDetails {
     required this.initials,
     required this.tier,
     required this.location,
-    required this.walletBalance,
   });
 
   final String name;
   final String initials;
   final String tier;
   final String location;
-  final double walletBalance;
 }
 
 const mockBuyerProfile = BuyerProfileDetails(
@@ -24,7 +22,6 @@ const mockBuyerProfile = BuyerProfileDetails(
   initials: 'KA',
   tier: 'Premium Buyer',
   location: 'Accra, Ghana',
-  walletBalance: 1450.25,
 );
 
 enum DeliveryAddressType { home, office }

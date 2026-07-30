@@ -2,10 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/widgets/agri_toast.dart';
+import '../../../core/widgets/coming_soon_screen.dart';
+import '../../../core/widgets/theme_toggle_button.dart';
 import '../application/auth_controller.dart';
 import '../data/models/register_request.dart';
 import '../data/models/user_role.dart';
 import 'widgets/auth_visuals.dart';
+
+const _markAsset = 'assets/images/agri_mark.png';
+
+void _openComingSoon(BuildContext context, String title, IconData icon) {
+  Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (context) => ComingSoonScreen(
+        title: title,
+        icon: icon,
+        message: '$title will be available in a future update.',
+      ),
+    ),
+  );
+}
 
 /// Checklist 1.2: shared fields for every role, plus fields specific to
 /// [role]. Client-side validation before submit; submit disabled in-flight.
@@ -24,6 +41,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
 
   final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -35,10 +53,12 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _agreedToTerms = false;
 
   @override
   void dispose() {
     _nameController.dispose();
+    _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -52,12 +72,21 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
+    if (!_agreedToTerms) {
+      showAgriToast(
+        context,
+        'Please agree to the Terms of Service and Privacy Policy',
+        icon: Icons.error_outline_rounded,
+      );
+      return;
+    }
     ref
         .read(authControllerProvider.notifier)
         .register(
           RegisterRequest(
             role: widget.role,
             name: _nameController.text.trim(),
+            email: _emailController.text.trim(),
             phone: _phoneController.text.trim(),
             password: _passwordController.text,
             region: widget.role == UserRole.farmer
@@ -83,14 +112,11 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
   Widget build(BuildContext context) {
     final session = ref.watch(authControllerProvider);
     final colorScheme = Theme.of(context).colorScheme;
-    final accent = widget.role.colorOf(colorScheme);
 
     ref.listen(authControllerProvider, (previous, next) {
       if (next.errorMessage != null &&
           next.errorMessage != previous?.errorMessage) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(next.errorMessage!)));
+        showAgriToast(context, next.errorMessage!, icon: Icons.error_outline_rounded);
       }
     });
 
@@ -107,47 +133,64 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    AuthBackButton(colorScheme: colorScheme, onPressed: () => context.pop()),
+                    Row(
+                      children: [
+                        AuthBackButton(colorScheme: colorScheme, onPressed: () => context.pop()),
+                        const Spacer(),
+                        const ThemeToggleButton(),
+                      ],
+                    ),
                     const SizedBox(height: 20),
+                    Image.asset(_markAsset, height: 40, fit: BoxFit.contain),
+                    const SizedBox(height: 14),
                     Text(
-                      'Sign up as ${widget.role.label}',
-                      style: TextStyle(color: colorScheme.onSurface, fontSize: 24, fontWeight: FontWeight.w800),
+                      'Create Account',
+                      style: TextStyle(color: colorScheme.onSurface, fontSize: 28, fontWeight: FontWeight.w800),
                     ),
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(widget.role.icon, size: 16, color: accent),
-                          const SizedBox(width: 6),
-                          Text(
-                            widget.role.label,
-                            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: accent),
-                          ),
-                        ],
-                      ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Fill in your details to join the agricultural marketplace as a ${widget.role.label.toLowerCase()}.',
+                      style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14.5, height: 1.4),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 24),
                     AuthGlassCard(
                       colorScheme: colorScheme,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          Text(
+                            'Account Details',
+                            style: TextStyle(color: colorScheme.onSurface, fontSize: 19, fontWeight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: 18),
                           _Field(
-                            label: 'Full name',
+                            label: 'Full Name',
                             controller: _nameController,
-                            hint: 'Enter your full name',
+                            hint: 'Enter your name',
+                            icon: Icons.person_outline_rounded,
                             colorScheme: colorScheme,
                           ),
                           _Field(
-                            label: 'Phone number',
+                            label: 'Email',
+                            controller: _emailController,
+                            hint: 'Enter your email',
+                            icon: Icons.email_outlined,
+                            keyboardType: TextInputType.emailAddress,
+                            colorScheme: colorScheme,
+                            validator: (value) {
+                              final email = value?.trim() ?? '';
+                              if (email.isEmpty) return 'Enter your email';
+                              if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+                                return 'Enter a valid email';
+                              }
+                              return null;
+                            },
+                          ),
+                          _Field(
+                            label: 'Phone Number',
                             controller: _phoneController,
-                            hint: '024 000 0000',
+                            hint: '+233 00 000 0000',
+                            icon: Icons.phone_outlined,
                             keyboardType: TextInputType.phone,
                             colorScheme: colorScheme,
                             validator: (value) {
@@ -164,6 +207,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                               label: 'Region / District',
                               controller: _regionController,
                               hint: 'e.g. Ashanti, Kumasi',
+                              icon: Icons.location_on_outlined,
                               colorScheme: colorScheme,
                             ),
                           if (widget.role == UserRole.buyer) ...[
@@ -171,6 +215,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                               label: 'Business name (optional)',
                               controller: _businessNameController,
                               hint: 'Enter your business name',
+                              icon: Icons.storefront_outlined,
                               colorScheme: colorScheme,
                               required: false,
                             ),
@@ -178,6 +223,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                               label: 'Business type',
                               controller: _businessTypeController,
                               hint: 'e.g. Wholesaler, Retailer',
+                              icon: Icons.category_outlined,
                               colorScheme: colorScheme,
                             ),
                           ],
@@ -186,12 +232,14 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                               label: 'Vehicle capacity',
                               controller: _vehicleCapacityController,
                               hint: 'e.g. 2 tonnes',
+                              icon: Icons.local_shipping_outlined,
                               colorScheme: colorScheme,
                             ),
                             _Field(
                               label: 'Operating region',
                               controller: _operatingRegionController,
                               hint: 'e.g. Greater Accra',
+                              icon: Icons.map_outlined,
                               colorScheme: colorScheme,
                             ),
                           ],
@@ -199,6 +247,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                             label: 'Password',
                             controller: _passwordController,
                             hint: 'Create a password',
+                            icon: Icons.lock_outline_rounded,
                             obscureText: _obscurePassword,
                             colorScheme: colorScheme,
                             onToggleObscure: () =>
@@ -211,6 +260,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                             label: 'Confirm password',
                             controller: _confirmPasswordController,
                             hint: 'Re-enter your password',
+                            icon: Icons.lock_outline_rounded,
                             obscureText: _obscureConfirmPassword,
                             colorScheme: colorScheme,
                             onToggleObscure: () => setState(
@@ -220,17 +270,82 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                                 ? 'Passwords do not match'
                                 : null,
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
+                          _TermsCheckbox(
+                            colorScheme: colorScheme,
+                            value: _agreedToTerms,
+                            onChanged: () => setState(() => _agreedToTerms = !_agreedToTerms),
+                          ),
+                          const SizedBox(height: 18),
                           AuthPillButton(
                             label: 'Create Account',
                             loading: session.isSubmitting,
                             onPressed: _submit,
                             colorScheme: colorScheme,
                           ),
+                          const SizedBox(height: 18),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  'Already have an account? ',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(color: colorScheme.onSurfaceVariant),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () => context.pop(),
+                                child: Text(
+                                  'Log In',
+                                  style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(child: Divider(color: colorScheme.outline.withValues(alpha: 0.3))),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            'or sign up with',
+                            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12.5, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        Expanded(child: Divider(color: colorScheme.outline.withValues(alpha: 0.3))),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _SocialButton(
+                            colorScheme: colorScheme,
+                            label: 'Google',
+                            iconBuilder: (color) => Text(
+                              'G',
+                              style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 18),
+                            ),
+                            onTap: () => _openComingSoon(context, 'Sign up with Google', Icons.g_mobiledata_rounded),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _SocialButton(
+                            colorScheme: colorScheme,
+                            label: 'Apple',
+                            iconBuilder: (color) => Icon(Icons.apple_rounded, color: color, size: 20),
+                            onTap: () => _openComingSoon(context, 'Sign up with Apple', Icons.apple_rounded),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -248,6 +363,7 @@ class _Field extends StatelessWidget {
     required this.controller,
     required this.hint,
     required this.colorScheme,
+    this.icon,
     this.keyboardType,
     this.obscureText = false,
     this.onToggleObscure,
@@ -259,6 +375,7 @@ class _Field extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final ColorScheme colorScheme;
+  final IconData? icon;
   final TextInputType? keyboardType;
   final bool obscureText;
   final VoidCallback? onToggleObscure;
@@ -278,6 +395,7 @@ class _Field extends StatelessWidget {
             controller: controller,
             hint: hint,
             colorScheme: colorScheme,
+            icon: icon,
             keyboardType: keyboardType,
             obscureText: obscureText,
             suffixIcon: onToggleObscure == null
@@ -298,6 +416,82 @@ class _Field extends StatelessWidget {
                     : null),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TermsCheckbox extends StatelessWidget {
+  const _TermsCheckbox({required this.colorScheme, required this.value, required this.onChanged});
+
+  final ColorScheme colorScheme;
+  final bool value;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onChanged,
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 26,
+            height: 26,
+            margin: const EdgeInsets.only(top: 2),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: value ? colorScheme.primary : Colors.transparent,
+              border: value ? null : Border.all(color: colorScheme.outline.withValues(alpha: 0.5)),
+            ),
+            child: value ? Icon(Icons.check_rounded, color: colorScheme.onPrimary, size: 16) : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'I agree to the Terms of Service and Privacy Policy',
+              style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SocialButton extends StatelessWidget {
+  const _SocialButton({
+    required this.colorScheme,
+    required this.label,
+    required this.iconBuilder,
+    required this.onTap,
+  });
+
+  final ColorScheme colorScheme;
+  final String label;
+  final Widget Function(Color color) iconBuilder;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 52,
+      child: OutlinedButton(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: colorScheme.onSurface,
+          side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.4)),
+          shape: const StadiumBorder(),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            iconBuilder(colorScheme.onSurface),
+            const SizedBox(width: 8),
+            Text(label, style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 14.5)),
+          ],
+        ),
       ),
     );
   }

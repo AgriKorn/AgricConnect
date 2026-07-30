@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency.dart';
+import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../application/dispatch_providers.dart';
@@ -78,14 +79,10 @@ class DriverHomeScreen extends ConsumerWidget {
                           colorScheme: colorScheme,
                           onDecline: () {
                             ref.read(activeTripProvider.notifier).complete();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Declined ${activeTrip.job.cropSummary}')),
-                            );
+                            showAgriToast(context, 'Declined ${activeTrip.job.cropSummary}');
                           },
                           onAccept: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Accepted ${activeTrip.job.cropSummary}')),
-                            );
+                            showAgriToast(context, 'Accepted ${activeTrip.job.cropSummary}');
                           },
                           onOpenNavigation: () => _pushComingSoon(
                             context,

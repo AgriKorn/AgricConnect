@@ -13,6 +13,7 @@ class RegisterRequest with _$RegisterRequest {
   const factory RegisterRequest({
     required UserRole role,
     required String name,
+    required String email,
     required String phone,
     required String password,
     String? region, // Farmer / Driver

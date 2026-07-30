@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency.dart';
@@ -52,35 +51,17 @@ class OrdersScreen extends ConsumerWidget {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                  child: Row(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'My Orders',
-                              style: TextStyle(color: colorScheme.onSurface, fontSize: 26, fontWeight: FontWeight.w800),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Track your farm-fresh produce',
-                              style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13.5),
-                            ),
-                          ],
-                        ),
+                      Text(
+                        'My Orders',
+                        style: TextStyle(color: colorScheme.onSurface, fontSize: 26, fontWeight: FontWeight.w800),
                       ),
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest, shape: BoxShape.circle),
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          tooltip: 'Search orders',
-                          icon: Icon(Icons.search_rounded, color: colorScheme.onSurface, size: 20),
-                          onPressed: () => context.go('/buyer/search'),
-                        ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Track your farm-fresh produce',
+                        style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13.5),
                       ),
                     ],
                   ),

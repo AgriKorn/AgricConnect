@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/utils/freshness.dart';
+import '../../../core/widgets/agri_toast.dart';
 import '../../auth/presentation/widgets/auth_visuals.dart';
 import '../../home/application/farmer_dashboard_providers.dart';
 import '../../home/data/farmer_dashboard_mock.dart';
@@ -77,9 +78,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
         );
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$cropType listed successfully')),
-    );
+    showAgriToast(context, '$cropType listed successfully');
     context.go('/farmer/listings');
   }
 

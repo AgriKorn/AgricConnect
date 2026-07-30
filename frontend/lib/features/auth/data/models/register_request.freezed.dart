@@ -23,6 +23,7 @@ RegisterRequest _$RegisterRequestFromJson(Map<String, dynamic> json) {
 mixin _$RegisterRequest {
   UserRole get role => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
+  String get email => throw _privateConstructorUsedError;
   String get phone => throw _privateConstructorUsedError;
   String get password => throw _privateConstructorUsedError;
   String? get region => throw _privateConstructorUsedError; // Farmer / Driver
@@ -52,6 +53,7 @@ abstract class $RegisterRequestCopyWith<$Res> {
   $Res call({
     UserRole role,
     String name,
+    String email,
     String phone,
     String password,
     String? region,
@@ -79,6 +81,7 @@ class _$RegisterRequestCopyWithImpl<$Res, $Val extends RegisterRequest>
   $Res call({
     Object? role = null,
     Object? name = null,
+    Object? email = null,
     Object? phone = null,
     Object? password = null,
     Object? region = freezed,
@@ -96,6 +99,10 @@ class _$RegisterRequestCopyWithImpl<$Res, $Val extends RegisterRequest>
             name: null == name
                 ? _value.name
                 : name // ignore: cast_nullable_to_non_nullable
+                      as String,
+            email: null == email
+                ? _value.email
+                : email // ignore: cast_nullable_to_non_nullable
                       as String,
             phone: null == phone
                 ? _value.phone
@@ -143,6 +150,7 @@ abstract class _$$RegisterRequestImplCopyWith<$Res>
   $Res call({
     UserRole role,
     String name,
+    String email,
     String phone,
     String password,
     String? region,
@@ -169,6 +177,7 @@ class __$$RegisterRequestImplCopyWithImpl<$Res>
   $Res call({
     Object? role = null,
     Object? name = null,
+    Object? email = null,
     Object? phone = null,
     Object? password = null,
     Object? region = freezed,
@@ -186,6 +195,10 @@ class __$$RegisterRequestImplCopyWithImpl<$Res>
         name: null == name
             ? _value.name
             : name // ignore: cast_nullable_to_non_nullable
+                  as String,
+        email: null == email
+            ? _value.email
+            : email // ignore: cast_nullable_to_non_nullable
                   as String,
         phone: null == phone
             ? _value.phone
@@ -226,6 +239,7 @@ class _$RegisterRequestImpl implements _RegisterRequest {
   const _$RegisterRequestImpl({
     required this.role,
     required this.name,
+    required this.email,
     required this.phone,
     required this.password,
     this.region,
@@ -242,6 +256,8 @@ class _$RegisterRequestImpl implements _RegisterRequest {
   final UserRole role;
   @override
   final String name;
+  @override
+  final String email;
   @override
   final String phone;
   @override
@@ -263,7 +279,7 @@ class _$RegisterRequestImpl implements _RegisterRequest {
 
   @override
   String toString() {
-    return 'RegisterRequest(role: $role, name: $name, phone: $phone, password: $password, region: $region, businessName: $businessName, businessType: $businessType, vehicleCapacity: $vehicleCapacity, operatingRegion: $operatingRegion)';
+    return 'RegisterRequest(role: $role, name: $name, email: $email, phone: $phone, password: $password, region: $region, businessName: $businessName, businessType: $businessType, vehicleCapacity: $vehicleCapacity, operatingRegion: $operatingRegion)';
   }
 
   @override
@@ -273,6 +289,7 @@ class _$RegisterRequestImpl implements _RegisterRequest {
             other is _$RegisterRequestImpl &&
             (identical(other.role, role) || other.role == role) &&
             (identical(other.name, name) || other.name == name) &&
+            (identical(other.email, email) || other.email == email) &&
             (identical(other.phone, phone) || other.phone == phone) &&
             (identical(other.password, password) ||
                 other.password == password) &&
@@ -293,6 +310,7 @@ class _$RegisterRequestImpl implements _RegisterRequest {
     runtimeType,
     role,
     name,
+    email,
     phone,
     password,
     region,
@@ -323,6 +341,7 @@ abstract class _RegisterRequest implements RegisterRequest {
   const factory _RegisterRequest({
     required final UserRole role,
     required final String name,
+    required final String email,
     required final String phone,
     required final String password,
     final String? region,
@@ -339,6 +358,8 @@ abstract class _RegisterRequest implements RegisterRequest {
   UserRole get role;
   @override
   String get name;
+  @override
+  String get email;
   @override
   String get phone;
   @override
