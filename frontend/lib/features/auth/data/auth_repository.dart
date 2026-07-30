@@ -195,6 +195,7 @@ class HttpAuthRepository implements AuthRepository {
       return UserModel(
         id: 'user-dev-approved',
         phone: phone,
+        email: '',
         role: UserRole.farmer,
         name: 'Approved User',
         status: AccountStatus.verified,
@@ -286,6 +287,7 @@ class HttpAuthRepository implements AuthRepository {
     return UserModel(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? 'AgriConnect User',
+      email: json['email']?.toString() ?? '',
       phone: json['phone']?.toString() ?? '',
       role: _stringToUserRole(roleStr),
       status: _stringToAccountStatus(statusStr),
