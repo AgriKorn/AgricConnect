@@ -71,7 +71,7 @@ class FarmerDashboardScreen extends ConsumerWidget {
                       ? const Center(child: CircularProgressIndicator())
                       : listings.isEmpty
                       ? EmptyState(
-                          icon: Icons.grass_outlined,
+                          icon: Icons.inventory_2_outlined,
                           message: 'You have no active listings yet.',
                           ctaLabel: 'Scan produce',
                           onCta: () => context.go('/farmer/scan'),
@@ -316,18 +316,20 @@ class _ListingCard extends StatelessWidget {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.12)],
-                          ),
-                        ),
-                        child: Center(
-                          child: Icon(Icons.eco_rounded, size: 40, color: accent.withValues(alpha: 0.8)),
-                        ),
-                      ),
+                      child: listing.imageAsset != null
+                          ? Image.asset(listing.imageAsset!, fit: BoxFit.cover)
+                          : DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.12)],
+                                ),
+                              ),
+                              child: Center(
+                                child: Icon(Icons.eco_rounded, size: 40, color: accent.withValues(alpha: 0.8)),
+                              ),
+                            ),
                     ),
                     Positioned(
                       top: 8,

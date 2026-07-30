@@ -8,6 +8,7 @@ import '../../../core/widgets/agri_bottom_sheet.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../checkout/presentation/checkout_screen.dart';
 import '../application/marketplace_providers.dart';
 import '../data/marketplace_mock.dart';
 
@@ -21,8 +22,18 @@ class MarketplaceScreen extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final listings = ref.watch(filteredMarketplaceListingsProvider);
     final userName = ref.watch(authControllerProvider).user?.name;
+    final selected = ref.watch(selectedMarketplaceListingsProvider);
 
     return Scaffold(
+      floatingActionButton: selected.isEmpty
+          ? null
+          : _CartFab(
+              colorScheme: colorScheme,
+              count: selected.length,
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => CheckoutScreen(listings: selected.toList())),
+              ),
+            ),
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -95,31 +106,25 @@ class _MarketplaceHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'AgriConnect',
-                style: TextStyle(color: colorScheme.primary, fontSize: 13, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 2),
-              Text(
                 'Marketplace',
-                style: TextStyle(color: colorScheme.onSurface, fontSize: 26, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                  color: colorScheme.onSurface,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -1,
+                ),
               ),
             ],
           ),
         ),
         GestureDetector(
           onTap: () => context.go('/buyer/profile'),
-          child: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest,
-              shape: BoxShape.circle,
-              border: Border.all(color: colorScheme.outline.withValues(alpha: 0.35)),
-            ),
-            alignment: Alignment.center,
+          child: CircleAvatar(
+            radius: 22,
+            backgroundColor: colorScheme.primary,
             child: Text(
               _initialsOf(userName),
-              style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 14),
+              style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w800, fontSize: 14),
             ),
           ),
         ),
@@ -294,84 +299,155 @@ class _CategoryChip extends StatelessWidget {
   }
 }
 
-class _ListingTile extends StatelessWidget {
+class _CartFab extends StatelessWidget {
+  const _CartFab({required this.colorScheme, required this.count, required this.onPressed});
+
+  final ColorScheme colorScheme;
+  final int count;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        FloatingActionButton(
+          backgroundColor: colorScheme.primary,
+          foregroundColor: colorScheme.onPrimary,
+          onPressed: onPressed,
+          child: const Icon(Icons.shopping_cart_rounded),
+        ),
+        Positioned(
+          top: -4,
+          right: -4,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            constraints: const BoxConstraints(minWidth: 22),
+            decoration: BoxDecoration(
+              color: colorScheme.error,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: colorScheme.surface, width: 2),
+            ),
+            child: Text(
+              '$count',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: colorScheme.onError, fontSize: 12, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ListingTile extends ConsumerWidget {
   const _ListingTile({required this.listing, required this.colorScheme});
 
   final MarketplaceListing listing;
   final ColorScheme colorScheme;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final freshness = freshnessColorFor(listing.freshnessScore, Theme.of(context).brightness);
     final accent = colorScheme.primary;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: Material(
-        color: colorScheme.surface.withValues(alpha: 0.6),
-        child: InkWell(
-          onTap: () => context.push('/buyer/marketplace/listing', extra: listing),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.12)],
+    final selected = ref.watch(selectedMarketplaceListingsProvider).contains(listing);
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        border: selected ? Border.all(color: colorScheme.primary, width: 3) : null,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(selected ? 19 : 22),
+        child: Material(
+          color: colorScheme.surface.withValues(alpha: 0.6),
+          child: InkWell(
+            onTap: () {
+              final notifier = ref.read(selectedMarketplaceListingsProvider.notifier);
+              final next = Set<MarketplaceListing>.from(notifier.state);
+              if (!next.remove(listing)) next.add(listing);
+              notifier.state = next;
+            },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: listing.imageAsset != null
+                            ? Image.asset(listing.imageAsset!, fit: BoxFit.cover)
+                            : DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.12)],
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Icon(listing.category.icon, size: 44, color: accent.withValues(alpha: 0.8)),
+                                ),
+                              ),
+                      ),
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(color: freshness, borderRadius: BorderRadius.circular(999)),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.eco_rounded, size: 11, color: Colors.white),
+                              const SizedBox(width: 3),
+                              Text(
+                                '${listing.freshnessScore}% Fresh',
+                                style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700),
+                              ),
+                            ],
                           ),
                         ),
-                        child: Center(
-                          child: Icon(listing.category.icon, size: 44, color: accent.withValues(alpha: 0.8)),
+                      ),
+                      if (selected)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(color: colorScheme.primary, shape: BoxShape.circle),
+                            child: Icon(Icons.check_rounded, size: 16, color: colorScheme.onPrimary),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        listing.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          letterSpacing: -1,
                         ),
                       ),
-                    ),
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(color: freshness, borderRadius: BorderRadius.circular(999)),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.eco_rounded, size: 11, color: Colors.white),
-                            const SizedBox(width: 3),
-                            Text(
-                              '${listing.freshnessScore}% Fresh',
-                              style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700),
-                            ),
-                          ],
-                        ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${formatGhs(listing.pricePerUnit)} / ${listing.unit}',
+                        style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w600, fontSize: 12),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      listing.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 14),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${formatGhs(listing.pricePerUnit)} / ${listing.unit}',
-                      style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w600, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

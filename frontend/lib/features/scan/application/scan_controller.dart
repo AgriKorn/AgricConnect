@@ -67,6 +67,13 @@ class ScanController extends Notifier<ScanState> {
     state = state.copyWith(isFlashOn: !state.isFlashOn);
   }
 
+  /// The crop type the upcoming [captureAndAnalyze] call will resolve to —
+  /// lets the capture screen's "detected" label match the result it's about
+  /// to navigate to, without actually running detection before the mock
+  /// "analysis" delay completes.
+  String get previewCropType =>
+      _sampleResults[_sampleIndex % _sampleResults.length].cropType;
+
   Future<ScanRecord> captureAndAnalyze() async {
     if (state.isScanning) {
       final existing = state.lastResult;

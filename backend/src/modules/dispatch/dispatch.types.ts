@@ -7,6 +7,7 @@ export interface DriverJob {
   driverId: string;
   cropType: string;
   quantityKg: number;
+  amountGhs: number;
   status: DriverJobStatus;
   createdAt: Date;
   updatedAt: Date;

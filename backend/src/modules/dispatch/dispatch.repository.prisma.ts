@@ -35,6 +35,7 @@ const mapPrismaToJob = (a: any): DriverJob => ({
   driverId: a.driver_id,
   cropType: a.orders?.produce_listings?.crop_types?.name || 'crop',
   quantityKg: a.orders?.produce_listings?.quantity_kg ? Number(a.orders.produce_listings.quantity_kg) : 100,
+  amountGhs: a.orders?.amount_ghs ? Number(a.orders.amount_ghs) : 0,
   status: statusFromPrisma(a.status),
   createdAt: a.notified_at,
   updatedAt: a.responded_at || a.notified_at,

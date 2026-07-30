@@ -11,6 +11,7 @@ class DispatchJobModel {
     required this.transactionId,
     required this.cropType,
     required this.quantityKg,
+    required this.amountGhs,
     required this.status,
     required this.createdAt,
   });
@@ -19,6 +20,7 @@ class DispatchJobModel {
   final String transactionId;
   final String cropType;
   final double quantityKg;
+  final double amountGhs;
   final String status;
   final DateTime createdAt;
 
@@ -28,6 +30,7 @@ class DispatchJobModel {
       transactionId: json['transactionId']?.toString() ?? '',
       cropType: json['cropType']?.toString() ?? 'Produce',
       quantityKg: double.tryParse(json['quantityKg']?.toString() ?? '') ?? 0.0,
+      amountGhs: double.tryParse(json['amountGhs']?.toString() ?? '') ?? 0.0,
       status: json['status']?.toString() ?? 'PENDING',
       createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now(),
     );

@@ -61,6 +61,7 @@ dependencies:
   # for a session, which the backend then verifies to issue our own JWT
   google_sign_in: ^6.2.2
   supabase_flutter: ^2.8.0
+  camera: ^0.12.0+2
 
 dev_dependencies:
   flutter_test:

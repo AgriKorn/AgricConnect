@@ -24,13 +24,16 @@ mixin _$UserModel {
   String get id => throw _privateConstructorUsedError;
   UserRole get role => throw _privateConstructorUsedError;
   String get name => throw _privateConstructorUsedError;
+  String get email => throw _privateConstructorUsedError;
   String get phone => throw _privateConstructorUsedError;
   AccountStatus get status => throw _privateConstructorUsedError;
-  String? get region => throw _privateConstructorUsedError; // Farmer / Driver
+  String? get region =>
+      throw _privateConstructorUsedError; // Farmer / Buyer / Driver — their operating location
   String? get businessName => throw _privateConstructorUsedError; // Buyer
   String? get businessType => throw _privateConstructorUsedError; // Buyer
   String? get vehicleCapacity => throw _privateConstructorUsedError; // Driver
-  String? get operatingRegion => throw _privateConstructorUsedError;
+  String? get operatingRegion => throw _privateConstructorUsedError; // Driver
+  String? get bio => throw _privateConstructorUsedError;
 
   /// Serializes this UserModel to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -51,6 +54,7 @@ abstract class $UserModelCopyWith<$Res> {
     String id,
     UserRole role,
     String name,
+    String email,
     String phone,
     AccountStatus status,
     String? region,
@@ -58,6 +62,7 @@ abstract class $UserModelCopyWith<$Res> {
     String? businessType,
     String? vehicleCapacity,
     String? operatingRegion,
+    String? bio,
   });
 }
 
@@ -79,6 +84,7 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
     Object? id = null,
     Object? role = null,
     Object? name = null,
+    Object? email = null,
     Object? phone = null,
     Object? status = null,
     Object? region = freezed,
@@ -86,6 +92,7 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
     Object? businessType = freezed,
     Object? vehicleCapacity = freezed,
     Object? operatingRegion = freezed,
+    Object? bio = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -100,6 +107,10 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
             name: null == name
                 ? _value.name
                 : name // ignore: cast_nullable_to_non_nullable
+                      as String,
+            email: null == email
+                ? _value.email
+                : email // ignore: cast_nullable_to_non_nullable
                       as String,
             phone: null == phone
                 ? _value.phone
@@ -129,6 +140,10 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
                 ? _value.operatingRegion
                 : operatingRegion // ignore: cast_nullable_to_non_nullable
                       as String?,
+            bio: freezed == bio
+                ? _value.bio
+                : bio // ignore: cast_nullable_to_non_nullable
+                      as String?,
           )
           as $Val,
     );
@@ -148,6 +163,7 @@ abstract class _$$UserModelImplCopyWith<$Res>
     String id,
     UserRole role,
     String name,
+    String email,
     String phone,
     AccountStatus status,
     String? region,
@@ -155,6 +171,7 @@ abstract class _$$UserModelImplCopyWith<$Res>
     String? businessType,
     String? vehicleCapacity,
     String? operatingRegion,
+    String? bio,
   });
 }
 
@@ -175,6 +192,7 @@ class __$$UserModelImplCopyWithImpl<$Res>
     Object? id = null,
     Object? role = null,
     Object? name = null,
+    Object? email = null,
     Object? phone = null,
     Object? status = null,
     Object? region = freezed,
@@ -182,6 +200,7 @@ class __$$UserModelImplCopyWithImpl<$Res>
     Object? businessType = freezed,
     Object? vehicleCapacity = freezed,
     Object? operatingRegion = freezed,
+    Object? bio = freezed,
   }) {
     return _then(
       _$UserModelImpl(
@@ -196,6 +215,10 @@ class __$$UserModelImplCopyWithImpl<$Res>
         name: null == name
             ? _value.name
             : name // ignore: cast_nullable_to_non_nullable
+                  as String,
+        email: null == email
+            ? _value.email
+            : email // ignore: cast_nullable_to_non_nullable
                   as String,
         phone: null == phone
             ? _value.phone
@@ -225,6 +248,10 @@ class __$$UserModelImplCopyWithImpl<$Res>
             ? _value.operatingRegion
             : operatingRegion // ignore: cast_nullable_to_non_nullable
                   as String?,
+        bio: freezed == bio
+            ? _value.bio
+            : bio // ignore: cast_nullable_to_non_nullable
+                  as String?,
       ),
     );
   }
@@ -237,6 +264,7 @@ class _$UserModelImpl implements _UserModel {
     required this.id,
     required this.role,
     required this.name,
+    required this.email,
     required this.phone,
     required this.status,
     this.region,
@@ -244,6 +272,7 @@ class _$UserModelImpl implements _UserModel {
     this.businessType,
     this.vehicleCapacity,
     this.operatingRegion,
+    this.bio,
   });
 
   factory _$UserModelImpl.fromJson(Map<String, dynamic> json) =>
@@ -256,12 +285,14 @@ class _$UserModelImpl implements _UserModel {
   @override
   final String name;
   @override
+  final String email;
+  @override
   final String phone;
   @override
   final AccountStatus status;
   @override
   final String? region;
-  // Farmer / Driver
+  // Farmer / Buyer / Driver — their operating location
   @override
   final String? businessName;
   // Buyer
@@ -273,10 +304,13 @@ class _$UserModelImpl implements _UserModel {
   // Driver
   @override
   final String? operatingRegion;
+  // Driver
+  @override
+  final String? bio;
 
   @override
   String toString() {
-    return 'UserModel(id: $id, role: $role, name: $name, phone: $phone, status: $status, region: $region, businessName: $businessName, businessType: $businessType, vehicleCapacity: $vehicleCapacity, operatingRegion: $operatingRegion)';
+    return 'UserModel(id: $id, role: $role, name: $name, email: $email, phone: $phone, status: $status, region: $region, businessName: $businessName, businessType: $businessType, vehicleCapacity: $vehicleCapacity, operatingRegion: $operatingRegion, bio: $bio)';
   }
 
   @override
@@ -287,6 +321,7 @@ class _$UserModelImpl implements _UserModel {
             (identical(other.id, id) || other.id == id) &&
             (identical(other.role, role) || other.role == role) &&
             (identical(other.name, name) || other.name == name) &&
+            (identical(other.email, email) || other.email == email) &&
             (identical(other.phone, phone) || other.phone == phone) &&
             (identical(other.status, status) || other.status == status) &&
             (identical(other.region, region) || other.region == region) &&
@@ -297,7 +332,8 @@ class _$UserModelImpl implements _UserModel {
             (identical(other.vehicleCapacity, vehicleCapacity) ||
                 other.vehicleCapacity == vehicleCapacity) &&
             (identical(other.operatingRegion, operatingRegion) ||
-                other.operatingRegion == operatingRegion));
+                other.operatingRegion == operatingRegion) &&
+            (identical(other.bio, bio) || other.bio == bio));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -307,6 +343,7 @@ class _$UserModelImpl implements _UserModel {
     id,
     role,
     name,
+    email,
     phone,
     status,
     region,
@@ -314,6 +351,7 @@ class _$UserModelImpl implements _UserModel {
     businessType,
     vehicleCapacity,
     operatingRegion,
+    bio,
   );
 
   /// Create a copy of UserModel
@@ -335,6 +373,7 @@ abstract class _UserModel implements UserModel {
     required final String id,
     required final UserRole role,
     required final String name,
+    required final String email,
     required final String phone,
     required final AccountStatus status,
     final String? region,
@@ -342,6 +381,7 @@ abstract class _UserModel implements UserModel {
     final String? businessType,
     final String? vehicleCapacity,
     final String? operatingRegion,
+    final String? bio,
   }) = _$UserModelImpl;
 
   factory _UserModel.fromJson(Map<String, dynamic> json) =
@@ -354,11 +394,13 @@ abstract class _UserModel implements UserModel {
   @override
   String get name;
   @override
+  String get email;
+  @override
   String get phone;
   @override
   AccountStatus get status;
   @override
-  String? get region; // Farmer / Driver
+  String? get region; // Farmer / Buyer / Driver — their operating location
   @override
   String? get businessName; // Buyer
   @override
@@ -366,7 +408,9 @@ abstract class _UserModel implements UserModel {
   @override
   String? get vehicleCapacity; // Driver
   @override
-  String? get operatingRegion;
+  String? get operatingRegion; // Driver
+  @override
+  String? get bio;
 
   /// Create a copy of UserModel
   /// with the given fields replaced by the non-null parameter values.

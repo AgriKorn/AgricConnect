@@ -27,6 +27,8 @@ describe('TransactionService', () => {
     listingId: 'listing-123',
     buyerId: 'buyer-456',
     farmerId: 'farmer-789',
+    farmerName: 'Test Farmer',
+    cropType: 'tomato',
     amountGhs: 3000,
     status: 'PAYMENT_HELD',
     hasOwnTransport: false,

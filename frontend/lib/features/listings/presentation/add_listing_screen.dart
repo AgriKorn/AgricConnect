@@ -6,6 +6,7 @@ import '../../../core/network/api_endpoints.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/utils/freshness.dart';
+import '../../../core/widgets/agri_toast.dart';
 import '../../auth/presentation/widgets/auth_visuals.dart';
 import '../../home/application/farmer_dashboard_providers.dart';
 import '../../marketplace/data/marketplace_repository.dart';
@@ -101,9 +102,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
           );
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$cropType listed successfully')),
-      );
+      showAgriToast(context, '$cropType listed successfully');
       context.go('/farmer/listings');
     } on ApiException catch (e) {
       setState(() => _error = e.message);

@@ -10,20 +10,19 @@ import '../../features/auth/data/models/user_role.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/pending_verification_screen.dart';
-import '../../features/auth/presentation/profile_screen.dart';
 import '../../features/auth/presentation/registration_screen.dart';
 import '../../features/auth/presentation/role_selection_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
+import '../../features/dispatch/presentation/driver_dispatch_screen.dart';
 import '../../features/dispatch/presentation/driver_home_screen.dart';
+import '../../features/dispatch/presentation/driver_profile_screen.dart';
 import '../../features/dispatch/presentation/job_history_screen.dart';
 import '../../features/home/presentation/farmer_dashboard_screen.dart';
 import '../../features/home/presentation/farmer_profile_screen.dart';
 import '../../features/listings/presentation/add_listing_screen.dart';
 import '../../features/listings/presentation/my_listings_screen.dart';
-import '../../features/marketplace/data/marketplace_mock.dart';
-import '../../features/marketplace/presentation/listing_detail_screen.dart';
+import '../../features/marketplace/presentation/buyer_profile_screen.dart';
 import '../../features/marketplace/presentation/marketplace_screen.dart';
-import '../../features/marketplace/presentation/search_screen.dart';
 import '../../features/notifications/presentation/alerts_screen.dart';
 import '../../features/onboarding/application/onboarding_controller.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
@@ -184,8 +183,8 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               label: 'Home',
             ),
             NavigationDestination(
-              icon: Icon(Icons.grass_outlined),
-              selectedIcon: Icon(Icons.grass_rounded),
+              icon: Icon(Icons.inventory_2_outlined),
+              selectedIcon: Icon(Icons.inventory_2_rounded),
               label: 'Listings',
             ),
             NavigationDestination(
@@ -232,12 +231,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         ],
       ),
 
-      GoRoute(
-        path: '/buyer/marketplace/listing',
-        builder: (context, state) => ListingDetailScreen(listing: state.extra as MarketplaceListing),
-      ),
-
-      // Buyer: Marketplace · Search · Orders · Profile (checklist 2.2)
+      // Buyer: Marketplace · Orders · Profile (checklist 2.2)
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => RoleNavShell(
           navigationShell: navigationShell,
@@ -246,11 +240,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               icon: Icon(Icons.storefront_outlined),
               selectedIcon: Icon(Icons.storefront_rounded),
               label: 'Marketplace',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.search_outlined),
-              selectedIcon: Icon(Icons.search_rounded),
-              label: 'Search',
             ),
             NavigationDestination(
               icon: Icon(Icons.receipt_long_outlined),
@@ -272,14 +261,6 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/buyer/search',
-                builder: (context, state) => const SearchScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
                 path: '/buyer/orders',
                 builder: (context, state) => const OrdersScreen(),
               ),
@@ -289,14 +270,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/buyer/profile',
-                builder: (context, state) => const ProfileScreen(),
+                builder: (context, state) => const BuyerProfileScreen(),
               ),
             ],
           ),
         ],
       ),
 
-      // Driver: Home (Availability toggle) · Job History · Profile (checklist 2.2)
+      // Driver: Home (Availability toggle) · Jobs (Dispatch) · Job History · Profile (checklist 2.2)
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => RoleNavShell(
           navigationShell: navigationShell,
@@ -305,6 +286,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               icon: Icon(Icons.local_shipping_outlined),
               selectedIcon: Icon(Icons.local_shipping_rounded),
               label: 'Home',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.assignment_outlined),
+              selectedIcon: Icon(Icons.assignment_rounded),
+              label: 'Jobs',
             ),
             NavigationDestination(
               icon: Icon(Icons.history_outlined),
@@ -326,6 +312,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/driver/jobs',
+                builder: (context, state) => const DriverDispatchScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: '/driver/history',
                 builder: (context, state) => const JobHistoryScreen(),
               ),
@@ -335,7 +329,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
             routes: [
               GoRoute(
                 path: '/driver/profile',
-                builder: (context, state) => const ProfileScreen(),
+                builder: (context, state) => const DriverProfileScreen(),
               ),
             ],
           ),

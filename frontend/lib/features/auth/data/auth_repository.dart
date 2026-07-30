@@ -92,6 +92,7 @@ class HttpAuthRepository implements AuthRepository {
       final roleStr = _userRoleToString(request.role);
       final payload = {
         'name': request.name.trim(),
+        'email': request.email.trim(),
         'phone': _formatGhanaPhone(request.phone),
         'password': request.password,
         'role': roleStr,
@@ -363,6 +364,7 @@ class HttpAuthRepository implements AuthRepository {
 /// Fallback Mock implementation for offline dev testing
 class MockAuthRepository implements AuthRepository {
   final Map<String, UserModel> _usersByPhone = {};
+  final Map<String, UserModel> _usersByEmail = {};
   final Map<String, String> _passwordsByPhone = {};
   int _nextId = 1;
 
@@ -375,12 +377,16 @@ class MockAuthRepository implements AuthRepository {
     if (_usersByPhone.containsKey(request.phone)) {
       throw const ApiException('An account with this phone number already exists.');
     }
+    if (_usersByEmail.containsKey(request.email)) {
+      throw const ApiException('An account with this email already exists.');
+    }
 
     final isBuyer = request.role == UserRole.buyer;
     final user = UserModel(
       id: 'mock-${_nextId++}',
       role: request.role,
       name: request.name,
+      email: request.email,
       phone: request.phone,
       status: isBuyer ? AccountStatus.verified : AccountStatus.pendingVerification,
       region: request.region,
@@ -391,6 +397,7 @@ class MockAuthRepository implements AuthRepository {
     );
 
     _usersByPhone[request.phone] = user;
+    _usersByEmail[request.email] = user;
     _passwordsByPhone[request.phone] = request.password;
 
     return RegisterResult(

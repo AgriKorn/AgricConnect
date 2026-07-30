@@ -26,6 +26,10 @@ final marketplaceSearchQueryProvider = StateProvider<String>((ref) => '');
 
 final marketplaceSortProvider = StateProvider<ListingSort>((ref) => ListingSort.freshnessDesc);
 
+/// Listings tapped/selected on the marketplace grid — driving the bottom
+/// cart button that takes them all to checkout together.
+final selectedMarketplaceListingsProvider = StateProvider<Set<MarketplaceListing>>((ref) => {});
+
 final filteredMarketplaceListingsProvider = Provider<List<MarketplaceListing>>((ref) {
   final category = ref.watch(marketplaceCategoryFilterProvider);
   final query = ref.watch(marketplaceSearchQueryProvider).trim().toLowerCase();

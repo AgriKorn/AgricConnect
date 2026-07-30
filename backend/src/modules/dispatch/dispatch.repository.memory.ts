@@ -13,7 +13,7 @@ export class InMemoryDispatchRepository implements IDispatchRepository {
 
   async create(data: CreateDriverJobRecord): Promise<DriverJob> {
     const now = new Date();
-    const job: DriverJob = { id: randomUUID(), ...data, status: 'PENDING', createdAt: now, updatedAt: now };
+    const job: DriverJob = { id: randomUUID(), ...data, amountGhs: 0, status: 'PENDING', createdAt: now, updatedAt: now };
     this.jobs.set(job.id, job);
     return job;
   }

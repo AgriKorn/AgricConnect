@@ -58,13 +58,12 @@ class AuthController extends Notifier<SessionState> {
     }
   }
 
-  Future<void> _persistSession(AuthResponseModel response) async {
+  Future<void> _persistSession(AuthResponseModel response) => _persistUser(response.user);
+
+  Future<void> _persistUser(UserModel user) async {
     await ref
         .read(localPrefsProvider)
-        .setString(
-          _sessionSnapshotKey,
-          jsonEncode({'user': response.user.toJson()}),
-        );
+        .setString(_sessionSnapshotKey, jsonEncode({'user': user.toJson()}));
   }
 
   Future<void> _clearPersistedSession() async {
@@ -92,6 +91,31 @@ class AuthController extends Notifier<SessionState> {
     } on ApiException catch (e) {
       state = state.copyWith(isSubmitting: false, errorMessage: e.message);
     }
+  }
+
+  /// Local-only edit (checklist: no `PATCH /users/me` endpoint yet) — updates
+  /// the signed-in [UserModel] and persists it the same way the post-login
+  /// snapshot is, so the change survives app restarts and shows up anywhere
+  /// [authControllerProvider] is read from.
+  Future<void> updateProfile({
+    required String name,
+    required String phone,
+    required String email,
+    String? region,
+    String? bio,
+  }) async {
+    final currentUser = state.user;
+    if (currentUser == null) return;
+
+    final updated = currentUser.copyWith(
+      name: name,
+      phone: phone,
+      email: email,
+      region: region,
+      bio: bio,
+    );
+    state = state.copyWith(user: updated);
+    await _persistUser(updated);
   }
 
   Future<void> login({required String phone, required String password}) async {

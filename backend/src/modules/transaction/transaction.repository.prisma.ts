@@ -16,6 +16,8 @@ const mapPrismaToTransaction = (order: any, farmerId?: string): Transaction => {
     listingId: order.listing_id,
     buyerId: order.buyer_id,
     farmerId: farmerId || order.produce_listings?.farmer_id || 'unknown',
+    farmerName: order.produce_listings?.users?.full_name || null,
+    cropType: order.produce_listings?.crop_types?.name || 'crop',
     amountGhs: Number(order.amount),
     status,
     hasOwnTransport: order.transport_mode === 'self_collect',
@@ -90,7 +92,10 @@ export class PrismaTransactionRepository implements ITransactionRepository {
       where: {
         OR: [{ buyer_id: userId }, { produce_listings: { farmer_id: userId } }],
       },
-      include: { payments: true, produce_listings: true },
+      include: {
+        payments: true,
+        produce_listings: { include: { crop_types: true, users: true } },
+      },
       orderBy: { created_at: 'desc' },
     });
     return list.map((o) => mapPrismaToTransaction(o));

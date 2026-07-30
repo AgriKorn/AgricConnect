@@ -12,6 +12,7 @@ class OrderItemModel {
     required this.amount,
     required this.status,
     required this.createdAt,
+    this.farmerName,
   });
 
   final String id;
@@ -19,6 +20,7 @@ class OrderItemModel {
   final double amount;
   final String status;
   final DateTime createdAt;
+  final String? farmerName;
 }
 
 class PurchaseResult {
@@ -97,6 +99,7 @@ class HttpOrdersRepository implements OrdersRepository {
         amount: double.tryParse(item['amountGhs']?.toString() ?? '') ?? 0.0,
         status: item['status']?.toString() ?? 'PAYMENT_HELD',
         createdAt: DateTime.tryParse(item['createdAt']?.toString() ?? '') ?? DateTime.now(),
+        farmerName: item['farmerName']?.toString(),
       )).toList();
     } on DioException {
       return const [];

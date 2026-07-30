@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/utils/currency.dart';
 import '../../../core/utils/freshness.dart';
+import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../application/scan_controller.dart';
 import '../data/scan_record.dart';
@@ -174,9 +175,7 @@ class _ResultAppBar extends StatelessWidget {
                     '${result.shelfLifeLabel} shelf life, ${formatGhs(result.recommendedPrice)} / ${result.priceUnit}.',
               ));
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Scan summary copied to clipboard')),
-                );
+                showAgriToast(context, 'Scan summary copied to clipboard');
               }
             },
           ),

@@ -31,15 +31,15 @@ extension UserRoleX on UserRole {
       };
 
   String get description => switch (this) {
-        UserRole.farmer => 'List and sell your produce directly to buyers',
-        UserRole.buyer => 'Discover and buy fresh produce from local farmers',
-        UserRole.driver => 'Deliver orders and earn on your own schedule',
+        UserRole.farmer => 'List your harvest, scan for freshness, and get AI price tips',
+        UserRole.buyer => 'Browse fresh produce directly from farms with GHS escrow',
+        UserRole.driver => 'Find delivery jobs and track routes with guaranteed GHS',
         UserRole.admin => 'Review and verify new accounts',
       };
 
   IconData get icon => switch (this) {
-        UserRole.farmer => Icons.agriculture_rounded,
-        UserRole.buyer => Icons.storefront_rounded,
+        UserRole.farmer => Icons.eco_rounded,
+        UserRole.buyer => Icons.shopping_basket_rounded,
         UserRole.driver => Icons.local_shipping_rounded,
         UserRole.admin => Icons.admin_panel_settings_rounded,
       };

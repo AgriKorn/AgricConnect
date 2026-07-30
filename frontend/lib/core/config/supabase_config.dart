@@ -10,10 +10,9 @@ class SupabaseConfig {
   static const String url = 'https://elqvrqydxpykxurmziky.supabase.co';
 
   // The anon/public key is safe to ship in a mobile app (it's the client
-  // key, gated by RLS) — but a real one hasn't been wired into this project
-  // anywhere yet. Replace with the value from Supabase Dashboard > Project
-  // Settings > API > "anon public".
-  static const String anonKey = 'REPLACE_WITH_SUPABASE_ANON_KEY';
+  // key, gated by RLS).
+  static const String anonKey =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVscXZycXlkeHB5a3h1cm16aWt5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM4ODkwMzQsImV4cCI6MjA5OTQ2NTAzNH0.f9LttaulMS34zqVJQ5MbYW2uRyTiQpqUUeQwZ7cniNY';
 
   // Google Cloud OAuth "Web application" client ID — passed as
   // GoogleSignIn(serverClientId:) so the native flow returns an ID token

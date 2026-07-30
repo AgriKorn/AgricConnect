@@ -27,6 +27,7 @@ describe('DispatchService', () => {
     driverId: 'driver-100',
     cropType: 'tomato',
     quantityKg: 200,
+    amountGhs: 500,
     status: 'PENDING',
     createdAt: new Date(),
     updatedAt: new Date(),

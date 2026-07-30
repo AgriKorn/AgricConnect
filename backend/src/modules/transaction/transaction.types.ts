@@ -5,6 +5,8 @@ export interface Transaction {
   listingId: string;
   buyerId: string;
   farmerId: string;
+  farmerName: string | null;
+  cropType: string;
   amountGhs: number;
   status: TransactionStatus;
   hasOwnTransport: boolean;
