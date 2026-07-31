@@ -5,6 +5,7 @@ import { validate } from '../../middleware/validate';
 import { disputeIdParamSchema, resolveDisputeSchema } from '../dispute/dispute.schema';
 import {
   approveUserHandler,
+  createAdminHandler,
   getAuditLogsHandler,
   listDisputesHandler,
   listPendingUsersHandler,
@@ -12,11 +13,13 @@ import {
   rejectUserHandler,
   resolveDisputeHandler,
 } from './admin.controller';
-import { userIdParamSchema } from './admin.schema';
+import { createAdminSchema, userIdParamSchema } from './admin.schema';
 
 const router = Router();
 
 router.use(authenticate, authorize('admin'));
+
+router.post('/admins', validate(createAdminSchema), createAdminHandler);
 
 router.get('/users/pending', listPendingUsersHandler);
 router.patch('/users/:id/approve', validate(userIdParamSchema), approveUserHandler);

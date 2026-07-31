@@ -3,7 +3,7 @@ import { IUserRepository } from '../user/user.repository';
 import { User } from '../user/user.types';
 import { transactionRepository } from '../transaction/transaction.repository.prisma';
 import { Transaction } from '../transaction/transaction.types';
-import { BadRequestError, NotFoundError } from '../../utils/errors';
+import { BadRequestError, ConflictError, NotFoundError } from '../../utils/errors';
 
 describe('AdminService', () => {
   let mockUsers: jest.Mocked<IUserRepository>;
@@ -135,6 +135,39 @@ describe('AdminService', () => {
       mockUsers.findById.mockResolvedValue(createUser({ status: 'REJECTED' }));
 
       await expect(adminService.approveUser('user-1')).rejects.toThrow(/REJECTED/);
+    });
+  });
+
+  describe('createAdmin', () => {
+    const adminInput = { name: 'New Admin', email: 'admin@agriconnect.com', phone: '+233551234567', password: 'StrongPass123!' };
+
+    it('should create and immediately activate a new admin account', async () => {
+      mockUsers.findByEmail.mockResolvedValue(null);
+      mockUsers.findByPhone.mockResolvedValue(null);
+      mockUsers.create.mockResolvedValue(createUser({ role: 'admin', status: 'PENDING_APPROVAL', email: adminInput.email }));
+      mockUsers.update.mockResolvedValue(createUser({ role: 'admin', status: 'ACTIVE', email: adminInput.email }));
+
+      const result = await adminService.createAdmin(adminInput);
+
+      expect(mockUsers.create).toHaveBeenCalledWith(expect.objectContaining({ role: 'admin', email: adminInput.email }));
+      expect(mockUsers.update).toHaveBeenCalledWith('user-1', { status: 'ACTIVE' });
+      expect(result.status).toBe('ACTIVE');
+      expect(result).not.toHaveProperty('passwordHash');
+    });
+
+    it('should reject a duplicate email', async () => {
+      mockUsers.findByEmail.mockResolvedValue(createUser());
+
+      await expect(adminService.createAdmin(adminInput)).rejects.toThrow(ConflictError);
+      expect(mockUsers.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject a duplicate phone number', async () => {
+      mockUsers.findByEmail.mockResolvedValue(null);
+      mockUsers.findByPhone.mockResolvedValue(createUser());
+
+      await expect(adminService.createAdmin(adminInput)).rejects.toThrow(ConflictError);
+      expect(mockUsers.create).not.toHaveBeenCalled();
     });
   });
 

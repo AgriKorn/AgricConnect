@@ -57,12 +57,12 @@ class ProfileData {
 
 abstract class AuthRepository {
   Future<RegisterResult> register(RegisterRequest request);
-  Future<AuthResponseModel> login({required String phone, required String password});
+  Future<AuthResponseModel> login({required String email, required String password});
   /// [role] is only sent for a brand-new sign-up (defaults to buyer on the
   /// backend if omitted); existing accounts are matched by email regardless.
   Future<AuthResponseModel> loginWithGoogle({UserRole? role});
   Future<UserModel> debugApprove(String phone);
-  Future<String> forgotPassword(String phone);
+  Future<String> forgotPassword(String email);
   Future<void> resetPassword({required String token, required String newPassword});
   Future<ProfileData> fetchProfile();
   Future<void> updateProfile(Map<String, dynamic> fields);
@@ -122,12 +122,12 @@ class HttpAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<AuthResponseModel> login({required String phone, required String password}) async {
+  Future<AuthResponseModel> login({required String email, required String password}) async {
     try {
       final response = await _dio.post(
         ApiEndpoints.authLogin,
         data: {
-          'phone': _formatGhanaPhone(phone),
+          'email': email.trim(),
           'password': password,
         },
       );
@@ -204,14 +204,14 @@ class HttpAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<String> forgotPassword(String phone) async {
+  Future<String> forgotPassword(String email) async {
     try {
       final response = await _dio.post(
         ApiEndpoints.authForgotPassword,
-        data: {'phone': _formatGhanaPhone(phone)},
+        data: {'email': email.trim()},
       );
       final data = response.data['data'] ?? response.data;
-      return data['message']?.toString() ?? 'If an account with that phone number exists, reset instructions have been sent.';
+      return data['message']?.toString() ?? 'If an account with that email exists, reset instructions have been sent.';
     } on DioException catch (e) {
       throw ApiException(_extractErrorMessage(e));
     }
@@ -367,7 +367,7 @@ class HttpAuthRepository implements AuthRepository {
 class MockAuthRepository implements AuthRepository {
   final Map<String, UserModel> _usersByPhone = {};
   final Map<String, UserModel> _usersByEmail = {};
-  final Map<String, String> _passwordsByPhone = {};
+  final Map<String, String> _passwordsByEmail = {};
   int _nextId = 1;
 
   Future<void> _simulateLatency() => Future.delayed(const Duration(milliseconds: 700));
@@ -400,7 +400,7 @@ class MockAuthRepository implements AuthRepository {
 
     _usersByPhone[request.phone] = user;
     _usersByEmail[request.email] = user;
-    _passwordsByPhone[request.phone] = request.password;
+    _passwordsByEmail[request.email] = request.password;
 
     return RegisterResult(
       userId: user.id,
@@ -412,12 +412,12 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<AuthResponseModel> login({required String phone, required String password}) async {
+  Future<AuthResponseModel> login({required String email, required String password}) async {
     await _simulateLatency();
 
-    final user = _usersByPhone[phone];
-    if (user == null || _passwordsByPhone[phone] != password) {
-      throw const ApiException('Incorrect phone number or password.');
+    final user = _usersByEmail[email];
+    if (user == null || _passwordsByEmail[email] != password) {
+      throw const ApiException('Incorrect email or password.');
     }
 
     return _tokensFor(user);
@@ -442,9 +442,9 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<String> forgotPassword(String phone) async {
+  Future<String> forgotPassword(String email) async {
     await _simulateLatency();
-    return 'If an account with that phone number exists, reset instructions have been sent.';
+    return 'If an account with that email exists, reset instructions have been sent.';
   }
 
   @override

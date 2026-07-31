@@ -29,11 +29,15 @@ const roleSchema = z.preprocess(
   z.enum(['farmer', 'buyer', 'driver']),
 );
 
+export const emailSchema = z.string().trim().toLowerCase().email('Enter a valid email address');
+
 export const registerSchema = z.object({
   body: z.object({
     name: z.string().trim().min(2, 'Name must be at least 2 characters'),
     phone: phoneSchema,
-    email: z.string().trim().toLowerCase().email('Enter a valid email address').optional(),
+    // Required, not just collected: login is by email, so an account
+    // created without one could never be signed back into.
+    email: emailSchema,
     password: z.string().min(8, 'Password must be at least 8 characters'),
     role: roleSchema,
   }),
@@ -41,7 +45,7 @@ export const registerSchema = z.object({
 
 export const forgotPasswordSchema = z.object({
   body: z.object({
-    phone: phoneSchema,
+    email: emailSchema,
   }),
 });
 
@@ -54,7 +58,7 @@ export const resetPasswordSchema = z.object({
 
 export const loginSchema = z.object({
   body: z.object({
-    phone: phoneSchema,
+    email: emailSchema,
     password: z.string().min(1, 'Password is required'),
   }),
 });

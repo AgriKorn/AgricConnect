@@ -53,6 +53,22 @@ describe('AuthService', () => {
         authService.register({
           name: 'Kofi Mensah',
           phone: '+233541234567',
+          email: 'kofi@example.com',
+          password: 'Password123',
+          role: 'farmer',
+        }),
+      ).rejects.toThrow(ConflictError);
+    });
+
+    it('should throw ConflictError if email is already registered', async () => {
+      mockUserRepo.findByPhone.mockResolvedValue(null);
+      mockUserRepo.findByEmail.mockResolvedValue(createMockUser());
+
+      await expect(
+        authService.register({
+          name: 'Kofi Mensah',
+          phone: '+233541234567',
+          email: 'kofi@example.com',
           password: 'Password123',
           role: 'farmer',
         }),
@@ -61,6 +77,7 @@ describe('AuthService', () => {
 
     it('should hash password and create user with status PENDING_APPROVAL', async () => {
       mockUserRepo.findByPhone.mockResolvedValue(null);
+      mockUserRepo.findByEmail.mockResolvedValue(null);
 
       const mockCreated = createMockUser({ id: 'new-user-uuid', status: 'PENDING_APPROVAL' });
       mockUserRepo.create.mockResolvedValue(mockCreated);
@@ -68,6 +85,7 @@ describe('AuthService', () => {
       const result = await authService.register({
         name: 'Kofi Mensah',
         phone: '+233541234567',
+        email: 'kofi@example.com',
         password: 'Password123',
         role: 'farmer',
       });
@@ -76,6 +94,7 @@ describe('AuthService', () => {
         expect.objectContaining({
           name: 'Kofi Mensah',
           phone: '+233541234567',
+          email: 'kofi@example.com',
           role: 'farmer',
         }),
       );
@@ -86,19 +105,20 @@ describe('AuthService', () => {
 
   describe('login', () => {
     it('should throw UnauthorizedError if user does not exist or password invalid', async () => {
-      mockUserRepo.findByPhone.mockResolvedValue(null);
+      mockUserRepo.findByEmail.mockResolvedValue(null);
 
-      await expect(authService.login({ phone: '+233541234567', password: 'WrongPassword' })).rejects.toThrow(UnauthorizedError);
+      await expect(authService.login({ email: 'nobody@example.com', password: 'WrongPassword' })).rejects.toThrow(UnauthorizedError);
     });
 
     it('should return auth payload when credentials are correct and account is ACTIVE', async () => {
       const hashedPassword = await bcrypt.hash('Password123', 10);
-      const mockUser = createMockUser({ passwordHash: hashedPassword, status: 'ACTIVE' });
-      mockUserRepo.findByPhone.mockResolvedValue(mockUser);
+      const mockUser = createMockUser({ email: 'kofi@example.com', passwordHash: hashedPassword, status: 'ACTIVE' });
+      mockUserRepo.findByEmail.mockResolvedValue(mockUser);
       mockUserRepo.update.mockResolvedValue(mockUser);
 
-      const result = await authService.login({ phone: '+233541234567', password: 'Password123' });
+      const result = await authService.login({ email: 'kofi@example.com', password: 'Password123' });
 
+      expect(mockUserRepo.findByEmail).toHaveBeenCalledWith('kofi@example.com');
       expect(result.accessToken).toBeDefined();
       expect(result.refreshToken).toBeDefined();
       expect(result.user.id).toBe('user-uuid-1');
@@ -107,14 +127,14 @@ describe('AuthService', () => {
 
   describe('forgotPassword & resetPassword', () => {
     it('should return generic message for non-existent user on forgotPassword', async () => {
-      mockUserRepo.findByPhone.mockResolvedValue(null);
-      const result = await authService.forgotPassword({ phone: '+233999999999' });
-      expect(result.message).toContain('If an account with that phone number exists');
+      mockUserRepo.findByEmail.mockResolvedValue(null);
+      const result = await authService.forgotPassword({ email: 'nobody@example.com' });
+      expect(result.message).toContain('If an account with that email exists');
     });
 
     it('should generate resetToken for existing user on forgotPassword', async () => {
-      mockUserRepo.findByPhone.mockResolvedValue(createMockUser());
-      const result = await authService.forgotPassword({ phone: '+233541234567' });
+      mockUserRepo.findByEmail.mockResolvedValue(createMockUser({ email: 'kofi@example.com' }));
+      const result = await authService.forgotPassword({ email: 'kofi@example.com' });
       expect(result.message).toBeDefined();
       expect(result.resetToken).toBeDefined();
     });

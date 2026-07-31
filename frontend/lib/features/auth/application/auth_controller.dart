@@ -118,13 +118,13 @@ class AuthController extends Notifier<SessionState> {
     await _persistUser(updated);
   }
 
-  Future<void> login({required String phone, required String password}) async {
+  Future<void> login({required String email, required String password}) async {
     state = state.copyWith(isSubmitting: true, errorMessage: null);
     try {
       final response = await ref
           .read(authRepositoryProvider)
-          .login(phone: phone, password: password);
-      _phoneForDebugApproval = phone;
+          .login(email: email, password: password);
+      _phoneForDebugApproval = response.user.phone;
       await _applyAuthResponse(response);
     } on ApiException catch (e) {
       state = state.copyWith(isSubmitting: false, errorMessage: e.message);

@@ -29,17 +29,15 @@ export class AuthService {
     const existing = await this.users.findByPhone(data.phone);
     if (existing) throw new ConflictError('Phone number already registered', 'PHONE_ALREADY_REGISTERED');
 
-    if (data.email) {
-      const existingEmail = await this.users.findByEmail(data.email);
-      if (existingEmail) throw new ConflictError('Email already registered', 'EMAIL_ALREADY_REGISTERED');
-    }
+    const existingEmail = await this.users.findByEmail(data.email);
+    if (existingEmail) throw new ConflictError('Email already registered', 'EMAIL_ALREADY_REGISTERED');
 
     const passwordHash = await bcrypt.hash(data.password, 10);
 
     const user = await this.users.create({
       name: data.name,
       phone: data.phone,
-      email: data.email ?? null,
+      email: data.email,
       passwordHash,
       role: data.role,
       otp: '',
@@ -58,8 +56,8 @@ export class AuthService {
   }
 
   async forgotPassword(data: ForgotPasswordInput): Promise<{ message: string; resetToken?: string }> {
-    const user = await this.users.findByPhone(data.phone);
-    const genericMessage = 'If an account with that phone number exists, password reset instructions have been generated.';
+    const user = await this.users.findByEmail(data.email);
+    const genericMessage = 'If an account with that email exists, password reset instructions have been generated.';
 
     if (!user) {
       return { message: genericMessage };
@@ -67,7 +65,7 @@ export class AuthService {
 
     const resetToken = jwt.sign({ userId: user.id, purpose: 'password_reset' }, env.JWT_SECRET, { expiresIn: RESET_TOKEN_TTL });
 
-    logger.info(`[password-reset] Password reset token generated for ${user.phone}: ${resetToken}`);
+    logger.info(`[password-reset] Password reset token generated for ${user.email}: ${resetToken}`);
 
     return {
       message: genericMessage,
@@ -97,7 +95,7 @@ export class AuthService {
   }
 
   async login(data: LoginInput): Promise<{ accessToken: string; refreshToken: string; user: SafeUser }> {
-    const user = await this.users.findByPhone(data.phone);
+    const user = await this.users.findByEmail(data.email);
     if (!user) throw new UnauthorizedError('Invalid credentials');
 
     const passwordMatches = await bcrypt.compare(data.password, user.passwordHash);

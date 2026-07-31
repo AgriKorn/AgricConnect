@@ -11,9 +11,10 @@ import 'widgets/auth_visuals.dart';
 
 const _markAsset = 'assets/images/agri_mark.png';
 
-/// Checklist 1.3: phone number / password (Mobile Money-linked accounts use
-/// phone as the primary identifier, not email). Styled fully off
-/// [ColorScheme] tokens (not fixed hex, unlike the splash/onboarding
+/// Email / password login — phone is still collected at registration (it's
+/// the driver/dispatch contact + WhatsApp-style identifier for the field),
+/// but the account is signed into by email, same as the admin side. Styled
+/// fully off [ColorScheme] tokens (not fixed hex, unlike the splash/onboarding
 /// screens) so it renders correctly in both light and dark mode. Shares its
 /// visual language (widgets/auth_visuals.dart) with role selection and
 /// registration.
@@ -26,13 +27,13 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -42,7 +43,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ref
         .read(authControllerProvider.notifier)
         .login(
-          phone: _phoneController.text.trim(),
+          email: _emailController.text.trim(),
           password: _passwordController.text,
         );
   }
@@ -85,19 +86,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             onSignUp: () => context.push('/role-selection'),
                           ),
                           const SizedBox(height: 22),
-                          AuthFieldLabel('Phone Number', colorScheme),
+                          AuthFieldLabel('Email', colorScheme),
                           const SizedBox(height: 8),
                           AuthTextField(
-                            controller: _phoneController,
-                            hint: '+233 00 000 0000',
-                            icon: Icons.phone_outlined,
-                            keyboardType: TextInputType.phone,
+                            controller: _emailController,
+                            hint: 'you@example.com',
+                            icon: Icons.email_outlined,
+                            keyboardType: TextInputType.emailAddress,
                             colorScheme: colorScheme,
                             validator: (value) {
-                              final phone = value?.trim() ?? '';
-                              if (phone.isEmpty) return 'Enter your phone number';
-                              if (!RegExp(r'^[0-9+]{9,15}$').hasMatch(phone)) {
-                                return 'Enter a valid phone number';
+                              final email = value?.trim() ?? '';
+                              if (email.isEmpty) return 'Enter your email';
+                              if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+                                return 'Enter a valid email';
                               }
                               return null;
                             },

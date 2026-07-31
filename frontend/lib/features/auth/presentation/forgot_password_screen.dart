@@ -6,7 +6,7 @@ import '../../../core/network/api_exception.dart';
 import '../data/auth_repository.dart';
 import 'widgets/auth_visuals.dart';
 
-/// Two-step reset: request a reset token by phone, then submit the token
+/// Two-step reset: request a reset token by email, then submit the token
 /// (received out-of-band) with a new password. Both steps hit the real
 /// /auth/forgot-password and /auth/reset-password endpoints.
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
@@ -17,7 +17,7 @@ class ForgotPasswordScreen extends ConsumerStatefulWidget {
 }
 
 class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
-  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _tokenController = TextEditingController();
   final _newPasswordController = TextEditingController();
   bool _requested = false;
@@ -27,15 +27,15 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _emailController.dispose();
     _tokenController.dispose();
     _newPasswordController.dispose();
     super.dispose();
   }
 
   Future<void> _requestReset() async {
-    if (_phoneController.text.trim().isEmpty) {
-      setState(() => _error = 'Enter your phone number.');
+    if (_emailController.text.trim().isEmpty) {
+      setState(() => _error = 'Enter your email.');
       return;
     }
     setState(() {
@@ -43,7 +43,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       _error = null;
     });
     try {
-      final message = await ref.read(authRepositoryProvider).forgotPassword(_phoneController.text.trim());
+      final message = await ref.read(authRepositoryProvider).forgotPassword(_emailController.text.trim());
       if (!mounted) return;
       setState(() {
         _requested = true;
@@ -118,17 +118,17 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                       children: [
                         if (!_requested) ...[
                           Text(
-                            'Enter your phone number and we\'ll generate a reset code.',
+                            'Enter your email and we\'ll generate a reset code.',
                             style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13.5, height: 1.4),
                           ),
                           const SizedBox(height: 18),
-                          AuthFieldLabel('Phone Number', colorScheme),
+                          AuthFieldLabel('Email', colorScheme),
                           const SizedBox(height: 8),
                           AuthTextField(
-                            controller: _phoneController,
-                            hint: '024XXXXXXX',
-                            icon: Icons.phone_outlined,
-                            keyboardType: TextInputType.phone,
+                            controller: _emailController,
+                            hint: 'you@example.com',
+                            icon: Icons.email_outlined,
+                            keyboardType: TextInputType.emailAddress,
                             colorScheme: colorScheme,
                           ),
                         ] else ...[
@@ -148,7 +148,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                           const SizedBox(height: 8),
                           AuthTextField(
                             controller: _tokenController,
-                            hint: 'Code from SMS',
+                            hint: 'Code from email',
                             icon: Icons.confirmation_number_outlined,
                             colorScheme: colorScheme,
                           ),
@@ -183,7 +183,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                                 _error = null;
                               }),
                               child: Text(
-                                'Use a different phone number',
+                                'Use a different email',
                                 style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w600, fontSize: 12.5),
                               ),
                             ),
