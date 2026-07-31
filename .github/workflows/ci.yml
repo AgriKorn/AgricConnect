@@ -4,13 +4,17 @@ on:
   pull_request:
     paths:
       - 'backend/**'
+      # Changes to the workflow itself must run it, otherwise CI configuration
+      # can be broken by a pull request that CI never executes — which is how
+      # the missing `prisma generate` step survived until the first PR.
+      - '.github/workflows/ci.yml'
     branches:
       - dev
       - main
 
 jobs:
   ci:
-    name: Backend Lint and Build
+    name: Backend Lint, Build and Test
     runs-on: ubuntu-latest
 
     defaults:
@@ -24,7 +28,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Must match the Dockerfile (node:22-alpine) and deploy.yml. The
+          # Supabase client needs native WebSocket, which arrives in Node 22 —
+          # on Node 20 config/supabase.ts throws at import time and every suite
+          # that reaches it fails to run. da8e587 fixed this for the Docker
+          # runtime; ci.yml was left behind, and it went unnoticed because CI
+          # did not run the tests.
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: './backend/package-lock.json'
 
@@ -45,3 +55,16 @@ jobs:
 
       - name: Compile TypeScript (Build)
         run: npm run build
+
+      # Runs after the build so a type error is reported by tsc, which explains
+      # it clearly, rather than surfacing as a confusing test failure.
+      #
+      # No database service is needed: every suite mocks ../../config/db with
+      # jest-mock-extended, and jest.setup.ts pins DATABASE_URL and DIRECT_URL
+      # at a throwaway value so a suite that does reach for a live connection
+      # fails loudly here instead of quietly finding a real database.
+      #
+      # npm test runs jest with --runInBand and --coverage; the serial run is
+      # deliberate, since the parallel workers exhausted memory on the runner.
+      - name: Run Tests
+        run: npm test
