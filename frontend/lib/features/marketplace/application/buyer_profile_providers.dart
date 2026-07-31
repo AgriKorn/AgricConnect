@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/application/auth_controller.dart';
+import '../data/address_repository.dart';
 import '../data/buyer_profile_mock.dart';
 
 String _initialsOf(String name) {
@@ -12,24 +13,61 @@ String _initialsOf(String name) {
   return (first + last).toUpperCase();
 }
 
-/// Overlays the real signed-in user's name/initials/location onto the mock
-/// profile so the Marketplace header and Buyer Profile screen (which read
-/// from different sources) never disagree on who's logged in.
+/// Derives the Buyer Profile header directly from the signed-in user — no
+/// invented "tier"/membership status, since the backend has no such concept.
 final buyerProfileProvider = Provider<BuyerProfileDetails>((ref) {
   final user = ref.watch(authControllerProvider).user;
-  if (user == null) return mockBuyerProfile;
-  final region = user.region?.trim();
+  final region = user?.region?.trim();
   return BuyerProfileDetails(
-    name: user.name,
-    initials: _initialsOf(user.name),
-    tier: mockBuyerProfile.tier,
-    location: (region != null && region.isNotEmpty) ? region : mockBuyerProfile.location,
+    name: user?.name ?? 'Buyer',
+    initials: _initialsOf(user?.name ?? ''),
+    location: (region != null && region.isNotEmpty) ? region : 'Ghana',
   );
 });
 
-final deliveryAddressesProvider = Provider<List<DeliveryAddress>>((ref) => mockDeliveryAddresses);
+/// Real delivery addresses, backed by GET/POST/PATCH/DELETE
+/// /api/users/addresses — replaces the previous hardcoded mock list.
+class DeliveryAddressesController extends AsyncNotifier<List<DeliveryAddress>> {
+  @override
+  Future<List<DeliveryAddress>> build() {
+    return ref.read(addressRepositoryProvider).fetchAddresses();
+  }
 
-final savedPaymentMethodsProvider = Provider<List<SavedPaymentMethod>>((ref) => mockSavedPaymentMethods);
+  Future<void> refresh() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() => ref.read(addressRepositoryProvider).fetchAddresses());
+  }
+
+  Future<void> add({required String label, required String addressLine, String? region, bool isDefault = false}) async {
+    await ref.read(addressRepositoryProvider).createAddress(
+          label: label,
+          addressLine: addressLine,
+          region: region,
+          isDefault: isDefault,
+        );
+    await refresh();
+  }
+
+  Future<void> edit(String id, {String? label, String? addressLine, String? region, bool? isDefault}) async {
+    await ref.read(addressRepositoryProvider).updateAddress(
+          id,
+          label: label,
+          addressLine: addressLine,
+          region: region,
+          isDefault: isDefault,
+        );
+    await refresh();
+  }
+
+  Future<void> remove(String id) async {
+    await ref.read(addressRepositoryProvider).deleteAddress(id);
+    await refresh();
+  }
+}
+
+final deliveryAddressesProvider = AsyncNotifierProvider<DeliveryAddressesController, List<DeliveryAddress>>(
+  DeliveryAddressesController.new,
+);
 
 class BuyerPreferencesController extends Notifier<BuyerPreferences> {
   @override

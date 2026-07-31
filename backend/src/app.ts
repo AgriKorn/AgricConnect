@@ -19,6 +19,7 @@ import dispatchRoutes from './modules/dispatch/dispatch.routes';
 import disputeRoutes from './modules/dispute/dispute.routes';
 import notificationRoutes from './modules/notification/notification.routes';
 import paymentRoutes from './modules/payment/payment.routes';
+import addressRoutes from './modules/address/address.routes';
 
 const app = express();
 
@@ -116,6 +117,7 @@ app.use('/api/dispatch', dispatchRoutes);
 app.use('/api/disputes', disputeRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/users/addresses', addressRoutes);
 
 // --------------- Unmatched Routes ---------------
 // Without this, an unknown path falls through to Express's default handler and

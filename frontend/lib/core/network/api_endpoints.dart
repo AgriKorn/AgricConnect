@@ -16,6 +16,7 @@ class ApiEndpoints {
   // User & Profile Endpoints
   static const String userProfile = '/users/profile';
   static const String userDeviceToken = '/users/device-token';
+  static const String userAddresses = '/users/addresses';
 
   // Dispatch (driver job offers)
   static const String dispatchJobs = '/dispatch/jobs';

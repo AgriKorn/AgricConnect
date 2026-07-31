@@ -7,7 +7,6 @@ import '../../../core/utils/currency.dart';
 import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
-import '../../marketplace/data/buyer_profile_mock.dart';
 import '../data/orders_mock.dart';
 
 void _openComingSoon(BuildContext context, String title, IconData icon) {
@@ -44,7 +43,7 @@ class OrderTrackingScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final pickup = shipment.farmerLocation ?? 'Farm pickup location';
-    final dropoff = mockDeliveryAddresses.isNotEmpty ? mockDeliveryAddresses.first.detail : 'Delivery address';
+    const dropoff = 'Your delivery address';
 
     return Scaffold(
       body: Stack(

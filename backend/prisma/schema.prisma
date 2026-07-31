@@ -41,12 +41,27 @@ model User {
   produce_listings                     produce_listings[]
   qr_scans                             qr_scans[]
   user_device_tokens                   user_device_tokens[]
+  delivery_addresses                   delivery_addresses[]
   users                                User?                   @relation("usersTousers", fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
   other_users                          User[]                  @relation("usersTousers")
 
   @@index([region], map: "idx_users_region")
   @@index([role, account_status], map: "idx_users_role_status")
   @@map("users")
+}
+
+model delivery_addresses {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String   @db.Uuid
+  label        String   @db.VarChar(50)
+  address_line String   @db.VarChar(255)
+  region       String?  @db.VarChar(100)
+  is_default   Boolean  @default(false)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @db.Timestamptz(6)
+  users        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id], map: "idx_delivery_addresses_user_id")
 }
 
 model Dispute {
