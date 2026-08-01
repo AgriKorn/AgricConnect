@@ -1,6 +1,7 @@
 {
   "watch": ["src"],
   "ext": "ts,json",
-  "ignore": ["node_modules", "dist"],
+  "_comment": "src/generated/prisma is the generated Prisma client, not source. Watching it means every `prisma generate` rewrites ~23 files at once, producing a burst of restarts that can leave the watcher stuck ('Internal watch failed: UNKNOWN ... lstat') and the server down.",
+  "ignore": ["node_modules", "dist", "src/generated"],
   "exec": "ts-node src/server.ts"
 }
