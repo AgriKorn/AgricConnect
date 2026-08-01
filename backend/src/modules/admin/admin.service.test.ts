@@ -184,6 +184,48 @@ describe('AdminService', () => {
     });
   });
 
+  describe('removeAdmin', () => {
+    it('should refuse to let an admin remove themselves', async () => {
+      await expect(adminService.removeAdmin('user-1', 'user-1')).rejects.toThrow(BadRequestError);
+      expect(mockUsers.findById).not.toHaveBeenCalled();
+    });
+
+    it('should throw NotFoundError for an unknown admin', async () => {
+      mockUsers.findById.mockResolvedValue(null);
+
+      await expect(adminService.removeAdmin('missing', 'requester-1')).rejects.toThrow(NotFoundError);
+    });
+
+    it('should refuse to remove a non-admin account through this path', async () => {
+      mockUsers.findById.mockResolvedValue(createUser({ role: 'farmer' }));
+
+      await expect(adminService.removeAdmin('user-1', 'requester-1')).rejects.toThrow(BadRequestError);
+      expect(mockUsers.update).not.toHaveBeenCalled();
+    });
+
+    it('should refuse to remove the last remaining active admin', async () => {
+      mockUsers.findById.mockResolvedValue(createUser({ role: 'admin', status: 'ACTIVE' }));
+      mockUsers.findManyByRole.mockResolvedValue([createUser({ role: 'admin', status: 'ACTIVE' })]);
+
+      await expect(adminService.removeAdmin('user-1', 'requester-1')).rejects.toThrow(BadRequestError);
+      expect(mockUsers.update).not.toHaveBeenCalled();
+    });
+
+    it('should reject the admin (not hard-delete) when another active admin remains', async () => {
+      mockUsers.findById.mockResolvedValue(createUser({ id: 'user-1', role: 'admin', status: 'ACTIVE' }));
+      mockUsers.findManyByRole.mockResolvedValue([
+        createUser({ id: 'user-1', role: 'admin', status: 'ACTIVE' }),
+        createUser({ id: 'requester-1', role: 'admin', status: 'ACTIVE' }),
+      ]);
+      mockUsers.update.mockResolvedValue(createUser({ id: 'user-1', role: 'admin', status: 'REJECTED' }));
+
+      const result = await adminService.removeAdmin('user-1', 'requester-1');
+
+      expect(mockUsers.update).toHaveBeenCalledWith('user-1', { status: 'REJECTED', refreshToken: null });
+      expect(result.status).toBe('REJECTED');
+    });
+  });
+
   describe('rejectUser', () => {
     it('should move a pending user to REJECTED', async () => {
       mockUsers.findById.mockResolvedValue(createUser());

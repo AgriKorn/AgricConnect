@@ -12,6 +12,7 @@ import {
   listPendingUsersHandler,
   listTransactionsHandler,
   rejectUserHandler,
+  removeAdminHandler,
   resolveDisputeHandler,
 } from './admin.controller';
 import { createAdminSchema, userIdParamSchema } from './admin.schema';
@@ -22,6 +23,7 @@ router.use(authenticate, authorize('admin'));
 
 router.get('/admins', listAdminsHandler);
 router.post('/admins', validate(createAdminSchema), createAdminHandler);
+router.delete('/admins/:id', validate(userIdParamSchema), removeAdminHandler);
 
 router.get('/users/pending', listPendingUsersHandler);
 router.patch('/users/:id/approve', validate(userIdParamSchema), approveUserHandler);

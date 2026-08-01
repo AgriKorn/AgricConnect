@@ -441,9 +441,10 @@ async function renderAdmins() {
         <td>${escapeHtml(a.email || '—')}</td>
         <td>${escapeHtml(a.phone)}</td>
         <td>${new Date(a.createdAt).toLocaleDateString()}</td>
+        <td><button class="btn-reject" onclick="removeAdmin('${a.id}', '${escapeHtml(a.name).replace(/'/g, "\\'")}')">Remove</button></td>
       </tr>`).join('');
     main.innerHTML = toolbar('Admins') + addBar + `
-      <table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Added</th></tr></thead>
+      <table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Added</th><th>Action</th></tr></thead>
       <tbody>${rows}</tbody></table>`;
   } catch (e) {
     main.innerHTML = toolbar('Admins') + `<div class="error-banner">${escapeHtml(e.message)}</div>`;
@@ -483,6 +484,19 @@ async function submitAddAdmin() {
   } catch (e) {
     errorEl.textContent = e.message;
     errorEl.style.display = 'block';
+  }
+}
+
+async function removeAdmin(id, name) {
+  // Revokes access (REJECTED status) rather than deleting the row — see
+  // AdminService.removeAdmin. The backend also refuses to remove yourself
+  // or the last remaining active admin; this just surfaces those messages.
+  if (!confirm(`Remove admin access for ${name}? They will no longer be able to log in.`)) return;
+  try {
+    await api(`/admin/admins/${id}`, { method: 'DELETE' });
+    renderAdmins();
+  } catch (e) {
+    alert(e.message);
   }
 }
 

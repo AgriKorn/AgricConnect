@@ -23,6 +23,16 @@ export const createAdminHandler = async (req: Request, res: Response, next: Next
   }
 };
 
+export const removeAdminHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const requestingAdminId = (req as any).user.userId;
+    const admin = await adminService.removeAdmin(req.params.id, requestingAdminId);
+    sendSuccess(res, admin);
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const listPendingUsersHandler = async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const users = await adminService.listPendingUsers();

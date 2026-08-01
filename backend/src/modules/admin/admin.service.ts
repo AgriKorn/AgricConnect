@@ -47,6 +47,33 @@ export class AdminService {
     return toSafeUser(activated);
   }
 
+  /**
+   * Revokes admin access rather than deleting the row outright — a hard
+   * delete risks foreign-key fallout (audit trail entries this admin wrote,
+   * MOFA price references they authored, users they approved via
+   * approved_by) and can't be undone if the wrong person is removed.
+   * REJECTED already blocks login everywhere else in the codebase, so this
+   * reuses that instead of inventing a second "disabled" concept.
+   */
+  async removeAdmin(adminId: string, requestingAdminId: string): Promise<SafeUser> {
+    if (adminId === requestingAdminId) {
+      throw new BadRequestError('You cannot remove your own admin access');
+    }
+
+    const admin = await this.users.findById(adminId);
+    if (!admin) throw new NotFoundError('Admin not found');
+    if (admin.role !== 'admin') throw new BadRequestError('That account is not an admin');
+
+    const allAdmins = await this.users.findManyByRole('admin');
+    const remainingActive = allAdmins.filter((a) => a.id !== adminId && a.status === 'ACTIVE');
+    if (remainingActive.length === 0) {
+      throw new BadRequestError('Cannot remove the last remaining admin — it would lock everyone out');
+    }
+
+    const updated = await this.users.update(adminId, { status: 'REJECTED', refreshToken: null });
+    return toSafeUser(updated);
+  }
+
   async listPendingUsers(): Promise<SafeUser[]> {
     const users = await this.users.findManyByStatus('PENDING_APPROVAL');
     return users.map(toSafeUser);
