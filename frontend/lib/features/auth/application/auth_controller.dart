@@ -93,27 +93,27 @@ class AuthController extends Notifier<SessionState> {
     }
   }
 
-  /// Local-only edit (checklist: no `PATCH /users/me` endpoint yet) — updates
-  /// the signed-in [UserModel] and persists it the same way the post-login
-  /// snapshot is, so the change survives app restarts and shows up anywhere
-  /// [authControllerProvider] is read from.
+  /// Saves through PATCH /users/profile — name and region are the only
+  /// fields this screen can actually change. Phone and email aren't in
+  /// updateProfileSchema at all (changing your login email needs its own
+  /// verified flow, not a silent free-text edit), so EditProfileScreen
+  /// shows them read-only rather than accepting edits it can't persist.
+  /// The local snapshot is only updated after the server confirms the
+  /// write, so a failed save can't leave the UI showing something the
+  /// backend never actually stored.
   Future<void> updateProfile({
     required String name,
-    required String phone,
-    required String email,
     String? region,
-    String? bio,
   }) async {
     final currentUser = state.user;
     if (currentUser == null) return;
 
-    final updated = currentUser.copyWith(
-      name: name,
-      phone: phone,
-      email: email,
-      region: region,
-      bio: bio,
-    );
+    await ref.read(authRepositoryProvider).updateProfile({
+      'name': name,
+      if (region != null && region.isNotEmpty) 'farmRegion': region,
+    });
+
+    final updated = currentUser.copyWith(name: name, region: region);
     state = state.copyWith(user: updated);
     await _persistUser(updated);
   }

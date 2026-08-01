@@ -43,7 +43,6 @@ void _openFarmerAccountSettings(BuildContext context, bool verified) {
         onHelpTap: () => _openFarmerHelp(context),
         locationLabel: 'Farm Location',
         locationHint: 'e.g. Ashanti Region, Ghana',
-        bioHint: 'Tell buyers about your farm...',
         verifiedSubtitle: 'Your profile badge is visible to all buyers.',
       ),
     ),

@@ -11,7 +11,6 @@ void _openEditProfile(
   required Widget Function(double size) avatarBuilder,
   required String locationLabel,
   required String locationHint,
-  required String bioHint,
   required String verifiedSubtitle,
 }) {
   Navigator.of(context).push(
@@ -20,7 +19,6 @@ void _openEditProfile(
         avatarBuilder: avatarBuilder,
         locationLabel: locationLabel,
         locationHint: locationHint,
-        bioHint: bioHint,
         verifiedSubtitle: verifiedSubtitle,
       ),
     ),
@@ -39,7 +37,6 @@ class AccountSettingsScreen extends ConsumerWidget {
     required this.onHelpTap,
     required this.locationLabel,
     required this.locationHint,
-    required this.bioHint,
     required this.verifiedSubtitle,
   });
 
@@ -48,7 +45,6 @@ class AccountSettingsScreen extends ConsumerWidget {
   final VoidCallback onHelpTap;
   final String locationLabel;
   final String locationHint;
-  final String bioHint;
   final String verifiedSubtitle;
 
   @override
@@ -136,7 +132,6 @@ class AccountSettingsScreen extends ConsumerWidget {
                             avatarBuilder: avatarBuilder,
                             locationLabel: locationLabel,
                             locationHint: locationHint,
-                            bioHint: bioHint,
                             verifiedSubtitle: verifiedSubtitle,
                           ),
                           child: Container(
