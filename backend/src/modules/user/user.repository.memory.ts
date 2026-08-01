@@ -26,7 +26,13 @@ export class InMemoryUserRepository implements IUserRepository {
       otp: data.otp,
       otpExpiry: data.otpExpiry,
       refreshToken: null,
-      profile: {},
+      profile: {
+        farmRegion: data.region,
+        operatingRegion: data.operatingRegion || data.region,
+        truckCapacity: data.vehicleCapacityKg,
+        businessName: data.businessName,
+        businessType: data.businessType,
+      },
       createdAt: now,
       updatedAt: now,
     };
@@ -53,7 +59,7 @@ export class InMemoryUserRepository implements IUserRepository {
   async findManyByStatus(status: UserStatus): Promise<User[]> {
     return [...this.usersById.values()]
       .filter((user) => user.status === status)
-      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   async findManyByRole(role: UserRole): Promise<User[]> {

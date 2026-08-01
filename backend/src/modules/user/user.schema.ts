@@ -18,6 +18,7 @@ export const updateProfileSchema = z.object({
     }).optional(),
     // Buyer
     businessName: z.string().optional(),
+    businessType: z.string().optional(),
     deliveryAddress: z.string().optional(),
     // Driver
     truckCapacity: z.number().positive('Truck capacity must be positive').optional(),

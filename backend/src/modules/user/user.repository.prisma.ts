@@ -48,6 +48,8 @@ const mapPrismaToUser = (p: any): User => {
       isAvailable: driver ? driver.availability_status === 'available' : undefined,
       momoNumber: p.momo_number || undefined,
       momoNetwork: p.momo_network || undefined,
+      businessName: p.business_name || undefined,
+      businessType: p.business_type || undefined,
     },
     createdAt: p.created_at,
     updatedAt: p.updated_at,
@@ -62,9 +64,11 @@ export class PrismaUserRepository implements IUserRepository {
         full_name: data.name,
         password_hash: data.passwordHash,
         role: data.role as user_role,
-        region: 'Greater Accra',
+        region: data.region || 'Greater Accra',
         account_status: data.role === 'buyer' ? 'approved' : 'pending',
         ...(data.email && { email: data.email }),
+        ...(data.businessName && { business_name: data.businessName }),
+        ...(data.businessType && { business_type: data.businessType }),
       },
     });
 
@@ -72,8 +76,8 @@ export class PrismaUserRepository implements IUserRepository {
       await prisma.driver_details.create({
         data: {
           user_id: created.id,
-          truck_capacity_kg: 1000,
-          operating_region: 'Greater Accra',
+          truck_capacity_kg: data.vehicleCapacityKg || 1000,
+          operating_region: data.operatingRegion || data.region || 'Greater Accra',
           availability_status: 'available',
         },
       });
@@ -111,6 +115,9 @@ export class PrismaUserRepository implements IUserRepository {
     const list = await prisma.user.findMany({
       where: { account_status: statusToPrisma(status) },
       include: { driver_details: true },
+      // Newest first — an admin reviewing a growing queue should see what
+      // just came in without scrolling past everything already waiting.
+      orderBy: { created_at: 'desc' },
     });
     return list.map(mapPrismaToUser);
   }
@@ -168,13 +175,22 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   async updateProfile(id: string, profile: Partial<User['profile']>): Promise<User> {
-    if (profile.farmRegion || profile.operatingRegion || profile.momoNumber || profile.momoNetwork) {
+    if (
+      profile.farmRegion ||
+      profile.operatingRegion ||
+      profile.momoNumber ||
+      profile.momoNetwork ||
+      profile.businessName ||
+      profile.businessType
+    ) {
       await prisma.user.update({
         where: { id },
         data: {
           ...((profile.farmRegion || profile.operatingRegion) && { region: profile.farmRegion || profile.operatingRegion }),
           ...(profile.momoNumber && { momo_number: profile.momoNumber }),
           ...(profile.momoNetwork && { momo_network: profile.momoNetwork }),
+          ...(profile.businessName && { business_name: profile.businessName }),
+          ...(profile.businessType && { business_type: profile.businessType }),
         },
       });
     }

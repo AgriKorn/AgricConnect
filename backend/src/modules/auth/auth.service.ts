@@ -22,6 +22,23 @@ const ACCESS_TOKEN_TTL = '15m';
 const REFRESH_TOKEN_TTL = '7d';
 const RESET_TOKEN_TTL = '15m';
 
+/**
+ * The registration form's vehicle-capacity field is free text (hint: "e.g. 2
+ * tonnes"), but the column it lands in is kg. Taking the leading number
+ * as-is would silently store 2 for a driver who typed "2 tonnes" — 1000x too
+ * small — and break dispatch's minimum-capacity matching. Unparseable input
+ * falls back to undefined so the caller's existing 1000kg default applies,
+ * rather than storing a wrong number with false confidence.
+ */
+const parseVehicleCapacityKg = (raw?: string): number | undefined => {
+  if (!raw) return undefined;
+  const match = raw.match(/[\d.]+/);
+  if (!match) return undefined;
+  const value = parseFloat(match[0]);
+  if (!Number.isFinite(value) || value <= 0) return undefined;
+  return /tonne|ton\b|tons\b/i.test(raw) ? value * 1000 : value;
+};
+
 export class AuthService {
   constructor(private readonly users: IUserRepository) {}
 
@@ -42,6 +59,11 @@ export class AuthService {
       role: data.role,
       otp: '',
       otpExpiry: new Date(),
+      region: data.region,
+      businessName: data.businessName,
+      businessType: data.businessType,
+      operatingRegion: data.operatingRegion,
+      vehicleCapacityKg: parseVehicleCapacityKg(data.vehicleCapacity),
     });
 
     const isBuyer = data.role.toLowerCase() === 'buyer';

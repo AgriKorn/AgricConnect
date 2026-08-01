@@ -21,6 +21,8 @@ model User {
   fcm_token                            String?                 @db.VarChar(255)
   momo_number                          String?                 @db.VarChar(20)
   momo_network                         String?                 @db.VarChar(20)
+  business_name                        String?                 @db.VarChar(150)
+  business_type                        String?                 @db.VarChar(100)
   password_hash                        String?                 @db.VarChar(255)
   /// Persisted so refresh tokens can be revoked: logout clears it and refresh
   /// rejects any token that does not match the stored one. Without this column

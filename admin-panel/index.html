@@ -140,6 +140,16 @@
   .badge-pending { background: rgba(224, 169, 64, 0.2); color: var(--warning); }
   .badge-active { background: rgba(63, 174, 92, 0.2); color: var(--primary); }
   .badge-rejected { background: rgba(217, 83, 79, 0.2); color: var(--danger); }
+  .nav-badge {
+    display: inline-block;
+    min-width: 18px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--warning);
+    color: #2b1c00;
+  }
   .row-actions { display: flex; gap: 8px; }
   .empty { color: var(--text-dim); padding: 40px; text-align: center; }
   .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
@@ -182,7 +192,7 @@
     </div>
   </header>
   <nav>
-    <button data-tab="pending" onclick="switchTab('pending')">Pending Approvals</button>
+    <button data-tab="pending" onclick="switchTab('pending')">Pending Approvals <span id="pending-badge" class="nav-badge" style="display:none"></span></button>
     <button data-tab="transactions" onclick="switchTab('transactions')">Transactions</button>
     <button data-tab="disputes" onclick="switchTab('disputes')">Disputes</button>
     <button data-tab="audit" onclick="switchTab('audit')">Audit Log</button>
@@ -293,11 +303,22 @@ function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+function setPendingBadge(count) {
+  const badge = document.getElementById('pending-badge');
+  if (count > 0) {
+    badge.textContent = count;
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
 async function renderPending() {
   const main = document.getElementById('main');
   main.innerHTML = toolbar('Pending Approvals') + '<div class="empty">Loading...</div>';
   try {
     const { users } = await api('/admin/users/pending');
+    setPendingBadge(users.length);
     if (!users.length) {
       main.innerHTML = toolbar('Pending Approvals') + '<div class="empty">No accounts awaiting approval.</div>';
       return;
@@ -305,24 +326,29 @@ async function renderPending() {
     const rows = users.map((u) => `
       <tr>
         <td>${escapeHtml(u.name)}</td>
+        <td>${escapeHtml(u.email || '—')}</td>
         <td>${escapeHtml(u.phone)}</td>
         <td>${escapeHtml(u.role)}</td>
         <td>${escapeHtml(u.profile?.farmRegion || u.profile?.operatingRegion || '—')}</td>
-        <td>${new Date(u.createdAt).toLocaleDateString()}</td>
+        <td>${new Date(u.createdAt).toLocaleString()}</td>
         <td class="row-actions">
-          <button class="btn-approve" onclick="actOnUser('${u.id}', 'approve')">Approve</button>
-          <button class="btn-reject" onclick="actOnUser('${u.id}', 'reject')">Reject</button>
+          <button class="btn-approve" onclick="actOnUser('${u.id}', 'approve', '${escapeHtml(u.name).replace(/'/g, "\\'")}')">Approve</button>
+          <button class="btn-reject" onclick="actOnUser('${u.id}', 'reject', '${escapeHtml(u.name).replace(/'/g, "\\'")}')">Reject</button>
         </td>
       </tr>`).join('');
     main.innerHTML = toolbar('Pending Approvals') + `
-      <table><thead><tr><th>Name</th><th>Phone</th><th>Role</th><th>Region</th><th>Registered</th><th>Action</th></tr></thead>
+      <table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Region</th><th>Registered</th><th>Action</th></tr></thead>
       <tbody>${rows}</tbody></table>`;
   } catch (e) {
     main.innerHTML = toolbar('Pending Approvals') + `<div class="error-banner">${escapeHtml(e.message)}</div>`;
   }
 }
 
-async function actOnUser(id, action) {
+async function actOnUser(id, action, name) {
+  const msg = action === 'approve'
+    ? `Approve ${name}? They'll be able to log in immediately.`
+    : `Reject ${name}? They will not be able to log in.`;
+  if (!confirm(msg)) return;
   try {
     await api(`/admin/users/${id}/${action}`, { method: 'PATCH' });
     renderPending();

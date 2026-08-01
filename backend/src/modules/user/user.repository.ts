@@ -4,6 +4,15 @@ export type CreateUserRecord = Pick<User, 'name' | 'phone' | 'passwordHash' | 'r
   otp: string;
   otpExpiry: Date;
   email?: string | null;
+  // Collected at registration for the roles that need them — silently
+  // dropped before this was wired up (see registerSchema): every farmer
+  // and driver defaulted to a hardcoded region regardless of what they
+  // picked, and buyer business info had nowhere to be stored at all.
+  region?: string;
+  businessName?: string;
+  businessType?: string;
+  operatingRegion?: string;
+  vehicleCapacityKg?: number;
 };
 
 export interface IUserRepository {

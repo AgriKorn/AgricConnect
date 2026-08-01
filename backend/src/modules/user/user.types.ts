@@ -13,6 +13,7 @@ export interface FarmerProfile {
 
 export interface BuyerProfile {
   businessName?: string;
+  businessType?: string;
   deliveryAddress?: string;
 }
 
