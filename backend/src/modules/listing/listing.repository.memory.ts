@@ -17,6 +17,9 @@ export class InMemoryListingRepository implements IListingRepository {
     const listing: Listing = {
       id: randomUUID(),
       ...data,
+      // No crop_types table to resolve against in memory; the Prisma repository
+      // fills this from the joined crop row.
+      cropCategory: null,
       createdAt: now,
       updatedAt: now,
     };
