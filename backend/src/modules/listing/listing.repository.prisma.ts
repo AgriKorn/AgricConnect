@@ -8,6 +8,7 @@ const mapPrismaToListing = (p: any): Listing => ({
   id: p.id,
   farmerId: p.farmer_id,
   cropType: p.crop_types?.name || 'unknown',
+  cropCategory: p.crop_types?.category ?? null,
   quantityKg: Number(p.quantity_kg),
   freshnessScore: Number(p.freshness_score),
   shelfLifeDays: p.estimated_viable_days,
@@ -72,13 +73,22 @@ export class PrismaListingRepository implements IListingRepository {
     if (filters.crop) {
       where.crop_types = { name: { equals: filters.crop, mode: 'insensitive' } };
     }
-    if (filters.minFreshness !== undefined) {
-      where.freshness_score = { gte: filters.minFreshness };
+    // Both bounds go in one object: assigning freshness_score twice would drop
+    // whichever was written first.
+    if (filters.minFreshness !== undefined || filters.maxFreshness !== undefined) {
+      where.freshness_score = {
+        ...(filters.minFreshness !== undefined && { gte: filters.minFreshness }),
+        ...(filters.maxFreshness !== undefined && { lte: filters.maxFreshness }),
+      };
     }
     if (filters.minQuantity !== undefined) {
       where.quantity_kg = { gte: filters.minQuantity };
     }
-    if (filters.farmerIds && filters.farmerIds.length > 0) {
+    // An empty farmerIds means the region filter matched no farmers, which must
+    // return nothing. Skipping the clause on empty (`length > 0`) dropped the
+    // region filter entirely, so browsing a region with no farmers returned
+    // every listing in the country.
+    if (filters.farmerIds !== undefined) {
       where.farmer_id = { in: filters.farmerIds };
     }
 
