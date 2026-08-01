@@ -45,7 +45,7 @@ describe('ListingService', () => {
         qrCodeData: 'hash-1',
       };
 
-      const mockListing = { id: '00000000-0000-0000-0000-000000000001', farmerId: 'farmer-1', ...input, status: 'ACTIVE' as const, createdAt: new Date(), updatedAt: new Date() };
+      const mockListing = { id: '00000000-0000-0000-0000-000000000001', farmerId: 'farmer-1', ...input, cropCategory: 'vegetables', status: 'ACTIVE' as const, createdAt: new Date(), updatedAt: new Date() };
       mockRepo.create.mockResolvedValue(mockListing);
 
       const result = await listingService.createListing(input, 'farmer-1');
@@ -72,7 +72,7 @@ describe('ListingService', () => {
         qrCodeData: 'hash-1',
       };
 
-      const mockListing = { id: '00000000-0000-0000-0000-000000000001', farmerId: 'farmer-1', ...input, status: 'ACTIVE' as const, createdAt: new Date(), updatedAt: new Date() };
+      const mockListing = { id: '00000000-0000-0000-0000-000000000001', farmerId: 'farmer-1', ...input, cropCategory: 'vegetables', status: 'ACTIVE' as const, createdAt: new Date(), updatedAt: new Date() };
       mockRepo.create.mockResolvedValue(mockListing);
 
       const result = await listingService.createListing(input, 'farmer-1');
