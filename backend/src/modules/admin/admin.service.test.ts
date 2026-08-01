@@ -35,6 +35,7 @@ describe('AdminService', () => {
       findByEmail: jest.fn(),
       findById: jest.fn(),
       findManyByStatus: jest.fn(),
+      findManyByRole: jest.fn(),
       findFarmerIdsByRegion: jest.fn(),
       findAvailableDrivers: jest.fn(),
       update: jest.fn(),
@@ -135,6 +136,18 @@ describe('AdminService', () => {
       mockUsers.findById.mockResolvedValue(createUser({ status: 'REJECTED' }));
 
       await expect(adminService.approveUser('user-1')).rejects.toThrow(/REJECTED/);
+    });
+  });
+
+  describe('listAdmins', () => {
+    it('should query users by the admin role and strip credentials', async () => {
+      mockUsers.findManyByRole.mockResolvedValue([createUser({ role: 'admin', status: 'ACTIVE' })]);
+
+      const result = await adminService.listAdmins();
+
+      expect(mockUsers.findManyByRole).toHaveBeenCalledWith('admin');
+      expect(result).toHaveLength(1);
+      expect(result[0]).not.toHaveProperty('passwordHash');
     });
   });
 

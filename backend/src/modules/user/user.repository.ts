@@ -1,4 +1,4 @@
-import { User, UserStatus } from './user.types';
+import { User, UserRole, UserStatus } from './user.types';
 
 export type CreateUserRecord = Pick<User, 'name' | 'phone' | 'passwordHash' | 'role'> & {
   otp: string;
@@ -12,6 +12,7 @@ export interface IUserRepository {
   findByEmail(email: string): Promise<User | null>;
   findById(id: string): Promise<User | null>;
   findManyByStatus(status: UserStatus): Promise<User[]>;
+  findManyByRole(role: UserRole): Promise<User[]>;
   findFarmerIdsByRegion(region: string): Promise<string[]>;
   findAvailableDrivers(minCapacityKg: number, excludeIds: string[]): Promise<User[]>;
   update(id: string, data: Partial<User>): Promise<User>;

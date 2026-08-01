@@ -115,6 +115,15 @@ export class PrismaUserRepository implements IUserRepository {
     return list.map(mapPrismaToUser);
   }
 
+  async findManyByRole(role: UserRole): Promise<User[]> {
+    const list = await prisma.user.findMany({
+      where: { role: role as user_role },
+      include: { driver_details: true },
+      orderBy: { created_at: 'desc' },
+    });
+    return list.map(mapPrismaToUser);
+  }
+
   async findFarmerIdsByRegion(region: string): Promise<string[]> {
     const list = await prisma.user.findMany({
       where: { role: 'farmer', region: { equals: region, mode: 'insensitive' } },

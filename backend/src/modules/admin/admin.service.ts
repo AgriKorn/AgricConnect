@@ -14,6 +14,11 @@ export class AdminService {
     return transactionRepository.findAll();
   }
 
+  async listAdmins(): Promise<SafeUser[]> {
+    const admins = await this.users.findManyByRole('admin');
+    return admins.map(toSafeUser);
+  }
+
   /**
    * Lets an existing admin add a colleague as a fellow admin — the only
    * way an admin account can be created outside the one-time local

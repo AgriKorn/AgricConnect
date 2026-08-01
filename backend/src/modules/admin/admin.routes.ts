@@ -7,6 +7,7 @@ import {
   approveUserHandler,
   createAdminHandler,
   getAuditLogsHandler,
+  listAdminsHandler,
   listDisputesHandler,
   listPendingUsersHandler,
   listTransactionsHandler,
@@ -19,6 +20,7 @@ const router = Router();
 
 router.use(authenticate, authorize('admin'));
 
+router.get('/admins', listAdminsHandler);
 router.post('/admins', validate(createAdminSchema), createAdminHandler);
 
 router.get('/users/pending', listPendingUsersHandler);

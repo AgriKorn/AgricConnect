@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { NotFoundError } from '../../utils/errors';
-import { User, UserStatus } from './user.types';
+import { User, UserRole, UserStatus } from './user.types';
 import { CreateUserRecord, IUserRepository } from './user.repository';
 
 /**
@@ -54,6 +54,12 @@ export class InMemoryUserRepository implements IUserRepository {
     return [...this.usersById.values()]
       .filter((user) => user.status === status)
       .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
+  async findManyByRole(role: UserRole): Promise<User[]> {
+    return [...this.usersById.values()]
+      .filter((user) => user.role === role)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   async findFarmerIdsByRegion(region: string): Promise<string[]> {

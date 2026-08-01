@@ -5,6 +5,15 @@ import { adminService } from './admin.service';
 
 import { auditService } from '../audit/audit.service';
 
+export const listAdminsHandler = async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const admins = await adminService.listAdmins();
+    sendSuccess(res, { admins, count: admins.length });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const createAdminHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const admin = await adminService.createAdmin(req.body);

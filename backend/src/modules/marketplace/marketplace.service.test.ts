@@ -41,6 +41,7 @@ describe('MarketplaceService', () => {
       findByPhone: jest.fn(),
       findById: jest.fn(),
       findManyByStatus: jest.fn(),
+      findManyByRole: jest.fn(),
       findFarmerIdsByRegion: jest.fn(),
       findAvailableDrivers: jest.fn(),
       update: jest.fn(),

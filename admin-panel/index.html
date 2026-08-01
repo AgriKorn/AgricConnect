@@ -165,8 +165,8 @@
     <h1>AgriConnect Admin</h1>
     <p>Internal tool — admin accounts only.</p>
     <div id="login-error" class="error-banner" style="display:none"></div>
-    <label for="phone">Phone</label>
-    <input id="phone" type="text" placeholder="+233241234567" autocomplete="username">
+    <label for="email">Email</label>
+    <input id="email" type="email" placeholder="you@agriconnect.com" autocomplete="username">
     <label for="password">Password</label>
     <input id="password" type="password" autocomplete="current-password">
     <button class="btn-primary" onclick="login()">Log In</button>
@@ -186,6 +186,7 @@
     <button data-tab="transactions" onclick="switchTab('transactions')">Transactions</button>
     <button data-tab="disputes" onclick="switchTab('disputes')">Disputes</button>
     <button data-tab="audit" onclick="switchTab('audit')">Audit Log</button>
+    <button data-tab="admins" onclick="switchTab('admins')">Admins</button>
   </nav>
   <main id="main"></main>
 </div>
@@ -202,6 +203,23 @@
   <div class="dialog-actions">
     <button class="btn-secondary" onclick="document.getElementById('resolve-dialog').close()">Cancel</button>
     <button class="btn-primary" style="width:auto" onclick="submitResolve()">Submit</button>
+  </div>
+</dialog>
+
+<dialog id="add-admin-dialog">
+  <h3>Add Admin</h3>
+  <div id="add-admin-error" class="error-banner" style="display:none"></div>
+  <label>Name</label>
+  <input id="new-admin-name" type="text" placeholder="Full name">
+  <label>Email</label>
+  <input id="new-admin-email" type="email" placeholder="colleague@agriconnect.com">
+  <label>Phone</label>
+  <input id="new-admin-phone" type="text" placeholder="+233241234567">
+  <label>Password</label>
+  <input id="new-admin-password" type="password" placeholder="At least 8 characters">
+  <div class="dialog-actions">
+    <button class="btn-secondary" onclick="closeAddAdmin()">Cancel</button>
+    <button class="btn-primary" style="width:auto" onclick="submitAddAdmin()">Create Admin</button>
   </div>
 </dialog>
 
@@ -229,17 +247,17 @@ async function api(path, options = {}) {
 }
 
 async function login() {
-  const phone = document.getElementById('phone').value.trim();
+  const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
   const errorEl = document.getElementById('login-error');
   errorEl.style.display = 'none';
   try {
-    const data = await api('/auth/login', { method: 'POST', body: JSON.stringify({ phone, password }) });
+    const data = await api('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
     if (data.user.role !== 'admin') {
       throw new Error('This account is not an admin.');
     }
     setToken(data.accessToken);
-    sessionStorage.setItem('agri_admin_who', `${data.user.name} (${data.user.phone})`);
+    sessionStorage.setItem('agri_admin_who', `${data.user.name} (${data.user.email})`);
     showApp();
   } catch (e) {
     errorEl.textContent = e.message;
@@ -263,7 +281,7 @@ function showApp() {
 function switchTab(tab) {
   currentTab = tab;
   document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
-  const renderers = { pending: renderPending, transactions: renderTransactions, disputes: renderDisputes, audit: renderAudit };
+  const renderers = { pending: renderPending, transactions: renderTransactions, disputes: renderDisputes, audit: renderAudit, admins: renderAdmins };
   renderers[tab]();
 }
 
@@ -404,6 +422,67 @@ async function renderAudit() {
       <tbody>${rows}</tbody></table>`;
   } catch (e) {
     main.innerHTML = toolbar('Audit Log') + `<div class="error-banner">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function renderAdmins() {
+  const main = document.getElementById('main');
+  main.innerHTML = toolbar('Admins') + '<div class="empty">Loading...</div>';
+  try {
+    const { admins } = await api('/admin/admins');
+    const addBar = `<div style="margin-bottom:14px"><button class="btn-primary" style="width:auto" onclick="openAddAdmin()">+ Add Admin</button></div>`;
+    if (!admins.length) {
+      main.innerHTML = toolbar('Admins') + addBar + '<div class="empty">No admin accounts found.</div>';
+      return;
+    }
+    const rows = admins.map((a) => `
+      <tr>
+        <td>${escapeHtml(a.name)}</td>
+        <td>${escapeHtml(a.email || '—')}</td>
+        <td>${escapeHtml(a.phone)}</td>
+        <td>${new Date(a.createdAt).toLocaleDateString()}</td>
+      </tr>`).join('');
+    main.innerHTML = toolbar('Admins') + addBar + `
+      <table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Added</th></tr></thead>
+      <tbody>${rows}</tbody></table>`;
+  } catch (e) {
+    main.innerHTML = toolbar('Admins') + `<div class="error-banner">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function openAddAdmin() {
+  ['new-admin-name', 'new-admin-email', 'new-admin-phone', 'new-admin-password'].forEach((id) => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('add-admin-error').style.display = 'none';
+  document.getElementById('add-admin-dialog').showModal();
+}
+
+function closeAddAdmin() {
+  document.getElementById('add-admin-dialog').close();
+}
+
+async function submitAddAdmin() {
+  const name = document.getElementById('new-admin-name').value.trim();
+  const email = document.getElementById('new-admin-email').value.trim();
+  const phone = document.getElementById('new-admin-phone').value.trim();
+  const password = document.getElementById('new-admin-password').value;
+  const errorEl = document.getElementById('add-admin-error');
+  errorEl.style.display = 'none';
+
+  if (!name || !email || !phone || !password) {
+    errorEl.textContent = 'All fields are required.';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  try {
+    await api('/admin/admins', { method: 'POST', body: JSON.stringify({ name, email, phone, password }) });
+    closeAddAdmin();
+    renderAdmins();
+  } catch (e) {
+    errorEl.textContent = e.message;
+    errorEl.style.display = 'block';
   }
 }
 
