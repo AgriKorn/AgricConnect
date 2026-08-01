@@ -12,6 +12,7 @@ describe('MarketplaceService', () => {
     id: 'listing-1',
     farmerId: 'farmer-1',
     cropType: 'tomato',
+    cropCategory: 'vegetables',
     quantityKg: 100,
     freshnessScore: 90,
     shelfLifeDays: 7,
