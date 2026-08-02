@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'coming_soon_screen.dart';
+import 'privacy_policy_screen.dart';
 
 void _openComingSoon(BuildContext context, String title, IconData icon) {
   Navigator.of(context).push(
@@ -12,6 +13,14 @@ void _openComingSoon(BuildContext context, String title, IconData icon) {
       ),
     ),
   );
+}
+
+void _openResourceLink(BuildContext context, HelpResourceLink link) {
+  if (link.label == 'Privacy Policy') {
+    Navigator.of(context).push(MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()));
+    return;
+  }
+  _openComingSoon(context, link.label, link.icon);
 }
 
 class HelpContactMethod {
@@ -201,7 +210,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                       colorScheme: colorScheme,
                       link: widget.resourceLinks[i],
                       isLast: i == widget.resourceLinks.length - 1,
-                      onTap: () => _openComingSoon(context, widget.resourceLinks[i].label, widget.resourceLinks[i].icon),
+                      onTap: () => _openResourceLink(context, widget.resourceLinks[i]),
                     ),
                 ],
               ),

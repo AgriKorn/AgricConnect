@@ -41,6 +41,8 @@ describe('DashboardService', () => {
     farmerId,
     farmerName: 'Test Farmer',
     driverName: null,
+    driverPhone: null,
+    driverId: null,
     cropType: 'tomato',
     amountGhs: 100,
     status: 'RELEASED',

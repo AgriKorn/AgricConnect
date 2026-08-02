@@ -6,8 +6,10 @@ export interface Transaction {
   buyerId: string;
   farmerId: string;
   farmerName: string | null;
-  /** Name of the driver who accepted this delivery job — null until one has (or for self-collect orders, always). */
+  /** Name/phone/id of the driver who accepted this delivery job — null until one has (or for self-collect orders, always). */
   driverName: string | null;
+  driverPhone: string | null;
+  driverId: string | null;
   cropType: string;
   amountGhs: number;
   status: TransactionStatus;

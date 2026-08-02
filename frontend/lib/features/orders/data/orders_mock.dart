@@ -21,6 +21,7 @@ class ActiveShipment {
     this.farmerInitials,
     this.farmerLocation,
     this.driverName,
+    this.driverPhone,
   });
 
   final String id;
@@ -38,6 +39,7 @@ class ActiveShipment {
   /// ETA, rating, or vehicle data anywhere in the system (no live GPS, no
   /// review system), so those aren't modeled here rather than faked.
   final String? driverName;
+  final String? driverPhone;
 }
 
 class OrderHistoryEntry {

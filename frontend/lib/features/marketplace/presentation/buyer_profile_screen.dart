@@ -8,6 +8,7 @@ import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/edit_profile_screen.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/help_support_screen.dart';
+import '../../../core/widgets/privacy_policy_screen.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/models/account_status.dart';
@@ -263,7 +264,9 @@ class BuyerProfileScreen extends ConsumerWidget {
                           colorScheme: colorScheme,
                           icon: Icons.verified_user_outlined,
                           label: 'Privacy Policy',
-                          onTap: () => _openComingSoon(context, 'Privacy Policy', Icons.verified_user_outlined),
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()),
+                          ),
                           isLast: true,
                         ),
                       ],

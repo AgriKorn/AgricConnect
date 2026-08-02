@@ -15,6 +15,7 @@ class OrderItemModel {
     required this.hasOwnTransport,
     this.farmerName,
     this.driverName,
+    this.driverPhone,
   });
 
   final String id;
@@ -25,6 +26,7 @@ class OrderItemModel {
   final bool hasOwnTransport;
   final String? farmerName;
   final String? driverName;
+  final String? driverPhone;
 }
 
 class PurchaseResult {
@@ -106,6 +108,7 @@ class HttpOrdersRepository implements OrdersRepository {
         hasOwnTransport: item['hasOwnTransport'] == true,
         farmerName: item['farmerName']?.toString(),
         driverName: item['driverName']?.toString(),
+        driverPhone: item['driverPhone']?.toString(),
       )).toList();
     } on DioException {
       return const [];

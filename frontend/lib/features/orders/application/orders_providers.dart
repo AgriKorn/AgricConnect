@@ -52,6 +52,7 @@ final activeShipmentsProvider = Provider<List<ActiveShipment>>((ref) {
             farmerName: o.farmerName,
             farmerInitials: o.farmerName == null ? null : _initialsFor(o.farmerName),
             driverName: o.driverName,
+            driverPhone: o.driverPhone,
           ))
       .toList();
 });

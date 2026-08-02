@@ -26,6 +26,8 @@ const mapPrismaToTransaction = (order: any, farmerId?: string): Transaction => {
     farmerId: farmerId || order.produce_listings?.farmer_id || 'unknown',
     farmerName: order.produce_listings?.users?.full_name || null,
     driverName: order.driver_assignments?.[0]?.users?.full_name || null,
+    driverPhone: order.driver_assignments?.[0]?.users?.phone_number || null,
+    driverId: order.driver_assignments?.[0]?.driver_id || null,
     cropType: order.produce_listings?.crop_types?.name || 'crop',
     amountGhs: Number(order.amount),
     status,

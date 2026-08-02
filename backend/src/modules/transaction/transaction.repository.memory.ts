@@ -18,6 +18,8 @@ export class InMemoryTransactionRepository implements ITransactionRepository {
       ...data,
       farmerName: null,
       driverName: null,
+      driverPhone: null,
+      driverId: null,
       cropType: 'crop',
       status: 'PAYMENT_HELD',
       transferCode: null,

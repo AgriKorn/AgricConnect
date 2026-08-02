@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency.dart';
@@ -11,6 +12,20 @@ import '../../../core/widgets/coming_soon_screen.dart';
 import '../application/orders_providers.dart';
 import '../data/orders_mock.dart';
 import 'confirm_delivery_screen.dart';
+
+Future<void> _callNumber(BuildContext context, String phone) async {
+  final uri = Uri(scheme: 'tel', path: phone);
+  if (!await launchUrl(uri)) {
+    if (context.mounted) showAgriToast(context, 'Could not open the phone app.');
+  }
+}
+
+Future<void> _textNumber(BuildContext context, String phone) async {
+  final uri = Uri(scheme: 'sms', path: phone);
+  if (!await launchUrl(uri)) {
+    if (context.mounted) showAgriToast(context, 'Could not open the messaging app.');
+  }
+}
 
 void _openComingSoon(BuildContext context, String title, IconData icon) {
   Navigator.of(context).push(
@@ -374,7 +389,17 @@ class _DriverCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               GestureDetector(
-                onTap: () => _openComingSoon(context, 'Call Driver', Icons.phone_rounded),
+                onTap: () => _textNumber(context, shipment.driverPhone ?? ''),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.18), shape: BoxShape.circle),
+                  child: const Icon(Icons.sms_outlined, color: Colors.white, size: 16),
+                ),
+              ),
+              const SizedBox(width: 8),
+              GestureDetector(
+                onTap: () => _callNumber(context, shipment.driverPhone ?? ''),
                 child: Container(
                   width: 36,
                   height: 36,
