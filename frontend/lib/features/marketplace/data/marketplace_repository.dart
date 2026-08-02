@@ -176,6 +176,7 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
       farmerName: json['farmerName']?.toString() ?? 'Local Farmer',
       farmerId: json['farmerId']?.toString(),
       quantityAvailable: double.tryParse(json['quantityKg']?.toString() ?? ''),
+      imageUrl: json['imageUrl']?.toString(),
     );
   }
 
