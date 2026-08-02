@@ -34,6 +34,15 @@ abstract class MarketplaceRepository {
     required double farmerLat,
     required double farmerLong,
     required double pricePerKg,
+    String? imageUrl,
+  });
+
+  /// Uploads [bytes] to S3 via a presigned URL and returns the resulting
+  /// public photo URL — caller still has to pass it to [createListing].
+  Future<String> uploadListingPhoto({
+    required List<int> bytes,
+    required String fileName,
+    required String contentType,
   });
 }
 
@@ -80,6 +89,7 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
     required double farmerLat,
     required double farmerLong,
     required double pricePerKg,
+    String? imageUrl,
   }) async {
     try {
       final response = await _dio.post(
@@ -92,6 +102,7 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
           'farmerLat': farmerLat,
           'farmerLong': farmerLong,
           'pricePerKg': pricePerKg,
+          if (imageUrl != null) 'imageUrl': imageUrl,
         },
       );
       final item = response.data['data'] ?? response.data;
@@ -99,6 +110,37 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
     } on DioException catch (e) {
       final serverMessage = e.response?.data?['error']?['message']?.toString();
       throw ApiException(serverMessage ?? e.message ?? 'Failed to create listing.');
+    }
+  }
+
+  @override
+  Future<String> uploadListingPhoto({
+    required List<int> bytes,
+    required String fileName,
+    required String contentType,
+  }) async {
+    try {
+      final urlResponse = await _dio.post(
+        '/listings/photo-upload-url',
+        data: {'fileName': fileName, 'contentType': contentType},
+      );
+      final urlData = urlResponse.data['data'] ?? urlResponse.data;
+      final uploadUrl = urlData['uploadUrl']?.toString() ?? '';
+      final publicUrl = urlData['publicUrl']?.toString() ?? '';
+      if (uploadUrl.isEmpty || publicUrl.isEmpty) {
+        throw const ApiException('Could not get a photo upload URL.');
+      }
+
+      await Dio().put<void>(
+        uploadUrl,
+        data: Stream.fromIterable([bytes]),
+        options: Options(headers: {'Content-Type': contentType, 'content-length': bytes.length}),
+      );
+
+      return publicUrl;
+    } on DioException catch (e) {
+      final serverMessage = e.response?.data?['error']?['message']?.toString();
+      throw ApiException(serverMessage ?? e.message ?? 'Failed to upload photo.');
     }
   }
 
@@ -117,6 +159,7 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
         _ => 'Active',
       },
       qrCodeData: json['qrCodeData']?.toString(),
+      imageUrl: json['imageUrl']?.toString(),
     );
   }
 

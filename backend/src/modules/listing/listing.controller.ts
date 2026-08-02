@@ -19,6 +19,17 @@ export const createListingHandler = async (req: Request, res: Response, next: Ne
   }
 };
 
+export const getListingPhotoUploadUrlHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    requireUserId(req);
+    const { fileName, contentType } = req.body;
+    const result = await listingService.getPhotoUploadUrl(fileName, contentType);
+    sendSuccess(res, result);
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const getFarmerListingsHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const farmerId = requireUserId(req);

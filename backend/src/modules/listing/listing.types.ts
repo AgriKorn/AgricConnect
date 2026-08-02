@@ -12,6 +12,8 @@ export interface Listing {
   pricePerKg: number;
   listingHash: string;
   qrCodeData: string;
+  /** Public S3 URL of the farmer's real photo of this crop — null until they upload one. */
+  imageUrl?: string;
   status: ListingStatus;
   createdAt: Date;
   updatedAt: Date;

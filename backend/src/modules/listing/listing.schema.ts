@@ -36,6 +36,15 @@ export const createListingSchema = z.object({
       required_error: 'Price per kg is required',
       invalid_type_error: 'Price per kg must be a number',
     }).positive('Price per kg must be greater than 0'),
+
+    imageUrl: z.string().url().optional(),
+  }),
+});
+
+export const listingPhotoUploadUrlSchema = z.object({
+  body: z.object({
+    fileName: z.string().min(1, 'fileName is required'),
+    contentType: z.string().regex(/^image\//, 'contentType must be an image MIME type'),
   }),
 });
 

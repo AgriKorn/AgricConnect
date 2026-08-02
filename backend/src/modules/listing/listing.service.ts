@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { ForbiddenError, NotFoundError, PayoutNotConfiguredError } from '../../utils/errors';
 import { auditService } from '../audit/audit.service';
 import logger from '../../utils/logger';
+import { s3Service, PresignedUploadUrlResult } from '../../services/s3.service';
 import { userRepository } from '../user/user.repository.prisma';
 import { CreateListingInput, UpdateListingInput } from './listing.schema';
 import { IListingRepository } from './listing.repository';
@@ -60,6 +61,11 @@ const auditNonFatal = async (operation: string, entityId: string, run: () => Pro
 
 export class ListingService {
   constructor(private readonly repo: IListingRepository) {}
+
+  /** Presigned S3 PUT URL for a crop photo — same public bucket/flow as profile photos. */
+  getPhotoUploadUrl(fileName: string, contentType: string): Promise<PresignedUploadUrlResult> {
+    return s3Service.generatePublicUploadUrl(fileName, contentType);
+  }
 
   async createListing(data: CreateListingInput, farmerId: string): Promise<Listing> {
     const farmer = await userRepository.findById(farmerId);

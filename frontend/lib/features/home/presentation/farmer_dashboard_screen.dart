@@ -331,7 +331,9 @@ class _ListingCard extends StatelessWidget {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: listing.imageAsset != null
+                      child: listing.imageUrl != null
+                          ? Image.network(listing.imageUrl!, fit: BoxFit.cover)
+                          : listing.imageAsset != null
                           ? Image.asset(listing.imageAsset!, fit: BoxFit.cover)
                           : DecoratedBox(
                               decoration: BoxDecoration(

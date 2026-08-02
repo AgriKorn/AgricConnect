@@ -12,6 +12,7 @@ class FarmerListingSummary {
     this.tag,
     this.qrCodeData,
     this.imageAsset,
+    this.imageUrl,
   });
 
   final String id;
@@ -22,5 +23,6 @@ class FarmerListingSummary {
   final String status; // Active | Pending | Sold
   final String? tag; // Premium | Verified
   final String? qrCodeData; // data:image/png;base64,... shown to buyers/drivers at delivery
-  final String? imageAsset;
+  final String? imageAsset; // bundled asset — unused by real listings, kept for any future seed/demo data
+  final String? imageUrl; // real S3 photo the farmer uploaded, if any
 }
