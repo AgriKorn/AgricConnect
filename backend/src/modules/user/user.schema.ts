@@ -26,6 +26,15 @@ export const updateProfileSchema = z.object({
     isAvailable: z.boolean().optional(),
     // Shared — set after a successful photo upload (see photoUploadUrlSchema)
     photoUrl: z.string().url().optional(),
+    // Shared — full object sent on every toggle flip, not a partial patch
+    notificationPreferences: z
+      .object({
+        orderStatusUpdates: z.boolean().optional(),
+        priceAlerts: z.boolean().optional(),
+        freshnessNotifications: z.boolean().optional(),
+        marketingOffers: z.boolean().optional(),
+      })
+      .optional(),
   }),
 });
 

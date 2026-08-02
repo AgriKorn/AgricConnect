@@ -12,11 +12,8 @@ class BuyerProfileDetails {
   final String location;
 }
 
-/// Notification toggles are UI-only preferences — there is no backend
-/// endpoint to persist them yet, so they reset on next login. Left as
-/// local-only state rather than removed, since flipping a switch and
-/// having it silently do nothing is a smaller, more familiar gap than
-/// showing invented account data (addresses/payment methods) as if real.
+/// Notification toggle state — persisted via PATCH /users/profile
+/// (buyer_profile_providers.dart), not local-only.
 class BuyerPreferences {
   const BuyerPreferences({
     required this.orderStatusUpdates,
@@ -44,10 +41,3 @@ class BuyerPreferences {
     );
   }
 }
-
-const mockBuyerPreferences = BuyerPreferences(
-  orderStatusUpdates: true,
-  priceAlerts: true,
-  freshnessNotifications: false,
-  marketingOffers: false,
-);

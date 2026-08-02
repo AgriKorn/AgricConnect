@@ -8,6 +8,7 @@ import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/edit_profile_screen.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/help_support_screen.dart';
+import '../../../core/widgets/user_avatar.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/models/account_status.dart';
 import '../application/buyer_profile_providers.dart';
@@ -93,7 +94,13 @@ class BuyerProfileScreen extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final profile = ref.watch(buyerProfileProvider);
     final addressesAsync = ref.watch(deliveryAddressesProvider);
-    final preferences = ref.watch(buyerPreferencesProvider);
+    final preferences = ref.watch(buyerPreferencesProvider).valueOrNull ??
+        const BuyerPreferences(
+          orderStatusUpdates: true,
+          priceAlerts: true,
+          freshnessNotifications: false,
+          marketingOffers: false,
+        );
     final verified = ref.watch(authControllerProvider).user?.status == AccountStatus.verified;
     final themeMode = ref.watch(themeModeControllerProvider);
 
@@ -309,14 +316,7 @@ class _ProfileHero extends StatelessWidget {
             offset: const Offset(0, -8),
             child: Column(
               children: [
-                CircleAvatar(
-                  radius: 52,
-                  backgroundColor: colorScheme.primary,
-                  child: Text(
-                    profile.initials,
-                    style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w800, fontSize: 30),
-                  ),
-                ),
+                const SizedBox(width: 104, height: 104, child: UserAvatar(size: 104)),
                 const SizedBox(height: 16),
                 Text(
                   profile.name,

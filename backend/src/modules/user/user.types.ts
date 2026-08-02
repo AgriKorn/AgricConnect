@@ -11,6 +11,13 @@ export interface FarmerProfile {
   momoNetwork?: string;
   /** Public S3 URL of the user's uploaded profile photo — shared across all roles. */
   photoUrl?: string;
+  /** Notification toggle state — shared across all roles, currently only surfaced in the Buyer profile UI. */
+  notificationPreferences?: {
+    orderStatusUpdates?: boolean;
+    priceAlerts?: boolean;
+    freshnessNotifications?: boolean;
+    marketingOffers?: boolean;
+  };
 }
 
 export interface BuyerProfile {

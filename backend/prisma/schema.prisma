@@ -24,6 +24,7 @@ model User {
   business_name                        String?                 @db.VarChar(150)
   business_type                        String?                 @db.VarChar(100)
   photo_url                            String?                 @db.VarChar(500)
+  notification_prefs                   Json?
   password_hash                        String?                 @db.VarChar(255)
   /// Persisted so refresh tokens can be revoked: logout clears it and refresh
   /// rejects any token that does not match the stored one. Without this column

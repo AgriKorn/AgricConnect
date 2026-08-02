@@ -32,6 +32,10 @@ class ProfileData {
     this.operatingRegion,
     this.momoNumber,
     this.momoNetwork,
+    this.orderStatusUpdates,
+    this.priceAlerts,
+    this.freshnessNotifications,
+    this.marketingOffers,
   });
 
   final String? farmRegion;
@@ -41,8 +45,13 @@ class ProfileData {
   final String? operatingRegion;
   final String? momoNumber;
   final String? momoNetwork;
+  final bool? orderStatusUpdates;
+  final bool? priceAlerts;
+  final bool? freshnessNotifications;
+  final bool? marketingOffers;
 
   factory ProfileData.fromJson(Map<String, dynamic> json) {
+    final prefs = (json['notificationPreferences'] as Map?)?.cast<String, dynamic>() ?? const {};
     return ProfileData(
       farmRegion: json['farmRegion']?.toString(),
       businessName: json['businessName']?.toString(),
@@ -51,6 +60,10 @@ class ProfileData {
       operatingRegion: json['operatingRegion']?.toString(),
       momoNumber: json['momoNumber']?.toString(),
       momoNetwork: json['momoNetwork']?.toString(),
+      orderStatusUpdates: prefs['orderStatusUpdates'] as bool?,
+      priceAlerts: prefs['priceAlerts'] as bool?,
+      freshnessNotifications: prefs['freshnessNotifications'] as bool?,
+      marketingOffers: prefs['marketingOffers'] as bool?,
     );
   }
 }
