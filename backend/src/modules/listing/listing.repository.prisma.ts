@@ -1,5 +1,4 @@
 import { prisma } from '../../config/db';
-import { BadRequestError } from '../../utils/errors';
 import { CreateListingRecord, IListingRepository, ListingFilters, UpdateListingRecord } from './listing.repository';
 import { Listing } from './listing.types';
 import { listing_status, Prisma } from '../../generated/prisma/client';
@@ -24,14 +23,20 @@ const mapPrismaToListing = (p: any): Listing => ({
 
 export class PrismaListingRepository implements IListingRepository {
   async create(data: CreateListingRecord): Promise<Listing> {
-    const crop = await prisma.crop_types.findFirst({
+    // Add Listing is a free-text "Crop / Produce Name" field, not a picker
+    // bound to this lookup table — rejecting anything not already seeded
+    // (mango, okra, groundnut, ...) was blocking real produce a farmer
+    // actually grows. Reuse an existing row case-insensitively so "Tomato"
+    // and "tomato" don't fork into duplicates; only create a new one
+    // (always lowercased, for consistency) when it's genuinely new.
+    let crop = await prisma.crop_types.findFirst({
       where: { name: { equals: data.cropType, mode: 'insensitive' } },
     });
 
     if (!crop) {
-      const validCrops = await prisma.crop_types.findMany({ select: { name: true } });
-      const cropList = validCrops.map((c) => c.name).join(', ');
-      throw new BadRequestError(`Unknown crop type '${data.cropType}'. Valid choices are: ${cropList}`);
+      crop = await prisma.crop_types.create({
+        data: { name: data.cropType.trim().toLowerCase() },
+      });
     }
 
     const created = await prisma.produce_listings.create({
