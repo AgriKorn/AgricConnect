@@ -297,7 +297,7 @@ class HttpAuthRepository implements AuthRepository {
         uploadUrl,
         data: Stream.fromIterable([bytes]),
         options: Options(
-          headers: {'Content-Type': contentType, Headers.contentLengthHeader: bytes.length},
+          headers: {'Content-Type': contentType, 'content-length': bytes.length},
         ),
       );
 
