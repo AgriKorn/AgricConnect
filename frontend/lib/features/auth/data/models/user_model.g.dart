@@ -20,6 +20,7 @@ _$UserModelImpl _$$UserModelImplFromJson(Map<String, dynamic> json) =>
       vehicleCapacity: json['vehicleCapacity'] as String?,
       operatingRegion: json['operatingRegion'] as String?,
       bio: json['bio'] as String?,
+      photoUrl: json['photoUrl'] as String?,
     );
 
 Map<String, dynamic> _$$UserModelImplToJson(_$UserModelImpl instance) =>
@@ -36,6 +37,7 @@ Map<String, dynamic> _$$UserModelImplToJson(_$UserModelImpl instance) =>
       'vehicleCapacity': instance.vehicleCapacity,
       'operatingRegion': instance.operatingRegion,
       'bio': instance.bio,
+      'photoUrl': instance.photoUrl,
     };
 
 const _$UserRoleEnumMap = {

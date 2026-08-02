@@ -10,6 +10,7 @@ describe('PricingService', () => {
     jest.clearAllMocks();
     mockMofaPrices = {
       findLatest: jest.fn(),
+      findPriceHistory: jest.fn(),
     } as any;
 
     pricingService = new PricingService(mockMofaPrices);
@@ -70,6 +71,46 @@ describe('PricingService', () => {
       expect(result.decayProjection).toHaveLength(6); // days 0..5 inclusive
       expect(result.decayProjection![0].daysElapsed).toBe(0);
       expect(result.decayProjection![0].projectedFreshness).toBe(90);
+    });
+  });
+
+  describe('getMarketTrend', () => {
+    it('returns null with no crop types given', async () => {
+      const result = await pricingService.getMarketTrend([], 'Ashanti');
+      expect(result.trendPercent).toBeNull();
+    });
+
+    it('returns null when there is only one recorded price snapshot per crop (no history to compare against)', async () => {
+      mockMofaPrices.findPriceHistory.mockResolvedValue([
+        { cropType: 'tomato', region: 'Ashanti', pricePerKg: 10, effectiveDate: new Date('2026-07-30') },
+      ]);
+
+      const result = await pricingService.getMarketTrend(['tomato'], 'Ashanti');
+
+      expect(result.trendPercent).toBeNull();
+    });
+
+    it('computes real percent change between the two latest snapshots for a crop', async () => {
+      mockMofaPrices.findPriceHistory.mockResolvedValue([
+        { cropType: 'tomato', region: 'Ashanti', pricePerKg: 11, effectiveDate: new Date('2026-07-30') },
+        { cropType: 'tomato', region: 'Ashanti', pricePerKg: 10, effectiveDate: new Date('2026-07-23') },
+      ]);
+
+      const result = await pricingService.getMarketTrend(['tomato'], 'Ashanti');
+
+      expect(result.trendPercent).toBe(10); // (11 - 10) / 10 * 100
+    });
+
+    it('averages percent change across multiple crops, ignoring crops with no history', async () => {
+      mockMofaPrices.findPriceHistory.mockResolvedValue([
+        { cropType: 'tomato', region: 'Ashanti', pricePerKg: 12, effectiveDate: new Date('2026-07-30') },
+        { cropType: 'tomato', region: 'Ashanti', pricePerKg: 10, effectiveDate: new Date('2026-07-23') },
+        { cropType: 'maize', region: 'Ashanti', pricePerKg: 5, effectiveDate: new Date('2026-07-30') }, // no prior snapshot
+      ]);
+
+      const result = await pricingService.getMarketTrend(['tomato', 'maize'], 'Ashanti');
+
+      expect(result.trendPercent).toBe(20); // only tomato had history: (12-10)/10 * 100
     });
   });
 });

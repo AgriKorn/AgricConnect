@@ -28,6 +28,15 @@ export class InMemoryMofaPriceRepository implements IMofaPriceRepository {
     return this.prices.get(this.key(cropType, region)) ?? null;
   }
 
+  async findPriceHistory(cropTypes: string[], region: string): Promise<MofaPriceReference[]> {
+    // Seed only ever holds one snapshot per crop/region — no history to
+    // compute a real trend from, so this deliberately mirrors that (empty
+    // when nothing matches, at most one entry per crop otherwise).
+    return cropTypes
+      .map((crop) => this.prices.get(this.key(crop, region)))
+      .filter((entry): entry is MofaPriceReference => entry !== undefined);
+  }
+
   private key(cropType: string, region: string): string {
     return `${cropType.toLowerCase()}::${region.toLowerCase()}`;
   }

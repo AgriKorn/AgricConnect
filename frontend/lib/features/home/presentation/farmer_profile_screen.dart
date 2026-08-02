@@ -7,38 +7,18 @@ import '../../../core/utils/currency.dart';
 import '../../../core/widgets/account_settings_screen.dart';
 import '../../../core/widgets/agri_dialog.dart';
 import '../../../core/widgets/help_support_screen.dart';
+import '../../../core/widgets/user_avatar.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/models/account_status.dart';
 import '../../auth/data/models/user_model.dart';
 import '../application/farmer_dashboard_providers.dart';
-import '../data/farmer_dashboard_mock.dart';
+import '../data/farmer_dashboard_repository.dart';
 import 'momo_payout_screen.dart';
-
-const _heroImage = 'assets/images/farmer_hero.jpeg';
-
-// Rec. 709 luma weights — desaturates the hero photo for the avatar so it
-// reads as the reference's black & white portrait without a second asset.
-const _grayscaleMatrix = <double>[
-  0.2126, 0.7152, 0.0722, 0, 0,
-  0.2126, 0.7152, 0.0722, 0, 0,
-  0.2126, 0.7152, 0.0722, 0, 0,
-  0, 0, 0, 1, 0,
-];
-
-Widget _farmerAvatar(double size) {
-  return ClipOval(
-    child: ColorFiltered(
-      colorFilter: const ColorFilter.matrix(_grayscaleMatrix),
-      child: Image.asset(_heroImage, fit: BoxFit.cover),
-    ),
-  );
-}
 
 void _openFarmerAccountSettings(BuildContext context, bool verified) {
   Navigator.of(context).push(
     MaterialPageRoute(
       builder: (context) => AccountSettingsScreen(
-        avatarBuilder: _farmerAvatar,
         roleBadgeLabel: verified ? 'Verified Farmer' : 'Farmer',
         onHelpTap: () => _openFarmerHelp(context),
         locationLabel: 'Farm Location',
@@ -88,7 +68,7 @@ class FarmerProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final user = ref.watch(authControllerProvider).user;
-    final details = ref.watch(farmerProfileDetailsProvider);
+    final details = ref.watch(farmerDashboardSummaryProvider).valueOrNull;
     final themeMode = ref.watch(themeModeControllerProvider);
 
     return Scaffold(
@@ -116,20 +96,22 @@ class FarmerProfileScreen extends ConsumerWidget {
                         _InfoRow(
                           colorScheme: colorScheme,
                           icon: Icons.location_on_rounded,
-                          title: details.location,
+                          title: details?.location ?? user?.region ?? 'Not set',
                           subtitle: 'Location',
                         ),
                         _InfoRow(
                           colorScheme: colorScheme,
                           icon: Icons.agriculture_rounded,
-                          title: details.primaryCrops.join(', '),
+                          title: (details == null || details.primaryCrops.isEmpty)
+                              ? 'No listings yet'
+                              : details.primaryCrops.join(', '),
                           subtitle: 'Primary Crops',
                         ),
                         _InfoRow(
                           colorScheme: colorScheme,
                           icon: Icons.account_balance_wallet_rounded,
-                          title: formatGhs(details.walletBalance),
-                          subtitle: 'Wallet Balance',
+                          title: formatGhs(details?.totalEarningsGhs ?? 0),
+                          subtitle: 'Total Earnings',
                           isLast: true,
                         ),
                       ],
@@ -206,7 +188,7 @@ class _ProfileHero extends StatelessWidget {
 
   final ColorScheme colorScheme;
   final UserModel? user;
-  final FarmerProfileDetails details;
+  final FarmerDashboardSummary? details;
 
   @override
   Widget build(BuildContext context) {
@@ -260,14 +242,14 @@ class _ProfileHero extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _HeroStat(value: details.rating.toStringAsFixed(1), label: 'Rating'),
+                    _HeroStat(value: '${details?.salesCount ?? 0}', label: 'Sales'),
                     Container(
                       width: 1,
                       height: 34,
                       color: Colors.white.withValues(alpha: 0.2),
                       margin: const EdgeInsets.symmetric(horizontal: 28),
                     ),
-                    _HeroStat(value: '${details.salesCount}', label: 'Sales'),
+                    _HeroStat(value: '${details?.activeOrders ?? 0}', label: 'Active Orders'),
                   ],
                 ),
               ],
@@ -285,12 +267,7 @@ class _ProfileHero extends StatelessWidget {
               color: Theme.of(context).scaffoldBackgroundColor,
               border: Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
             ),
-            child: ClipOval(
-              child: ColorFiltered(
-                colorFilter: const ColorFilter.matrix(_grayscaleMatrix),
-                child: Image.asset(_heroImage, fit: BoxFit.cover),
-              ),
-            ),
+            child: const UserAvatar(size: 90),
           ),
         ),
       ],

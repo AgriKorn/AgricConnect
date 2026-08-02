@@ -62,6 +62,8 @@ dependencies:
   google_sign_in: ^6.2.2
   supabase_flutter: ^2.8.0
   camera: ^0.12.0+2
+  # Real profile photo upload (Edit Profile "Change Profile Photo")
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:

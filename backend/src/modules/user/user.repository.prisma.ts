@@ -50,6 +50,7 @@ const mapPrismaToUser = (p: any): User => {
       momoNetwork: p.momo_network || undefined,
       businessName: p.business_name || undefined,
       businessType: p.business_type || undefined,
+      photoUrl: p.photo_url || undefined,
     },
     createdAt: p.created_at,
     updatedAt: p.updated_at,
@@ -181,7 +182,8 @@ export class PrismaUserRepository implements IUserRepository {
       profile.momoNumber ||
       profile.momoNetwork ||
       profile.businessName ||
-      profile.businessType
+      profile.businessType ||
+      profile.photoUrl
     ) {
       await prisma.user.update({
         where: { id },
@@ -191,6 +193,7 @@ export class PrismaUserRepository implements IUserRepository {
           ...(profile.momoNetwork && { momo_network: profile.momoNetwork }),
           ...(profile.businessName && { business_name: profile.businessName }),
           ...(profile.businessType && { business_type: profile.businessType }),
+          ...(profile.photoUrl && { photo_url: profile.photoUrl }),
         },
       });
     }

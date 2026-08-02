@@ -27,30 +27,10 @@ void _openComingSoon(BuildContext context, String title, IconData icon) {
   );
 }
 
-Widget Function(double size) _buyerAvatarBuilder(BuyerProfileDetails profile) {
-  return (size) => Builder(
-        builder: (context) {
-          final colorScheme = Theme.of(context).colorScheme;
-          return ClipOval(
-            child: ColoredBox(
-              color: colorScheme.primary,
-              child: Center(
-                child: Text(
-                  profile.initials,
-                  style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w800, fontSize: size * 0.34),
-                ),
-              ),
-            ),
-          );
-        },
-      );
-}
-
 void _openBuyerAccountSettings(BuildContext context, BuyerProfileDetails profile, bool verified) {
   Navigator.of(context).push(
     MaterialPageRoute(
       builder: (context) => AccountSettingsScreen(
-        avatarBuilder: _buyerAvatarBuilder(profile),
         roleBadgeLabel: verified ? 'Verified Buyer' : 'Buyer',
         onHelpTap: () => _openBuyerHelp(context),
         locationLabel: 'Location',
@@ -65,7 +45,6 @@ void _openBuyerEditProfile(BuildContext context, BuyerProfileDetails profile) {
   Navigator.of(context).push(
     MaterialPageRoute(
       builder: (context) => EditProfileScreen(
-        avatarBuilder: _buyerAvatarBuilder(profile),
         locationLabel: 'Location',
         locationHint: 'e.g. Accra, Ghana',
         verifiedSubtitle: 'Your profile badge is visible to all farmers.',

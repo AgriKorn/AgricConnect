@@ -24,6 +24,15 @@ export const updateProfileSchema = z.object({
     truckCapacity: z.number().positive('Truck capacity must be positive').optional(),
     operatingRegion: z.string().optional(),
     isAvailable: z.boolean().optional(),
+    // Shared — set after a successful photo upload (see photoUploadUrlSchema)
+    photoUrl: z.string().url().optional(),
+  }),
+});
+
+export const photoUploadUrlSchema = z.object({
+  body: z.object({
+    fileName: z.string().min(1, 'fileName is required'),
+    contentType: z.string().regex(/^image\//, 'contentType must be an image MIME type'),
   }),
 });
 

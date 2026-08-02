@@ -9,6 +9,8 @@ export interface FarmerProfile {
   momoNumber?: string;
   /** Paystack Ghana mobile-money bank code: 'MTN' | 'VOD' | 'ATL'. */
   momoNetwork?: string;
+  /** Public S3 URL of the user's uploaded profile photo — shared across all roles. */
+  photoUrl?: string;
 }
 
 export interface BuyerProfile {

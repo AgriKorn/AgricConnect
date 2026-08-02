@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../features/auth/application/auth_controller.dart';
+import '../../features/auth/data/auth_repository.dart';
 import '../../features/auth/presentation/widgets/auth_visuals.dart';
 import '../network/api_exception.dart';
+import 'agri_bottom_sheet.dart';
 import 'agri_dialog.dart';
 import 'agri_toast.dart';
 import 'coming_soon_screen.dart';
+import 'user_avatar.dart';
 
 void _openComingSoon(BuildContext context, String title, IconData icon) {
   Navigator.of(context).push(
@@ -29,13 +33,11 @@ void _openComingSoon(BuildContext context, String title, IconData icon) {
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({
     super.key,
-    required this.avatarBuilder,
     required this.locationLabel,
     required this.locationHint,
     required this.verifiedSubtitle,
   });
 
-  final Widget Function(double size) avatarBuilder;
   final String locationLabel;
   final String locationHint;
   final String verifiedSubtitle;
@@ -46,11 +48,13 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _imagePicker = ImagePicker();
   late final TextEditingController _nameController;
   late final TextEditingController _locationController;
   late final String _phone;
   late final String _email;
   bool _saving = false;
+  bool _uploadingPhoto = false;
   String? _error;
 
   @override
@@ -68,6 +72,53 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _nameController.dispose();
     _locationController.dispose();
     super.dispose();
+  }
+
+  Future<void> _changePhoto() async {
+    final source = await showAgriBottomSheet<ImageSource>(
+      context,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.photo_camera_outlined),
+            title: const Text('Take a photo'),
+            onTap: () => Navigator.of(context).pop(ImageSource.camera),
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library_outlined),
+            title: const Text('Choose from gallery'),
+            onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+          ),
+        ],
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    final picked = await _imagePicker.pickImage(source: source, maxWidth: 1024, imageQuality: 85);
+    if (picked == null || !mounted) return;
+
+    setState(() => _uploadingPhoto = true);
+    try {
+      final bytes = await picked.readAsBytes();
+      final ext = picked.name.contains('.') ? picked.name.split('.').last.toLowerCase() : 'jpg';
+      final contentType = ext == 'png' ? 'image/png' : 'image/jpeg';
+
+      final publicUrl = await ref.read(authRepositoryProvider).uploadProfilePhoto(
+            bytes: bytes,
+            fileName: picked.name,
+            contentType: contentType,
+          );
+
+      await ref.read(authControllerProvider.notifier).updatePhotoUrl(publicUrl);
+
+      if (!mounted) return;
+      showAgriToast(context, 'Profile photo updated');
+    } on ApiException catch (e) {
+      if (mounted) showAgriToast(context, e.message);
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
   }
 
   Future<void> _save() async {
@@ -160,12 +211,19 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    SizedBox(width: 132, height: 132, child: widget.avatarBuilder(132)),
+                    const SizedBox(width: 132, height: 132, child: UserAvatar(size: 132)),
+                    if (_uploadingPhoto)
+                      const Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(color: Colors.black38, shape: BoxShape.circle),
+                          child: Center(child: CircularProgressIndicator(color: Colors.white)),
+                        ),
+                      ),
                     Positioned(
                       right: -4,
                       bottom: -4,
                       child: GestureDetector(
-                        onTap: () => _openComingSoon(context, 'Change Profile Photo', Icons.camera_alt_outlined),
+                        onTap: _uploadingPhoto ? null : _changePhoto,
                         child: Container(
                           width: 40,
                           height: 40,
@@ -184,7 +242,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               const SizedBox(height: 14),
               Center(
                 child: GestureDetector(
-                  onTap: () => _openComingSoon(context, 'Change Profile Photo', Icons.camera_alt_outlined),
+                  onTap: _uploadingPhoto ? null : _changePhoto,
                   child: Text(
                     'Change Profile Photo',
                     style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w700, fontSize: 14.5),

@@ -118,6 +118,20 @@ class AuthController extends Notifier<SessionState> {
     await _persistUser(updated);
   }
 
+  /// Separate from [updateProfile] so changing the photo doesn't force a
+  /// name re-submit — the upload itself already happened by the time this
+  /// runs, this just persists the resulting URL.
+  Future<void> updatePhotoUrl(String photoUrl) async {
+    final currentUser = state.user;
+    if (currentUser == null) return;
+
+    await ref.read(authRepositoryProvider).updateProfile({'photoUrl': photoUrl});
+
+    final updated = currentUser.copyWith(photoUrl: photoUrl);
+    state = state.copyWith(user: updated);
+    await _persistUser(updated);
+  }
+
   Future<void> login({required String email, required String password}) async {
     state = state.copyWith(isSubmitting: true, errorMessage: null);
     try {

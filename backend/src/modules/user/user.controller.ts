@@ -25,6 +25,18 @@ export const updateProfileHandler = async (req: Request, res: Response, next: Ne
   }
 };
 
+export const getPhotoUploadUrlHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = (req as any).user;
+    if (!user) throw new UnauthorizedError();
+    const { fileName, contentType } = req.body;
+    const result = await userService.getPhotoUploadUrl(fileName, contentType);
+    sendSuccess(res, result);
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const registerDeviceTokenHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = (req as any).user;
