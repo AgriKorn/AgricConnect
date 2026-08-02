@@ -6,3 +6,4 @@ A freshness-aware agricultural marketplace connecting farmers, buyers, and truck
 
 - [`frontend/`](frontend/) — Flutter application
 - [`backend/`](backend/) — Express + TypeScript API
+- [`ai/`](ai/) — On-device crop/freshness/shelf-life model (TFLite) + training pipeline
