@@ -48,8 +48,10 @@ final activeShipmentsProvider = Provider<List<ActiveShipment>>((ref) {
             itemName: o.listingName,
             status: _statusFor(o.status),
             escrowTotal: o.amount,
+            hasOwnTransport: o.hasOwnTransport,
             farmerName: o.farmerName,
             farmerInitials: o.farmerName == null ? null : _initialsFor(o.farmerName),
+            driverName: o.driverName,
           ))
       .toList();
 });

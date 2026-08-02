@@ -28,6 +28,7 @@ describe('TransactionService', () => {
     buyerId: 'buyer-456',
     farmerId: 'farmer-789',
     farmerName: 'Test Farmer',
+    driverName: null,
     cropType: 'tomato',
     amountGhs: 3000,
     status: 'PAYMENT_HELD',

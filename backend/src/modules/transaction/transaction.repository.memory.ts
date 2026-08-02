@@ -17,6 +17,7 @@ export class InMemoryTransactionRepository implements ITransactionRepository {
       id: randomUUID(),
       ...data,
       farmerName: null,
+      driverName: null,
       cropType: 'crop',
       status: 'PAYMENT_HELD',
       transferCode: null,

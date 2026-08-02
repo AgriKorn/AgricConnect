@@ -1,13 +1,16 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency.dart';
 import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
+import '../application/orders_providers.dart';
 import '../data/orders_mock.dart';
+import 'confirm_delivery_screen.dart';
 
 void _openComingSoon(BuildContext context, String title, IconData icon) {
   Navigator.of(context).push(
@@ -30,17 +33,33 @@ String _initialsOf(String name) {
   return (first + last).toUpperCase();
 }
 
-/// Live tracking for an in-transit shipment: ETA + progress, a route map
-/// with the driver's contact card, delivery details, an escrow reminder,
-/// and a Confirm Arrival action. Pushed from the Active Shipment card's
-/// "Track Live" button (orders_screen.dart).
-class OrderTrackingScreen extends StatelessWidget {
+/// Live tracking for an in-transit shipment: status + route map with the
+/// driver's contact card (when one's actually assigned), delivery details,
+/// an escrow reminder, and a Confirm Arrival action that runs the same real
+/// QR-based confirm-delivery flow as the Orders screen — this used to just
+/// show a "thank you" toast and pop without calling the backend at all, so
+/// "confirming" here silently left the order stuck and payment unreleased.
+/// Pushed from the Active Shipment card's map button (orders_screen.dart).
+class OrderTrackingScreen extends ConsumerWidget {
   const OrderTrackingScreen({super.key, required this.shipment});
 
   final ActiveShipment shipment;
 
+  Future<void> _confirmArrival(BuildContext context, WidgetRef ref) async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => ConfirmDeliveryScreen(transactionId: shipment.id)),
+    );
+    if (result == true) {
+      ref.invalidate(myOrdersProvider);
+      if (context.mounted) {
+        showAgriToast(context, 'Delivery confirmed — payment released to the farmer.');
+        Navigator.of(context).pop();
+      }
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final pickup = shipment.farmerLocation ?? 'Farm pickup location';
     const dropoff = 'Your delivery address';
@@ -94,7 +113,11 @@ class OrderTrackingScreen extends StatelessWidget {
                     ],
                   ),
                 ),
-                _ConfirmArrivalBar(colorScheme: colorScheme, total: shipment.escrowTotal),
+                _ConfirmArrivalBar(
+                  colorScheme: colorScheme,
+                  total: shipment.escrowTotal,
+                  onConfirm: () => _confirmArrival(context, ref),
+                ),
               ],
             ),
           ),
@@ -142,7 +165,9 @@ class _TrackingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final eta = shipment.etaMinutes;
+    // No live GPS/ETA data exists anywhere in the system, so this shows the
+    // real order status rather than a fabricated "arriving in N mins".
+    final driverAssigned = shipment.driverName != null;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -166,7 +191,7 @@ class _TrackingCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      eta != null ? 'Arriving in $eta mins' : shipment.status.label,
+                      shipment.status.label,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: colorScheme.onSurface, fontSize: 22, fontWeight: FontWeight.w800),
@@ -184,8 +209,10 @@ class _TrackingCard extends StatelessWidget {
           const SizedBox(height: 18),
           _ProgressTrack(colorScheme: colorScheme, progress: 1),
           const SizedBox(height: 10),
-          _ProgressTrack(colorScheme: colorScheme, progress: shipment.transitProgress ?? 0.5),
-          const SizedBox(height: 18),
+          if (!shipment.hasOwnTransport) ...[
+            _ProgressTrack(colorScheme: colorScheme, progress: driverAssigned ? 1 : 0),
+            const SizedBox(height: 18),
+          ],
           _MapPreview(shipment: shipment),
         ],
       ),
@@ -288,6 +315,11 @@ class _RouteMapPainter extends CustomPainter {
   bool shouldRepaint(covariant _RouteMapPainter oldDelegate) => oldDelegate.routeColor != routeColor;
 }
 
+/// Three honest states, no invented driver identity, rating, or vehicle
+/// (none of that data exists anywhere in the system): self-collect orders
+/// never had a driver to begin with; driver-assisted orders show a real
+/// "waiting for a driver" state until one actually accepts the job, then
+/// show that driver's real name.
 class _DriverCard extends StatelessWidget {
   const _DriverCard({required this.shipment});
 
@@ -296,9 +328,23 @@ class _DriverCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
-    final driverName = shipment.driverName ?? shipment.farmerName ?? 'Driver';
-    final rating = shipment.driverRating;
-    final vehicle = shipment.driverVehicle;
+
+    if (shipment.hasOwnTransport) {
+      return _StatusCard(
+        icon: Icons.storefront_rounded,
+        primary: primary,
+        text: "You're picking this up yourself — no driver needed.",
+      );
+    }
+
+    final driverName = shipment.driverName;
+    if (driverName == null) {
+      return _StatusCard(
+        icon: Icons.hourglass_top_rounded,
+        primary: primary,
+        text: 'Waiting for a driver to accept this delivery.',
+      );
+    }
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
@@ -319,38 +365,11 @@ class _DriverCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      driverName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14.5),
-                    ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        if (rating != null) ...[
-                          const Icon(Icons.star_rounded, color: Color(0xFFF9A825), size: 13),
-                          const SizedBox(width: 2),
-                          Text(rating.toStringAsFixed(1), style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                        ],
-                        if (rating != null && vehicle != null)
-                          const Text(' • ', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                        if (vehicle != null)
-                          Expanded(
-                            child: Text(
-                              vehicle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.white70, fontSize: 12),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
+                child: Text(
+                  driverName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14.5),
                 ),
               ),
               const SizedBox(width: 8),
@@ -361,6 +380,40 @@ class _DriverCard extends StatelessWidget {
                   height: 36,
                   decoration: BoxDecoration(color: primary, shape: BoxShape.circle),
                   child: const Icon(Icons.phone_rounded, color: Colors.white, size: 16),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusCard extends StatelessWidget {
+  const _StatusCard({required this.icon, required this.primary, required this.text});
+
+  final IconData icon;
+  final Color primary;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.45), borderRadius: BorderRadius.circular(18)),
+          child: Row(
+            children: [
+              Icon(icon, color: primary, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  text,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
                 ),
               ),
             ],
@@ -488,10 +541,11 @@ class _EscrowNotice extends StatelessWidget {
 }
 
 class _ConfirmArrivalBar extends StatelessWidget {
-  const _ConfirmArrivalBar({required this.colorScheme, required this.total});
+  const _ConfirmArrivalBar({required this.colorScheme, required this.total, required this.onConfirm});
 
   final ColorScheme colorScheme;
   final double total;
+  final VoidCallback onConfirm;
 
   @override
   Widget build(BuildContext context) {
@@ -502,10 +556,7 @@ class _ConfirmArrivalBar extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: () {
-            showAgriToast(context, 'Arrival confirmed — thank you!');
-            Navigator.of(context).pop();
-          },
+          onTap: onConfirm,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             child: Row(
@@ -524,7 +575,7 @@ class _ConfirmArrivalBar extends StatelessWidget {
                     ],
                   ),
                 ),
-                Text('Confirm Arrival', style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w800, fontSize: 15)),
+                Text('Scan to Confirm', style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w800, fontSize: 15)),
               ],
             ),
           ),

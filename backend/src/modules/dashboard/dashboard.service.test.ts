@@ -40,6 +40,7 @@ describe('DashboardService', () => {
     buyerId: 'buyer-1',
     farmerId,
     farmerName: 'Test Farmer',
+    driverName: null,
     cropType: 'tomato',
     amountGhs: 100,
     status: 'RELEASED',
