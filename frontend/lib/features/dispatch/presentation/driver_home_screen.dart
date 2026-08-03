@@ -175,12 +175,7 @@ class _HeroHeader extends StatelessWidget {
                   padding: EdgeInsets.zero,
                   tooltip: 'Notifications',
                   icon: Icon(Icons.notifications_none_rounded, color: colorScheme.onPrimary, size: 20),
-                  onPressed: () => _pushComingSoon(
-                    context,
-                    title: 'Notifications',
-                    icon: Icons.notifications_none_rounded,
-                    message: 'Driver notifications will be available in a future update.',
-                  ),
+                  onPressed: () => context.go('/driver/alerts'),
                 ),
               ),
             ],

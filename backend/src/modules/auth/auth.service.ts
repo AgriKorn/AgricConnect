@@ -86,7 +86,13 @@ export class AuthService {
 
     const resetToken = jwt.sign({ userId: user.id, purpose: 'password_reset' }, env.JWT_SECRET, { expiresIn: RESET_TOKEN_TTL });
 
-    logger.info(`[password-reset] Password reset token generated for ${user.email}: ${resetToken}`);
+    // No real email/SMS delivery is wired up yet, so logging the token is
+    // how this gets to a developer/tester — but a production log is not a
+    // secure delivery channel, and this token alone is enough to take over
+    // the account. Only ever surface it (log or API response) outside prod.
+    if (env.NODE_ENV !== 'production') {
+      logger.info(`[password-reset] Password reset token generated for ${user.email}: ${resetToken}`);
+    }
 
     return {
       message: genericMessage,
