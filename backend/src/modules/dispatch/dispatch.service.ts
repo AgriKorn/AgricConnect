@@ -54,7 +54,7 @@ export class DispatchService {
    * picks a specific driver rather than the automatic capacity-based match,
    * since exhaustion means no candidate was available/willing.
    */
-  async manualAssignDriver(transactionId: string, driverId: string): Promise<DriverJob> {
+  async manualAssignDriver(transactionId: string, driverId: string, assignedBy: string): Promise<DriverJob> {
     const order = await prisma.orders.findUnique({
       where: { id: transactionId },
       include: { produce_listings: { include: { crop_types: true } } },
@@ -75,7 +75,7 @@ export class DispatchService {
       quantityKg,
     });
 
-    await auditService.log('DRIVER_MANUALLY_ASSIGNED' as any, transactionId, { driverId, jobId: job.id }, driverId);
+    await auditService.log('DRIVER_MANUALLY_ASSIGNED' as any, transactionId, { driverId, jobId: job.id }, assignedBy);
 
     await notificationService.sendNotification({
       userId: driver.id,

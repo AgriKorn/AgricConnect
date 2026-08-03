@@ -46,7 +46,7 @@ export class PrismaListingRepository implements IListingRepository {
         farmer_id: data.farmerId,
         crop_type_id: crop.id,
         quantity_kg: new Prisma.Decimal(data.quantityKg),
-        region: 'Greater Accra',
+        region: data.region || 'Greater Accra',
         gps_lat: new Prisma.Decimal(data.farmerLat),
         gps_lng: new Prisma.Decimal(data.farmerLong),
         freshness_score: new Prisma.Decimal(data.freshnessScore),

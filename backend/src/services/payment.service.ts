@@ -19,10 +19,17 @@ export interface ResolveMomoResult {
   bankCode: string;
 }
 
+export interface RefundResult {
+  refundReference: string;
+  status: 'pending' | 'processed';
+}
+
 export interface IPaymentService {
   initializeTransaction(amountGhs: number, payerPhone: string, metadata: Record<string, unknown>): Promise<InitializeTransactionResult>;
   initiateTransfer(recipientPhone: string, amountGhs: number, reason: string, bankCode: string): Promise<TransferResult>;
   resolveMomoAccount(accountNumber: string, bankCode: string): Promise<ResolveMomoResult>;
+  /** Reverses a held/captured charge via Paystack's refund API — used when a dispute is resolved in the buyer's favor. */
+  refundTransaction(paymentReference: string, amountGhs: number): Promise<RefundResult>;
   verifyWebhookSignature(signature: string, rawBody: string | Buffer): boolean;
 }
 
@@ -111,6 +118,35 @@ export class PaystackPaymentService implements IPaymentService {
     } catch (error: any) {
       logger.error('[Paystack Transfer Error]:', error?.response?.data || error.message);
       throw new Error('Payout transfer failed with Paystack API');
+    }
+  }
+
+  async refundTransaction(paymentReference: string, amountGhs: number): Promise<RefundResult> {
+    if (!this.secretKey) {
+      const refundReference = `stub_refund_${randomUUID()}`;
+      logger.info(`[Payment Stub] Refunded GHS ${amountGhs.toFixed(2)} for ${paymentReference} — reference ${refundReference}`);
+      return { refundReference, status: 'processed' };
+    }
+
+    try {
+      const response = await axios.post(
+        `${this.baseUrl}/refund`,
+        {
+          transaction: paymentReference,
+          amount: Math.round(amountGhs * 100), // Convert GHS to Pesewas
+        },
+        { headers: { Authorization: `Bearer ${this.secretKey}` } },
+      );
+
+      const data = response.data.data;
+      return {
+        refundReference: data.id?.toString() ?? paymentReference,
+        status: data.status === 'processed' ? 'processed' : 'pending',
+      };
+    } catch (error: any) {
+      logger.error('[Paystack Refund Error]:', error?.response?.data || error.message);
+      const paystackMessage = error?.response?.data?.message;
+      throw new BadRequestError(paystackMessage || 'Could not process refund with Paystack');
     }
   }
 

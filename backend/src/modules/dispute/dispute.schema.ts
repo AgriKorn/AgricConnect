@@ -17,5 +17,6 @@ export const disputeIdParamSchema = z.object({
 export const resolveDisputeSchema = z.object({
   body: z.object({
     resolution: z.string().min(5, 'Resolution must be at least 5 characters'),
+    action: z.enum(['REFUND_BUYER', 'RELEASE_FARMER']).optional(),
   }),
 });

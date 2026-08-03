@@ -9,19 +9,24 @@ export class NotificationService {
     private readonly users: IUserRepository = userRepository,
   ) {}
 
+  // Device tokens are captured (POST /users/device-token) and stored ready for
+  // this, but there is no FCM/APNs integration wired up yet — no push SDK is
+  // installed on either side. This persists the in-app notification (which
+  // the Farmer Alerts screen reads) and stops there. Do not log this as a
+  // dispatched push: that previously logged a fabricated "Dispatched
+  // real-time push notification" line even though nothing was sent.
   async sendNotification(data: { userId: string; type: string; message: string; orderId?: string; listingId?: string }) {
     const notification = await this.repo.create(data);
 
-    // Fetch target user's active device tokens for FCM push dispatch
     try {
       const activeTokens = await this.users.findActiveDeviceTokens(data.userId);
       if (activeTokens.length > 0) {
         logger.info(
-          `[FCM Push] Dispatched real-time push notification (${data.type}) to ${activeTokens.length} active device(s) for user ${data.userId}`,
+          `[Notification] Persisted (${data.type}) for user ${data.userId}; ${activeTokens.length} device token(s) on file but push delivery is not yet implemented — in-app only.`,
         );
       }
     } catch (err) {
-      logger.error('[FCM Push Error] Failed to fetch active device tokens:', err);
+      logger.error('[Notification] Failed to look up active device tokens:', err);
     }
 
     return notification;

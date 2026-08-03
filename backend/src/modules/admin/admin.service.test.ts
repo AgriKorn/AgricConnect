@@ -3,6 +3,8 @@ import { IUserRepository } from '../user/user.repository';
 import { User } from '../user/user.types';
 import { transactionRepository } from '../transaction/transaction.repository.prisma';
 import { Transaction } from '../transaction/transaction.types';
+import { auditService } from '../audit/audit.service';
+import { notificationService } from '../notification/notification.service';
 import { BadRequestError, ConflictError, NotFoundError } from '../../utils/errors';
 
 describe('AdminService', () => {
@@ -28,6 +30,8 @@ describe('AdminService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(auditService, 'log').mockResolvedValue({} as any);
+    jest.spyOn(notificationService, 'sendNotification').mockResolvedValue({} as any);
 
     mockUsers = {
       create: jest.fn(),
@@ -95,17 +99,29 @@ describe('AdminService', () => {
       mockUsers.findById.mockResolvedValue(createUser());
       mockUsers.update.mockResolvedValue(createUser({ status: 'ACTIVE' }));
 
-      const result = await adminService.approveUser('user-1');
+      const result = await adminService.approveUser('user-1', 'admin-1');
 
-      expect(mockUsers.update).toHaveBeenCalledWith('user-1', { status: 'ACTIVE' });
+      expect(mockUsers.update).toHaveBeenCalledWith('user-1', { status: 'ACTIVE', approvedBy: 'admin-1', approvedAt: expect.any(Date) });
       expect(result.status).toBe('ACTIVE');
+    });
+
+    it('should audit-log the approval under the acting admin, and notify the user', async () => {
+      mockUsers.findById.mockResolvedValue(createUser());
+      mockUsers.update.mockResolvedValue(createUser({ status: 'ACTIVE' }));
+
+      await adminService.approveUser('user-1', 'admin-1');
+
+      expect(auditService.log).toHaveBeenCalledWith('USER_APPROVED', 'user-1', expect.any(Object), 'admin-1');
+      expect(notificationService.sendNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-1', type: 'ACCOUNT_APPROVED' }),
+      );
     });
 
     it('should strip credentials from the approved user', async () => {
       mockUsers.findById.mockResolvedValue(createUser());
       mockUsers.update.mockResolvedValue(createUser({ status: 'ACTIVE' }));
 
-      const result = await adminService.approveUser('user-1');
+      const result = await adminService.approveUser('user-1', 'admin-1');
 
       expect(result).not.toHaveProperty('passwordHash');
       expect(result).not.toHaveProperty('refreshToken');
@@ -114,28 +130,28 @@ describe('AdminService', () => {
     it('should throw NotFoundError for an unknown user', async () => {
       mockUsers.findById.mockResolvedValue(null);
 
-      await expect(adminService.approveUser('missing')).rejects.toThrow(NotFoundError);
+      await expect(adminService.approveUser('missing', 'admin-1')).rejects.toThrow(NotFoundError);
       expect(mockUsers.update).not.toHaveBeenCalled();
     });
 
     it('should refuse to re-approve an already active user', async () => {
       mockUsers.findById.mockResolvedValue(createUser({ status: 'ACTIVE' }));
 
-      await expect(adminService.approveUser('user-1')).rejects.toThrow(BadRequestError);
+      await expect(adminService.approveUser('user-1', 'admin-1')).rejects.toThrow(BadRequestError);
       expect(mockUsers.update).not.toHaveBeenCalled();
     });
 
     it('should refuse to approve a user who has not verified their OTP', async () => {
       mockUsers.findById.mockResolvedValue(createUser({ status: 'PENDING_OTP' }));
 
-      await expect(adminService.approveUser('user-1')).rejects.toThrow(BadRequestError);
+      await expect(adminService.approveUser('user-1', 'admin-1')).rejects.toThrow(BadRequestError);
       expect(mockUsers.update).not.toHaveBeenCalled();
     });
 
     it('should name the blocking status in the error message', async () => {
       mockUsers.findById.mockResolvedValue(createUser({ status: 'REJECTED' }));
 
-      await expect(adminService.approveUser('user-1')).rejects.toThrow(/REJECTED/);
+      await expect(adminService.approveUser('user-1', 'admin-1')).rejects.toThrow(/REJECTED/);
     });
   });
 
@@ -160,10 +176,11 @@ describe('AdminService', () => {
       mockUsers.create.mockResolvedValue(createUser({ role: 'admin', status: 'PENDING_APPROVAL', email: adminInput.email }));
       mockUsers.update.mockResolvedValue(createUser({ role: 'admin', status: 'ACTIVE', email: adminInput.email }));
 
-      const result = await adminService.createAdmin(adminInput);
+      const result = await adminService.createAdmin(adminInput, 'admin-1');
 
       expect(mockUsers.create).toHaveBeenCalledWith(expect.objectContaining({ role: 'admin', email: adminInput.email }));
       expect(mockUsers.update).toHaveBeenCalledWith('user-1', { status: 'ACTIVE' });
+      expect(auditService.log).toHaveBeenCalledWith('ADMIN_CREATED', 'user-1', expect.any(Object), 'admin-1');
       expect(result.status).toBe('ACTIVE');
       expect(result).not.toHaveProperty('passwordHash');
     });
@@ -171,7 +188,7 @@ describe('AdminService', () => {
     it('should reject a duplicate email', async () => {
       mockUsers.findByEmail.mockResolvedValue(createUser());
 
-      await expect(adminService.createAdmin(adminInput)).rejects.toThrow(ConflictError);
+      await expect(adminService.createAdmin(adminInput, 'admin-1')).rejects.toThrow(ConflictError);
       expect(mockUsers.create).not.toHaveBeenCalled();
     });
 
@@ -179,7 +196,7 @@ describe('AdminService', () => {
       mockUsers.findByEmail.mockResolvedValue(null);
       mockUsers.findByPhone.mockResolvedValue(createUser());
 
-      await expect(adminService.createAdmin(adminInput)).rejects.toThrow(ConflictError);
+      await expect(adminService.createAdmin(adminInput, 'admin-1')).rejects.toThrow(ConflictError);
       expect(mockUsers.create).not.toHaveBeenCalled();
     });
   });
@@ -231,30 +248,34 @@ describe('AdminService', () => {
       mockUsers.findById.mockResolvedValue(createUser());
       mockUsers.update.mockResolvedValue(createUser({ status: 'REJECTED' }));
 
-      const result = await adminService.rejectUser('user-1');
+      const result = await adminService.rejectUser('user-1', 'admin-1');
 
-      expect(mockUsers.update).toHaveBeenCalledWith('user-1', { status: 'REJECTED' });
+      expect(mockUsers.update).toHaveBeenCalledWith('user-1', { status: 'REJECTED', approvedBy: 'admin-1', approvedAt: expect.any(Date) });
+      expect(auditService.log).toHaveBeenCalledWith('USER_REJECTED', 'user-1', expect.any(Object), 'admin-1');
+      expect(notificationService.sendNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'user-1', type: 'ACCOUNT_REJECTED' }),
+      );
       expect(result.status).toBe('REJECTED');
     });
 
     it('should throw NotFoundError for an unknown user', async () => {
       mockUsers.findById.mockResolvedValue(null);
 
-      await expect(adminService.rejectUser('missing')).rejects.toThrow(NotFoundError);
+      await expect(adminService.rejectUser('missing', 'admin-1')).rejects.toThrow(NotFoundError);
       expect(mockUsers.update).not.toHaveBeenCalled();
     });
 
     it('should refuse to reject a user who is already active', async () => {
       mockUsers.findById.mockResolvedValue(createUser({ status: 'ACTIVE' }));
 
-      await expect(adminService.rejectUser('user-1')).rejects.toThrow(BadRequestError);
+      await expect(adminService.rejectUser('user-1', 'admin-1')).rejects.toThrow(BadRequestError);
       expect(mockUsers.update).not.toHaveBeenCalled();
     });
 
     it('should refuse to reject a user twice', async () => {
       mockUsers.findById.mockResolvedValue(createUser({ status: 'REJECTED' }));
 
-      await expect(adminService.rejectUser('user-1')).rejects.toThrow(BadRequestError);
+      await expect(adminService.rejectUser('user-1', 'admin-1')).rejects.toThrow(BadRequestError);
       expect(mockUsers.update).not.toHaveBeenCalled();
     });
   });

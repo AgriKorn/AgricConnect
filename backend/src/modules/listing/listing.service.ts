@@ -81,6 +81,7 @@ export class ListingService {
       listingHash,
       qrCodeData,
       status: 'ACTIVE',
+      region: farmer.profile.farmRegion || farmer.profile.operatingRegion,
     });
 
     await auditNonFatal('LISTING_CREATED', listing.id, () =>

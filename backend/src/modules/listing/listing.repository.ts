@@ -1,8 +1,12 @@
 import { Listing } from './listing.types';
 
 // cropCategory is excluded: it is derived from the crop_types row the listing
-// resolves to, never supplied by the caller.
-export type CreateListingRecord = Omit<Listing, 'id' | 'createdAt' | 'updatedAt' | 'cropCategory'>;
+// resolves to, never supplied by the caller. region is added (not part of the
+// public Listing shape) so the service layer can pass the farmer's real
+// region through for storage — the repository has no user lookup of its own.
+export type CreateListingRecord = Omit<Listing, 'id' | 'createdAt' | 'updatedAt' | 'cropCategory'> & {
+  region?: string;
+};
 export type UpdateListingRecord = Partial<Pick<Listing, 'pricePerKg' | 'quantityKg'>>;
 
 export interface ListingFilters {

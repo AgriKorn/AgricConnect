@@ -44,6 +44,9 @@ export interface User {
   otpExpiry: Date | null;
   refreshToken: string | null;
   profile: FarmerProfile & BuyerProfile & DriverProfile;
+  /** Which admin approved/rejected this account, and when — set by AdminService.approveUser/rejectUser. */
+  approvedBy?: string | null;
+  approvedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

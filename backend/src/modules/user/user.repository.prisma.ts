@@ -41,6 +41,8 @@ const mapPrismaToUser = (p: any): User => {
     otp: null,
     otpExpiry: null,
     refreshToken: p.refresh_token || null,
+    approvedBy: p.approved_by || null,
+    approvedAt: p.approved_at || null,
     profile: {
       farmRegion: p.region || undefined,
       operatingRegion: driver?.operating_region || p.region || undefined,
@@ -163,6 +165,8 @@ export class PrismaUserRepository implements IUserRepository {
     if (data.email !== undefined) updateData.email = data.email;
     if (data.status) updateData.account_status = statusToPrisma(data.status);
     if (data.refreshToken !== undefined) updateData.refresh_token = data.refreshToken;
+    if (data.approvedBy !== undefined) updateData.approved_by = data.approvedBy;
+    if (data.approvedAt !== undefined) updateData.approved_at = data.approvedAt;
     // AuthService.resetPassword writes the new hash through this method; without
     // this line the reset reports success and silently changes nothing.
     if (data.passwordHash !== undefined) updateData.password_hash = data.passwordHash;
