@@ -11,11 +11,12 @@ import {
   listDisputesHandler,
   listPendingUsersHandler,
   listTransactionsHandler,
+  manualAssignDriverHandler,
   rejectUserHandler,
   removeAdminHandler,
   resolveDisputeHandler,
 } from './admin.controller';
-import { createAdminSchema, userIdParamSchema } from './admin.schema';
+import { createAdminSchema, manualAssignDriverSchema, userIdParamSchema } from './admin.schema';
 
 const router = Router();
 
@@ -33,6 +34,8 @@ router.get('/transactions', listTransactionsHandler);
 
 router.get('/disputes', listDisputesHandler);
 router.patch('/disputes/:id/resolve', validate(disputeIdParamSchema), validate(resolveDisputeSchema), resolveDisputeHandler);
+
+router.post('/dispatch/assign', validate(manualAssignDriverSchema), manualAssignDriverHandler);
 
 router.get('/audit', getAuditLogsHandler);
 

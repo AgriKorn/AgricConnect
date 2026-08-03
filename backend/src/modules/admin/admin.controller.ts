@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { sendSuccess } from '../../utils/response';
 import { disputeService } from '../dispute/dispute.service';
+import { dispatchService } from '../dispatch/dispatch.service';
 import { adminService } from './admin.service';
 
 import { auditService } from '../audit/audit.service';
@@ -83,6 +84,16 @@ export const resolveDisputeHandler = async (req: Request, res: Response, next: N
     const action = req.body.action || 'REFUND_BUYER';
     const dispute = await disputeService.resolve(req.params.id, req.body.resolution, action);
     sendSuccess(res, dispute);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const manualAssignDriverHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { transactionId, driverId } = req.body;
+    const job = await dispatchService.manualAssignDriver(transactionId, driverId);
+    sendSuccess(res, job, 201);
   } catch (err) {
     next(err);
   }

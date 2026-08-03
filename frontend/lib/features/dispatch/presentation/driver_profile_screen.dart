@@ -56,10 +56,13 @@ String _initialsOf(String name) {
   return (first + last).toUpperCase();
 }
 
-/// Driver-specific Profile tab: hero (rating/deliveries), On-Time/Earnings
-/// stats, Vehicle Details, Verified Documents, and Account Settings
-/// (language, notifications, sign out). Farmer/Buyer still use their own
-/// profile screens — this one replicates the driver-specific reference.
+/// Driver-specific Profile tab: hero (verified badge/deliveries/earnings —
+/// all real), Vehicle Details, Verified Documents, and Account Settings
+/// (notifications, help, sign out). Vehicle details and document
+/// verification have no backing system in the backend yet (no vehicle
+/// registration or document upload flow exists), so both route to a
+/// "coming soon" state instead of showing invented values — same as
+/// Language, which was already honest about not being wired up.
 class DriverProfileScreen extends ConsumerWidget {
   const DriverProfileScreen({super.key});
 
@@ -67,7 +70,7 @@ class DriverProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final details = ref.watch(driverProfileDetailsProvider);
-    final notificationsOn = ref.watch(driverNotificationsProvider);
+    final notificationsOn = ref.watch(driverNotificationsProvider).valueOrNull ?? true;
 
     return Scaffold(
       body: ColoredBox(
@@ -88,7 +91,17 @@ class DriverProfileScreen extends ConsumerWidget {
                       style: TextStyle(color: colorScheme.onSurface, fontSize: 20, fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 12),
-                    _VehicleCard(colorScheme: colorScheme, vehicle: details.vehicle),
+                    _InfoCard(
+                      colorScheme: colorScheme,
+                      children: [
+                        _ActionRow(
+                          colorScheme: colorScheme,
+                          label: 'Add your vehicle details',
+                          onTap: () => _openComingSoon(context, 'Vehicle Details', Icons.local_shipping_outlined),
+                          isLast: true,
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 28),
                     Text(
                       'Verified Documents',
@@ -98,13 +111,12 @@ class DriverProfileScreen extends ConsumerWidget {
                     _InfoCard(
                       colorScheme: colorScheme,
                       children: [
-                        for (var i = 0; i < details.documents.length; i++)
-                          _ActionRow(
-                            colorScheme: colorScheme,
-                            label: details.documents[i],
-                            onTap: () => _openComingSoon(context, details.documents[i], Icons.description_outlined),
-                            isLast: i == details.documents.length - 1,
-                          ),
+                        _ActionRow(
+                          colorScheme: colorScheme,
+                          label: 'Upload verification documents',
+                          onTap: () => _openComingSoon(context, 'Document Verification', Icons.description_outlined),
+                          isLast: true,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 28),
@@ -222,16 +234,9 @@ class _ProfileHero extends StatelessWidget {
                   color: Colors.black.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.star_rounded, color: Color(0xFFFFC107), size: 16),
-                    const SizedBox(width: 6),
-                    Text(
-                      '${details.rating.toStringAsFixed(1)} (${details.deliveriesCount} deliveries)',
-                      style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w700, fontSize: 13.5),
-                    ),
-                  ],
+                child: Text(
+                  details.verified ? 'Verified Driver' : 'AgriConnect Driver',
+                  style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w700, fontSize: 13.5),
                 ),
               ),
             ],
@@ -246,8 +251,8 @@ class _ProfileHero extends StatelessWidget {
               Expanded(
                 child: _StatPill(
                   colorScheme: colorScheme,
-                  value: '${details.onTimePercent}%',
-                  label: 'On-Time',
+                  value: '${details.deliveriesCount}',
+                  label: 'Deliveries',
                 ),
               ),
               const SizedBox(width: 12),
@@ -298,68 +303,6 @@ class _StatPill extends StatelessWidget {
                 ),
                 Text(label, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11.5)),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _VehicleCard extends StatelessWidget {
-  const _VehicleCard({required this.colorScheme, required this.vehicle});
-
-  final ColorScheme colorScheme;
-  final DriverVehicle vehicle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: colorScheme.primary.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(Icons.local_shipping_rounded, color: colorScheme.primary, size: 22),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  vehicle.model,
-                  style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w800, fontSize: 15.5),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${vehicle.category} • ${vehicle.capacityTons} Tons',
-                  style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12.5),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
-            ),
-            child: Text(
-              vehicle.plateNumber,
-              style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 12.5),
             ),
           ),
         ],

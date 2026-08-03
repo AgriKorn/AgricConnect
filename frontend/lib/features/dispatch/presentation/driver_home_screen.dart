@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency.dart';
 import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../orders/presentation/confirm_delivery_screen.dart';
 import '../application/dispatch_providers.dart';
 import '../data/dispatch_mock.dart';
 import 'widgets/job_request_card.dart';
@@ -28,11 +28,13 @@ class DriverHomeScreen extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final profile = ref.watch(driverProfileProvider);
     final online = ref.watch(driverOnlineProvider);
-    final activeTrip = ref.watch(activeTripProvider);
+    final activeTripAsync = ref.watch(activeTripProvider);
 
     return Scaffold(
       body: SafeArea(
-        child: ListView(
+        child: RefreshIndicator(
+          onRefresh: () => ref.read(activeTripProvider.notifier).refresh(),
+          child: ListView(
           padding: EdgeInsets.zero,
           children: [
             _HeroHeader(colorScheme: colorScheme, profile: profile, online: online),
@@ -72,34 +74,43 @@ class DriverHomeScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  activeTrip == null
-                      ? _NoActiveDeliveryCard(colorScheme: colorScheme)
-                      : _ActiveDeliveryCard(
-                          trip: activeTrip,
-                          colorScheme: colorScheme,
-                          onDecline: () {
-                            ref.read(activeTripProvider.notifier).complete();
-                            showAgriToast(
+                  activeTripAsync.when(
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (error, _) => EmptyState(
+                      icon: Icons.wifi_off_rounded,
+                      message: 'Could not check your active delivery. Pull to refresh.',
+                    ),
+                    data: (activeTrip) => activeTrip == null
+                        ? _NoActiveDeliveryCard(colorScheme: colorScheme)
+                        : _ActiveDeliveryCard(
+                            trip: activeTrip,
+                            colorScheme: colorScheme,
+                            onConfirmDelivery: () async {
+                              final result = await Navigator.of(context).push<bool>(
+                                MaterialPageRoute(
+                                  builder: (_) => ConfirmDeliveryScreen(transactionId: activeTrip.job.transactionId),
+                                ),
+                              );
+                              if (result == true) {
+                                await ref.read(activeTripProvider.notifier).refresh();
+                                if (context.mounted) {
+                                  showAgriToast(context, 'Delivery confirmed — payment released to the farmer.');
+                                }
+                              }
+                            },
+                            onOpenNavigation: () => _pushComingSoon(
                               context,
-                              'Declined ${activeTrip.job.cropSummary}',
-                              icon: Icons.cancel_rounded,
-                              isError: true,
-                            );
-                          },
-                          onAccept: () {
-                            showAgriToast(context, 'Accepted ${activeTrip.job.cropSummary}');
-                          },
-                          onOpenNavigation: () => _pushComingSoon(
-                            context,
-                            title: 'Navigation',
-                            icon: Icons.navigation_rounded,
-                            message: 'Turn-by-turn navigation will be available in a future update.',
+                              title: 'Navigation',
+                              icon: Icons.navigation_rounded,
+                              message: 'Turn-by-turn navigation will be available in a future update.',
+                            ),
                           ),
-                        ),
+                  ),
                 ],
               ),
             ),
           ],
+          ),
         ),
       ),
     );
@@ -319,20 +330,17 @@ class _ActiveDeliveryCard extends StatelessWidget {
   const _ActiveDeliveryCard({
     required this.trip,
     required this.colorScheme,
-    required this.onDecline,
-    required this.onAccept,
+    required this.onConfirmDelivery,
     required this.onOpenNavigation,
   });
 
   final ActiveTrip trip;
   final ColorScheme colorScheme;
-  final VoidCallback onDecline;
-  final VoidCallback onAccept;
+  final VoidCallback onConfirmDelivery;
   final VoidCallback onOpenNavigation;
 
   @override
   Widget build(BuildContext context) {
-    final warning = AgriStatusColors.warning(Theme.of(context).brightness);
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
@@ -357,39 +365,47 @@ class _ActiveDeliveryCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(color: colorScheme.primary, borderRadius: BorderRadius.circular(999)),
-                      child: const Text(
-                        'IN TRANSIT',
-                        style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'ETA: ${trip.etaMinutes} mins',
-                      style: TextStyle(color: warning, fontWeight: FontWeight.w700, fontSize: 13),
-                    ),
-                  ],
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: colorScheme.primary, borderRadius: BorderRadius.circular(999)),
+                  child: const Text(
+                    'IN TRANSIT',
+                    style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                  ),
                 ),
                 const SizedBox(height: 14),
-                JobRequestCard(job: trip.job, colorScheme: colorScheme, onDecline: onDecline, onAccept: onAccept),
+                JobRequestCard(job: trip.job, colorScheme: colorScheme),
                 const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: FilledButton.icon(
-                    onPressed: onOpenNavigation,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: colorScheme.primary,
-                      foregroundColor: colorScheme.onPrimary,
-                      shape: const StadiumBorder(),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: onOpenNavigation,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: colorScheme.primary,
+                          side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.5)),
+                          shape: const StadiumBorder(),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        icon: const Icon(Icons.navigation_rounded, size: 18),
+                        label: const Text('Navigate', style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
                     ),
-                    icon: const Icon(Icons.navigation_rounded, size: 18),
-                    label: const Text('Open Navigation', style: TextStyle(fontWeight: FontWeight.w700)),
-                  ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: onConfirmDelivery,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: colorScheme.primary,
+                          foregroundColor: colorScheme.onPrimary,
+                          shape: const StadiumBorder(),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                        label: const Text('Confirm', style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

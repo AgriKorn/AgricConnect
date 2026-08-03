@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/currency.dart';
+import '../../../../core/widgets/agri_toast.dart';
 import '../../data/dispatch_mock.dart';
 
 String formatCountdown(Duration duration) {
@@ -10,22 +12,33 @@ String formatCountdown(Duration duration) {
   return '$minutes:$seconds';
 }
 
+Future<void> _callNumber(BuildContext context, String phone) async {
+  final uri = Uri(scheme: 'tel', path: phone);
+  if (!await launchUrl(uri)) {
+    if (context.mounted) showAgriToast(context, 'Could not open the phone app.');
+  }
+}
+
 /// Shared job-request card: used both on the Driver Dispatch list and inside
 /// the Driver Home "Active Delivery" preview, so the two stay visually
 /// identical instead of drifting into two hand-maintained copies.
+/// [onDecline]/[onAccept] are only meaningful for a job still awaiting a
+/// response — pass both null to show it read-only (e.g. a trip already
+/// accepted), which hides the action row entirely rather than offering
+/// buttons that don't apply to an in-progress delivery.
 class JobRequestCard extends StatelessWidget {
   const JobRequestCard({
     super.key,
     required this.job,
     required this.colorScheme,
-    required this.onDecline,
-    required this.onAccept,
+    this.onDecline,
+    this.onAccept,
   });
 
   final JobRequest job;
   final ColorScheme colorScheme;
-  final VoidCallback onDecline;
-  final VoidCallback onAccept;
+  final VoidCallback? onDecline;
+  final VoidCallback? onAccept;
 
   @override
   Widget build(BuildContext context) {
@@ -87,34 +100,18 @@ class JobRequestCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'PICKUP',
-                      style: TextStyle(
-                        color: colorScheme.onSurfaceVariant,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.4,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      job.pickupLocation,
-                      style: TextStyle(color: colorScheme.onSurface, fontSize: 13.5, fontWeight: FontWeight.w600),
+                    _ContactRow(
+                      label: 'PICKUP',
+                      location: job.pickupLocation,
+                      phone: job.farmerPhone,
+                      colorScheme: colorScheme,
                     ),
                     const SizedBox(height: 14),
-                    Text(
-                      'DROPOFF',
-                      style: TextStyle(
-                        color: colorScheme.onSurfaceVariant,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.4,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      job.dropoffLocation,
-                      style: TextStyle(color: colorScheme.onSurface, fontSize: 13.5, fontWeight: FontWeight.w600),
+                    _ContactRow(
+                      label: 'DROPOFF',
+                      location: job.dropoffLocation,
+                      phone: job.buyerPhone,
+                      colorScheme: colorScheme,
                     ),
                   ],
                 ),
@@ -147,24 +144,74 @@ class JobRequestCard extends StatelessWidget {
                   ],
                 ),
               ),
-              TextButton(
-                onPressed: onDecline,
-                child: Text('Decline', style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w700)),
-              ),
-              FilledButton(
-                onPressed: onAccept,
-                style: FilledButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: colorScheme.onPrimary,
-                  shape: const StadiumBorder(),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              if (onDecline != null)
+                TextButton(
+                  onPressed: onDecline,
+                  child: Text('Decline', style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w700)),
                 ),
-                child: const Text('Accept Job', style: TextStyle(fontWeight: FontWeight.w700)),
-              ),
+              if (onAccept != null)
+                FilledButton(
+                  onPressed: onAccept,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
+                    shape: const StadiumBorder(),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                  child: const Text('Accept Job', style: TextStyle(fontWeight: FontWeight.w700)),
+                ),
             ],
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ContactRow extends StatelessWidget {
+  const _ContactRow({required this.label, required this.location, required this.phone, required this.colorScheme});
+
+  final String label;
+  final String location;
+  final String? phone;
+  final ColorScheme colorScheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.4,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                location,
+                style: TextStyle(color: colorScheme.onSurface, fontSize: 13.5, fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+        if (phone != null)
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            onPressed: () => _callNumber(context, phone!),
+            icon: Icon(Icons.call_rounded, size: 17, color: colorScheme.primary),
+            tooltip: 'Call',
+          ),
+      ],
     );
   }
 }
