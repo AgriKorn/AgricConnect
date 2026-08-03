@@ -58,6 +58,7 @@ describe('DashboardService', () => {
     id: 'listing-1',
     farmerId,
     cropType: 'tomato',
+    cropCategory: 'vegetables',
     quantityKg: 50,
     freshnessScore: 90,
     shelfLifeDays: 7,
