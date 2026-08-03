@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/storage/local_prefs.dart';
 import '../../../core/storage/secure_storage.dart';
+import '../../home/application/farmer_dashboard_providers.dart';
 import '../data/auth_repository.dart';
 import '../data/models/account_status.dart';
 import '../data/models/auth_response_model.dart';
@@ -116,6 +117,11 @@ class AuthController extends Notifier<SessionState> {
     final updated = currentUser.copyWith(name: name, region: region);
     state = state.copyWith(user: updated);
     await _persistUser(updated);
+
+    // farmerDashboardSummaryProvider caches its GET /dashboard/farmer-summary
+    // fetch for the app's lifetime — without this, a region edit here (or the
+    // weather it drives) keeps showing whatever was fetched at login.
+    ref.invalidate(farmerDashboardSummaryProvider);
   }
 
   /// Separate from [updateProfile] so changing the photo doesn't force a
