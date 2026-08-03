@@ -44,6 +44,9 @@ abstract class MarketplaceRepository {
     required String fileName,
     required String contentType,
   });
+
+  /// Soft-deletes the listing — DELETE /listings/:id.
+  Future<void> deleteListing(String id);
 }
 
 class HttpMarketplaceRepository implements MarketplaceRepository {
@@ -141,6 +144,16 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
     } on DioException catch (e) {
       final serverMessage = e.response?.data?['error']?['message']?.toString();
       throw ApiException(serverMessage ?? e.message ?? 'Failed to upload photo.');
+    }
+  }
+
+  @override
+  Future<void> deleteListing(String id) async {
+    try {
+      await _dio.delete('${ApiEndpoints.listings}/$id');
+    } on DioException catch (e) {
+      final serverMessage = e.response?.data?['error']?['message']?.toString();
+      throw ApiException(serverMessage ?? e.message ?? 'Failed to delete listing.');
     }
   }
 

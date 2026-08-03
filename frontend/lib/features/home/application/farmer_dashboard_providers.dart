@@ -54,6 +54,12 @@ class FarmerListingsController extends AsyncNotifier<List<FarmerListingSummary>>
     ref.invalidateSelf();
     await future;
   }
+
+  Future<void> deleteListing(String id) async {
+    await ref.read(marketplaceRepositoryProvider).deleteListing(id);
+    ref.invalidateSelf();
+    await future;
+  }
 }
 
 final farmerListingsProvider = AsyncNotifierProvider<FarmerListingsController, List<FarmerListingSummary>>(

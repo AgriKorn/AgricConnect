@@ -5,10 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/theme/motion.dart';
 import '../../../core/utils/currency.dart';
 import '../../../core/utils/freshness.dart';
 import '../../../core/widgets/agri_bottom_sheet.dart';
+import '../../../core/widgets/agri_dialog.dart';
+import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../home/application/farmer_dashboard_providers.dart';
@@ -36,6 +39,25 @@ class MyListingsScreen extends ConsumerStatefulWidget {
 class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
   String _selectedTab = 'Active';
   _ListingSort _sort = _ListingSort.freshnessDesc;
+
+  Future<void> _deleteListing(FarmerListingSummary listing) async {
+    final confirmed = await showAgriDialog(
+      context,
+      title: 'Delete this listing?',
+      message: '"${listing.cropType}" will no longer be visible to buyers. This can\'t be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await ref.read(farmerListingsProvider.notifier).deleteListing(listing.id);
+      if (!mounted) return;
+      showAgriToast(context, '${listing.cropType} deleted');
+    } on ApiException catch (e) {
+      if (mounted) showAgriToast(context, e.message);
+    }
+  }
 
   void _showSortSheet(BuildContext context) {
     showAgriBottomSheet(
@@ -148,7 +170,11 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
                             padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
                             itemCount: listings.length,
                             separatorBuilder: (context, index) => const SizedBox(height: 16),
-                            itemBuilder: (context, index) => _ListingRow(listing: listings[index], colorScheme: colorScheme),
+                            itemBuilder: (context, index) => _ListingRow(
+                              listing: listings[index],
+                              colorScheme: colorScheme,
+                              onDelete: () => _deleteListing(listings[index]),
+                            ),
                           ),
                   ),
                 ),
@@ -258,10 +284,34 @@ class _StatusTab extends StatelessWidget {
 }
 
 class _ListingRow extends StatelessWidget {
-  const _ListingRow({required this.listing, required this.colorScheme});
+  const _ListingRow({required this.listing, required this.colorScheme, required this.onDelete});
 
   final FarmerListingSummary listing;
   final ColorScheme colorScheme;
+  final VoidCallback onDelete;
+
+  void _showManageSheet(BuildContext context) {
+    showAgriBottomSheet(
+      context,
+      builder: (sheetContext) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ListTile(
+            leading: Icon(Icons.delete_outline_rounded, color: Theme.of(context).colorScheme.error),
+            title: Text(
+              'Delete Listing',
+              style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.w700),
+            ),
+            onTap: () {
+              Navigator.of(sheetContext).pop();
+              onDelete();
+            },
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -357,6 +407,21 @@ class _ListingRow extends StatelessWidget {
               child: Text(
                 '${listing.freshnessScore}%',
                 style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 10,
+            left: 10,
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.45), shape: BoxShape.circle),
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                tooltip: 'Manage listing',
+                icon: const Icon(Icons.more_vert_rounded, color: Colors.white, size: 18),
+                onPressed: () => _showManageSheet(context),
               ),
             ),
           ),

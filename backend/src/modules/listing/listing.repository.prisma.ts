@@ -65,8 +65,11 @@ export class PrismaListingRepository implements IListingRepository {
   }
 
   async findManyByFarmer(farmerId: string): Promise<Listing[]> {
+    // Excludes 'cancelled' (soft-deleted) — otherwise a deleted listing maps
+    // to the generic INACTIVE status and reappears mislabeled as "Pending"
+    // instead of actually disappearing from the farmer's own list.
     const list = await prisma.produce_listings.findMany({
-      where: { farmer_id: farmerId },
+      where: { farmer_id: farmerId, status: { not: 'cancelled' } },
       include: { crop_types: true },
       orderBy: { created_at: 'desc' },
     });
