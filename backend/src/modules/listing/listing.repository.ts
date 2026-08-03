@@ -1,6 +1,8 @@
 import { Listing } from './listing.types';
 
-export type CreateListingRecord = Omit<Listing, 'id' | 'createdAt' | 'updatedAt'>;
+// cropCategory is excluded: it is derived from the crop_types row the listing
+// resolves to, never supplied by the caller.
+export type CreateListingRecord = Omit<Listing, 'id' | 'createdAt' | 'updatedAt' | 'cropCategory'>;
 export type UpdateListingRecord = Partial<Pick<Listing, 'pricePerKg' | 'quantityKg'>>;
 
 export interface ListingFilters {
