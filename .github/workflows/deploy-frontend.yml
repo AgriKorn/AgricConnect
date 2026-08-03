@@ -4,7 +4,6 @@ on:
   push:
     paths:
       - 'frontend/**'
-      - 'admin-panel/**'
       - '.github/workflows/deploy-frontend.yml'
     branches:
       - main
@@ -38,7 +37,7 @@ jobs:
       - name: Add Admin Panel as a static sibling path (/admin)
         run: |
           mkdir -p build/web/admin
-          cp ../admin-panel/index.html build/web/admin/index.html
+          cp admin-panel/index.html build/web/admin/index.html
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
