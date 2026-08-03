@@ -9,6 +9,18 @@ module.exports = {
   },
   rules: {
     '@typescript-eslint/no-explicit-any': 'off',
-    '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+    // The codebase marks deliberate discards with a leading underscore. Only
+    // argsIgnorePattern was set, which covers function parameters alone — so
+    // destructured discards (toSafeUser stripping passwordHash/otp/refreshToken)
+    // and caught-but-unused errors were still reported, training people to scroll
+    // past warnings. All three positions now honour the same convention.
+    '@typescript-eslint/no-unused-vars': [
+      'warn',
+      {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+      },
+    ],
   },
 };

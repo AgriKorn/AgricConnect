@@ -1,6 +1,6 @@
 import { prisma } from '../../config/db';
 import { CreateDisputeRecord, IDisputeRepository } from './dispute.repository';
-import { Dispute, DisputeStatus, DisputeType } from './dispute.types';
+import { Dispute, DisputeStatus } from './dispute.types';
 import { dispute_status } from '../../generated/prisma/client';
 
 const statusFromPrisma = (s: dispute_status): DisputeStatus => {
