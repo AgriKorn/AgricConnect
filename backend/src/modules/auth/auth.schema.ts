@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 export const normalizePhone = (val: unknown): unknown => {
   if (typeof val !== 'string') return val;
-  let p = val.trim().replace(/\s+/g, '');
+  const p = val.trim().replace(/\s+/g, '');
   if (/^0\d{9}$/.test(p)) {
     return `+233${p.slice(1)}`;
   }

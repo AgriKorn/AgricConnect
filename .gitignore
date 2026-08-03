@@ -24,6 +24,14 @@ migrate_working_dir/
 # is commented out by default.
 .vscode/
 
+# Claude Code local settings
+.claude/
+
+# NOTE: .github/ must NOT be ignored. It holds the CI and deploy workflows,
+# and GitHub only runs workflows that exist in the repository. Ignoring it
+# does not untrack the four existing files, but any workflow added or renamed
+# afterwards is silently excluded and never runs.
+
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
