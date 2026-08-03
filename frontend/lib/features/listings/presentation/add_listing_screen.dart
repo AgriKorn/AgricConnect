@@ -40,6 +40,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   late final TextEditingController _priceController;
   late final TextEditingController _quantityController;
   late final TextEditingController _shelfLifeController;
+  late final TextEditingController _descriptionController;
   late double _freshnessScore;
   String? _imageUrl;
   bool _uploadingPhoto = false;
@@ -56,6 +57,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
     _shelfLifeController = TextEditingController(
       text: scan == null ? '' : (_parseLeadingInt(scan.shelfLifeLabel)?.toString() ?? ''),
     );
+    _descriptionController = TextEditingController();
     _freshnessScore = (scan?.score ?? 100).toDouble();
   }
 
@@ -65,6 +67,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
     _priceController.dispose();
     _quantityController.dispose();
     _shelfLifeController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 
@@ -141,6 +144,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
             farmerLong: long,
             pricePerKg: double.parse(_priceController.text.trim()),
             imageUrl: _imageUrl,
+            description: _descriptionController.text.trim(),
           );
 
       if (!mounted) return;
@@ -285,6 +289,14 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                               final days = int.tryParse(value?.trim() ?? '');
                               return (days == null || days <= 0) ? 'Enter a valid number of days' : null;
                             },
+                          ),
+                          const SizedBox(height: 16),
+                          AuthFieldLabel('Description (optional)', colorScheme),
+                          const SizedBox(height: 8),
+                          AuthTextField(
+                            controller: _descriptionController,
+                            hint: 'Add any extra details for buyers...',
+                            colorScheme: colorScheme,
                           ),
                           if (_error != null) ...[
                             const SizedBox(height: 14),

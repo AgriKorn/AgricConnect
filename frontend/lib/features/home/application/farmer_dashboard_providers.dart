@@ -40,6 +40,7 @@ class FarmerListingsController extends AsyncNotifier<List<FarmerListingSummary>>
     required double farmerLong,
     required double pricePerKg,
     String? imageUrl,
+    String? description,
   }) async {
     await ref.read(marketplaceRepositoryProvider).createListing(
           cropType: cropType,
@@ -50,6 +51,7 @@ class FarmerListingsController extends AsyncNotifier<List<FarmerListingSummary>>
           farmerLong: farmerLong,
           pricePerKg: pricePerKg,
           imageUrl: imageUrl,
+          description: description,
         );
     ref.invalidateSelf();
     await future;

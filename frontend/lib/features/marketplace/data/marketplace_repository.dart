@@ -40,6 +40,7 @@ abstract class MarketplaceRepository {
     required double farmerLong,
     required double pricePerKg,
     String? imageUrl,
+    String? description,
   });
 
   /// Uploads [bytes] to S3 via a presigned URL and returns the resulting
@@ -105,6 +106,7 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
     required double farmerLong,
     required double pricePerKg,
     String? imageUrl,
+    String? description,
   }) async {
     try {
       final response = await _dio.post(
@@ -118,6 +120,7 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
           'farmerLong': farmerLong,
           'pricePerKg': pricePerKg,
           if (imageUrl != null) 'imageUrl': imageUrl,
+          if (description != null && description.trim().isNotEmpty) 'description': description.trim(),
         },
       );
       final item = response.data['data'] ?? response.data;
@@ -221,6 +224,7 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
       farmerName: json['farmerName']?.toString() ?? 'Local Farmer',
       farmerId: json['farmerId']?.toString(),
       farmerRegion: json['farmerRegion']?.toString(),
+      description: json['description']?.toString(),
     );
   }
 

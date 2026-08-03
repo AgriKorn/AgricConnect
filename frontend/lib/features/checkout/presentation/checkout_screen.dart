@@ -6,6 +6,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/utils/currency.dart';
 import '../../../core/utils/freshness.dart';
 import '../../../core/widgets/ambient_background.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../marketplace/data/marketplace_mock.dart';
 import '../../orders/data/orders_repository.dart';
 import '../application/checkout_providers.dart';
@@ -141,7 +142,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: Column(
+            child: ResponsiveContent(
+              child: Column(
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 8, 20, 0),
@@ -260,6 +262,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   onPay: _pay,
                 ),
               ],
+              ),
             ),
           ),
         ],

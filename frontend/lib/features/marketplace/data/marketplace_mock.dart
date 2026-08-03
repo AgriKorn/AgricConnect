@@ -73,6 +73,7 @@ class MarketplaceListingDetail {
     this.quantityAvailable,
     this.shelfLifeDays,
     this.imageUrl,
+    this.description,
   });
 
   final String id;
@@ -87,6 +88,8 @@ class MarketplaceListingDetail {
   final double? quantityAvailable;
   final int? shelfLifeDays;
   final String? imageUrl;
+  /// Free-text details the farmer added when listing, if any.
+  final String? description;
 }
 
 extension MarketplaceListingDetailX on MarketplaceListingDetail {

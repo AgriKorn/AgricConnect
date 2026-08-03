@@ -5,6 +5,7 @@ import '../../../core/utils/currency.dart';
 import '../../../core/utils/freshness.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../checkout/presentation/checkout_screen.dart';
 import '../application/marketplace_providers.dart';
@@ -32,36 +33,38 @@ class ProductDetailScreen extends ConsumerWidget {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 20, 0),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: Icon(Icons.chevron_left_rounded, color: colorScheme.onSurface),
-                        style: IconButton.styleFrom(
-                          backgroundColor: colorScheme.surfaceContainerHighest,
-                          shape: const CircleBorder(),
+            child: ResponsiveContent(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 20, 0),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: Icon(Icons.chevron_left_rounded, color: colorScheme.onSurface),
+                          style: IconButton.styleFrom(
+                            backgroundColor: colorScheme.surfaceContainerHighest,
+                            shape: const CircleBorder(),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: detailAsync.when(
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (error, _) => Center(
+                        child: EmptyState(
+                          icon: Icons.error_outline_rounded,
+                          message: 'Could not load this listing.',
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: detailAsync.when(
-                    loading: () => const Center(child: CircularProgressIndicator()),
-                    error: (error, _) => Center(
-                      child: EmptyState(
-                        icon: Icons.error_outline_rounded,
-                        message: 'Could not load this listing.',
-                      ),
+                      data: (listing) => _ProductDetailBody(colorScheme: colorScheme, listing: listing),
                     ),
-                    data: (listing) => _ProductDetailBody(colorScheme: colorScheme, listing: listing),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -146,6 +149,18 @@ class _ProductDetailBody extends ConsumerWidget {
               (Icons.hourglass_bottom_rounded, 'Shelf Life', '${listing.shelfLifeDays} days'),
           ],
         ),
+        if (listing.description != null && listing.description!.trim().isNotEmpty) ...[
+          const SizedBox(height: 20),
+          Text(
+            'Description',
+            style: TextStyle(color: colorScheme.onSurface, fontSize: 16, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            listing.description!,
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13.5, height: 1.4),
+          ),
+        ],
         const SizedBox(height: 24),
         if (isOwnListing)
           Container(

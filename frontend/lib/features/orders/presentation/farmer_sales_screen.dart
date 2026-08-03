@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/currency.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../application/orders_providers.dart';
 import '../data/orders_repository.dart';
 
@@ -33,7 +34,8 @@ class FarmerSalesScreen extends ConsumerWidget {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: Column(
+            child: ResponsiveContent(
+              child: Column(
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 8, 20, 0),
@@ -93,6 +95,7 @@ class FarmerSalesScreen extends ConsumerWidget {
                   ),
                 ),
               ],
+              ),
             ),
           ),
         ],

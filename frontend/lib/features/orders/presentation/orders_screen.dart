@@ -6,6 +6,7 @@ import '../../../core/utils/currency.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../application/orders_providers.dart';
 import '../data/orders_mock.dart';
 import 'confirm_delivery_screen.dart';
@@ -74,7 +75,8 @@ class OrdersScreen extends ConsumerWidget {
           SafeArea(
             child: RefreshIndicator(
               onRefresh: () => ref.refresh(myOrdersProvider.future),
-              child: Column(
+              child: ResponsiveContent(
+                child: Column(
                 children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -179,6 +181,7 @@ class OrdersScreen extends ConsumerWidget {
                           ),
                   ),
                 ],
+                ),
               ),
             ),
           ),
