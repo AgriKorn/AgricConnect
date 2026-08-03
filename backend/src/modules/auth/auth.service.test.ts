@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { AuthService } from './auth.service';
 import { PrismaUserRepository } from '../user/user.repository.prisma';
-import { AccountPendingApprovalError, ConflictError, InvalidTokenError, NotFoundError, UnauthorizedError } from '../../utils/errors';
+import { AccountPendingApprovalError, ConflictError, InvalidTokenError, UnauthorizedError } from '../../utils/errors';
 import { supabase } from '../../config/supabase';
 import { User } from '../user/user.types';
 import { env } from '../../config/env';
