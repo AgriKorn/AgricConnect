@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/motion.dart';
 import '../../../core/widgets/agri_toast.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../../core/widgets/theme_toggle_button.dart';
 import '../application/auth_controller.dart';
 import 'widgets/auth_visuals.dart';
@@ -67,7 +68,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: SingleChildScrollView(
+            child: ResponsiveContent(
+              child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
               child: Form(
                 key: _formKey,
@@ -182,6 +184,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ],
                   ],
                 ),
+              ),
               ),
             ),
           ),

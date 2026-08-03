@@ -6,6 +6,7 @@ import '../../../core/utils/currency.dart';
 import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../orders/presentation/confirm_delivery_screen.dart';
 import '../application/dispatch_providers.dart';
 import '../data/dispatch_mock.dart';
@@ -32,7 +33,8 @@ class DriverHomeScreen extends ConsumerWidget {
 
     return Scaffold(
       body: SafeArea(
-        child: RefreshIndicator(
+        child: ResponsiveContent(
+          child: RefreshIndicator(
           onRefresh: () => ref.read(activeTripProvider.notifier).refresh(),
           child: ListView(
           padding: EdgeInsets.zero,
@@ -110,6 +112,7 @@ class DriverHomeScreen extends ConsumerWidget {
               ),
             ),
           ],
+          ),
           ),
         ),
       ),

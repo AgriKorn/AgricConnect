@@ -9,6 +9,7 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/utils/freshness.dart';
 import '../../../core/widgets/agri_bottom_sheet.dart';
 import '../../../core/widgets/agri_toast.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../auth/presentation/widgets/auth_visuals.dart';
 import '../../home/application/farmer_dashboard_providers.dart';
 import '../../marketplace/data/marketplace_repository.dart';
@@ -168,7 +169,8 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: SingleChildScrollView(
+            child: ResponsiveContent(
+              child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               child: Form(
                 key: _formKey,
@@ -317,6 +319,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                     ),
                   ],
                 ),
+              ),
               ),
             ),
           ),

@@ -11,6 +11,7 @@ import '../../../core/utils/currency.dart';
 import '../../../core/utils/freshness.dart';
 import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../application/scan_controller.dart';
 import '../data/scan_record.dart';
 
@@ -50,7 +51,8 @@ class ScanResultScreen extends ConsumerWidget {
         children: [
           _ResultBackground(tint: tint),
           SafeArea(
-            child: Column(
+            child: ResponsiveContent(
+              child: Column(
               children: [
                 _ResultAppBar(colorScheme: colorScheme, result: result),
                 Expanded(
@@ -73,6 +75,7 @@ class ScanResultScreen extends ConsumerWidget {
                   ),
                 ),
               ],
+              ),
             ),
           ),
           Positioned(

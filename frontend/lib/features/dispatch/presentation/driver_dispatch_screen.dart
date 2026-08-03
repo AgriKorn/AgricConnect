@@ -6,6 +6,7 @@ import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../orders/presentation/confirm_delivery_screen.dart';
 import '../application/dispatch_providers.dart';
 import '../data/dispatch_mock.dart';
@@ -36,7 +37,8 @@ class DriverDispatchScreen extends ConsumerWidget {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: RefreshIndicator(
+            child: ResponsiveContent(
+              child: RefreshIndicator(
               onRefresh: () => Future.wait([
                 ref.read(availableJobsProvider.notifier).refresh(),
                 ref.read(activeTripProvider.notifier).refresh(),
@@ -167,6 +169,7 @@ class DriverDispatchScreen extends ConsumerWidget {
                     const SizedBox(height: 12),
                   ],
               ],
+              ),
               ),
             ),
           ),

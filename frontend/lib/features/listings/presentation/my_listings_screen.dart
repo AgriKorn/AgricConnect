@@ -14,6 +14,7 @@ import '../../../core/widgets/agri_dialog.dart';
 import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../home/application/farmer_dashboard_providers.dart';
 import '../../home/data/farmer_dashboard_mock.dart';
 
@@ -108,7 +109,8 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: Column(
+            child: ResponsiveContent(
+              child: Column(
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -179,6 +181,7 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
                   ),
                 ),
               ],
+              ),
             ),
           ),
         ],

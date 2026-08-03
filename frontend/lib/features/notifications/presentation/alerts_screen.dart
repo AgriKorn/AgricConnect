@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../data/notifications_repository.dart';
 
 /// Farmer/buyer/driver notification feed — real events from the backend
@@ -66,7 +67,8 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: RefreshIndicator(
+            child: ResponsiveContent(
+              child: RefreshIndicator(
               onRefresh: _load,
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
@@ -97,6 +99,7 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
                                 )),
                           ],
                         ),
+            ),
             ),
           ),
         ],

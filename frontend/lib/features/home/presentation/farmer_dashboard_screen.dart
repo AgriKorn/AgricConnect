@@ -7,6 +7,7 @@ import '../../../core/utils/currency.dart';
 import '../../../core/utils/freshness.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../orders/presentation/farmer_sales_screen.dart';
@@ -37,7 +38,8 @@ class FarmerDashboardScreen extends ConsumerWidget {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: ListView(
+            child: ResponsiveContent(
+              child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               children: [
                 _DashboardHeader(
@@ -95,6 +97,7 @@ class FarmerDashboardScreen extends ConsumerWidget {
                 const SizedBox(height: 12),
                 _OverviewGrid(colorScheme: colorScheme, summary: summaryAsync.valueOrNull, alertCount: alertCount),
               ],
+              ),
             ),
           ),
         ],
