@@ -44,6 +44,7 @@ class ScanRecord {
     required this.confidence,
     required this.attributes,
     required this.capturedAt,
+    this.imagePath,
   });
 
   final String id;
@@ -57,7 +58,27 @@ class ScanRecord {
   final List<ScanAttribute> attributes;
   final DateTime capturedAt;
 
+  /// Local file path of the actual photo taken for this scan (null on
+  /// platforms/devices with no camera, where capture never produced a file).
+  final String? imagePath;
+
   String get semanticLabel => freshnessStateLabel(score);
+
+  ScanRecord copyWith({String? imagePath}) {
+    return ScanRecord(
+      id: id,
+      cropType: cropType,
+      score: score,
+      shelfLifeLabel: shelfLifeLabel,
+      qualityGrade: qualityGrade,
+      recommendedPrice: recommendedPrice,
+      priceUnit: priceUnit,
+      confidence: confidence,
+      attributes: attributes,
+      capturedAt: capturedAt,
+      imagePath: imagePath ?? this.imagePath,
+    );
+  }
 
   Map<String, dynamic> toJson() {
     return {
@@ -71,6 +92,7 @@ class ScanRecord {
       'confidence': confidence,
       'attributes': attributes.map((a) => a.toJson()).toList(),
       'capturedAt': capturedAt.toIso8601String(),
+      'imagePath': imagePath,
     };
   }
 
@@ -88,6 +110,7 @@ class ScanRecord {
           .map((a) => ScanAttribute.fromJson(a as Map<String, dynamic>))
           .toList(),
       capturedAt: DateTime.parse(json['capturedAt'] as String),
+      imagePath: json['imagePath'] as String?,
     );
   }
 }

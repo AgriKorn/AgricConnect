@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,11 +10,10 @@ import '../../../core/utils/currency.dart';
 import '../../../core/utils/freshness.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/user_avatar.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/farmer_dashboard_providers.dart';
 import '../data/farmer_dashboard_mock.dart';
-
-const _heroImage = 'assets/images/farmer_hero.jpeg';
 
 /// Farmer Home: greeting header -> Market trend banner -> Scan CTA ->
 /// Active Listings carousel -> Overview stats grid.
@@ -120,8 +122,16 @@ class _DashboardHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        ClipOval(
-          child: Image.asset(_heroImage, width: 52, height: 52, fit: BoxFit.cover),
+        GestureDetector(
+          onTap: () => context.go('/farmer/profile'),
+          child: SizedBox(
+            width: 52,
+            height: 52,
+            child: UserAvatar(
+              size: 52,
+              fallback: (context) => GreenInitialsAvatar(name: name, size: 52, colorScheme: colorScheme),
+            ),
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -313,20 +323,7 @@ class _ListingCard extends StatelessWidget {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: listing.imageAsset != null
-                          ? Image.asset(listing.imageAsset!, fit: BoxFit.cover)
-                          : DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.12)],
-                                ),
-                              ),
-                              child: Center(
-                                child: Icon(Icons.eco_rounded, size: 40, color: accent.withValues(alpha: 0.8)),
-                              ),
-                            ),
+                      child: _dashboardListingImage(listing, accent),
                     ),
                     Positioned(
                       top: 8,
@@ -359,27 +356,6 @@ class _ListingCard extends StatelessWidget {
                       '${formatGhs(listing.price)} / ${listing.unit}',
                       style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w600, fontSize: 12),
                     ),
-                    if (listing.tag != null) ...[
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              listing.tag!,
-                              style: TextStyle(color: colorScheme.onSurface, fontSize: 10.5, fontWeight: FontWeight.w600),
-                            ),
-                            const SizedBox(width: 3),
-                            Icon(Icons.auto_awesome_rounded, size: 10, color: colorScheme.onSurface),
-                          ],
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -389,6 +365,35 @@ class _ListingCard extends StatelessWidget {
       ),
     );
   }
+}
+
+Widget _dashboardListingImage(FarmerListingSummary listing, Color accent) {
+  Widget fallback() {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.12)],
+        ),
+      ),
+      child: Center(
+        child: Icon(Icons.eco_rounded, size: 40, color: accent.withValues(alpha: 0.8)),
+      ),
+    );
+  }
+
+  if (!kIsWeb && listing.imagePath != null) {
+    return Image.file(
+      File(listing.imagePath!),
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) => fallback(),
+    );
+  }
+  if (listing.imageAsset != null) {
+    return Image.asset(listing.imageAsset!, fit: BoxFit.cover);
+  }
+  return fallback();
 }
 
 class _OverviewGrid extends StatelessWidget {

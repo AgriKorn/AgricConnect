@@ -65,8 +65,8 @@ class FarmerListingSummary {
     required this.price,
     required this.unit,
     required this.status,
-    this.tag,
     this.imageAsset,
+    this.imagePath,
   });
 
   final String id;
@@ -75,8 +75,8 @@ class FarmerListingSummary {
   final double price;
   final String unit;
   final String status; // Active | Pending | Sold
-  final String? tag; // Premium | Verified
-  final String? imageAsset;
+  final String? imageAsset; // bundled asset, used by mock listings
+  final String? imagePath; // local file path, from a scan or user-picked photo
 }
 
 class FreshnessAlertItem {
@@ -99,7 +99,6 @@ const mockFarmerListings = [
     price: 35,
     unit: 'kg',
     status: 'Active',
-    tag: 'Premium',
     imageAsset: 'assets/images/roma tomatoes.png',
   ),
   FarmerListingSummary(
@@ -109,7 +108,6 @@ const mockFarmerListings = [
     price: 25,
     unit: 'kg',
     status: 'Active',
-    tag: 'Verified',
     imageAsset: 'assets/images/yellow maize.png',
   ),
   FarmerListingSummary(
@@ -119,7 +117,6 @@ const mockFarmerListings = [
     price: 60,
     unit: 'box',
     status: 'Active',
-    tag: 'Premium',
     imageAsset: 'assets/images/haden mangoes.png',
   ),
   FarmerListingSummary(
@@ -129,7 +126,6 @@ const mockFarmerListings = [
     price: 42,
     unit: 'kg',
     status: 'Active',
-    tag: 'Verified',
     imageAsset: 'assets/images/belll pepper.png',
   ),
   FarmerListingSummary(

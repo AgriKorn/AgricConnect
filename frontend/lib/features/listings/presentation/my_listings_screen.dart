@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -268,20 +271,7 @@ class _ListingRow extends StatelessWidget {
                   child: SizedBox(
                     height: 190,
                     width: double.infinity,
-                    child: listing.imageAsset != null
-                        ? Image.asset(listing.imageAsset!, fit: BoxFit.cover)
-                        : DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.12)],
-                              ),
-                            ),
-                            child: Center(
-                              child: Icon(Icons.eco_rounded, size: 48, color: accent.withValues(alpha: 0.8)),
-                            ),
-                          ),
+                    child: _ListingImage(listing: listing, accent: accent),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -294,26 +284,6 @@ class _ListingRow extends StatelessWidget {
                   '${formatGhs(listing.price)} / ${listing.unit}',
                   style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w700, fontSize: 14),
                 ),
-                if (listing.tag != null) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          listing.tag!,
-                          style: TextStyle(color: colorScheme.onSurface, fontSize: 11.5, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      const Spacer(),
-                      Icon(Icons.auto_awesome_rounded, size: 16, color: colorScheme.onSurfaceVariant),
-                    ],
-                  ),
-                ],
               ],
             ),
           ),
@@ -330,6 +300,43 @@ class _ListingRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ListingImage extends StatelessWidget {
+  const _ListingImage({required this.listing, required this.accent});
+
+  final FarmerListingSummary listing;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!kIsWeb && listing.imagePath != null) {
+      return Image.file(
+        File(listing.imagePath!),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _fallback(),
+      );
+    }
+    if (listing.imageAsset != null) {
+      return Image.asset(listing.imageAsset!, fit: BoxFit.cover);
+    }
+    return _fallback();
+  }
+
+  Widget _fallback() {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.12)],
+        ),
+      ),
+      child: Center(
+        child: Icon(Icons.eco_rounded, size: 48, color: accent.withValues(alpha: 0.8)),
       ),
     );
   }

@@ -12,7 +12,7 @@ import 'models/user_model.dart';
 /// the only implementation for now.
 abstract class AuthRepository {
   Future<AuthResponseModel> register(RegisterRequest request);
-  Future<AuthResponseModel> login({required String phone, required String password});
+  Future<AuthResponseModel> login({required String email, required String password});
 
   /// Dev-only affordance standing in for the Admin approval flow (Phase 9,
   /// not yet built) so the pending-verification screen can be demonstrated
@@ -23,7 +23,7 @@ abstract class AuthRepository {
 class MockAuthRepository implements AuthRepository {
   final Map<String, UserModel> _usersByPhone = {};
   final Map<String, UserModel> _usersByEmail = {};
-  final Map<String, String> _passwordsByPhone = {};
+  final Map<String, String> _passwordsByEmail = {};
   int _nextId = 1;
 
   Future<void> _simulateLatency() => Future.delayed(const Duration(milliseconds: 700));
@@ -55,18 +55,18 @@ class MockAuthRepository implements AuthRepository {
 
     _usersByPhone[request.phone] = user;
     _usersByEmail[request.email] = user;
-    _passwordsByPhone[request.phone] = request.password;
+    _passwordsByEmail[request.email] = request.password;
 
     return _tokensFor(user);
   }
 
   @override
-  Future<AuthResponseModel> login({required String phone, required String password}) async {
+  Future<AuthResponseModel> login({required String email, required String password}) async {
     await _simulateLatency();
 
-    final user = _usersByPhone[phone];
-    if (user == null || _passwordsByPhone[phone] != password) {
-      throw const ApiException('Incorrect phone number or password.');
+    final user = _usersByEmail[email];
+    if (user == null || _passwordsByEmail[email] != password) {
+      throw const ApiException('Incorrect email or password.');
     }
 
     return _tokensFor(user);

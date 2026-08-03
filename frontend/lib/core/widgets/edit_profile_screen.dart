@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../features/auth/application/auth_controller.dart';
 import '../../features/auth/presentation/widgets/auth_visuals.dart';
+import 'agri_bottom_sheet.dart';
 import 'agri_dialog.dart';
 import 'agri_toast.dart';
 import 'coming_soon_screen.dart';
+import 'user_avatar.dart';
 
 void _openComingSoon(BuildContext context, String title, IconData icon) {
   Navigator.of(context).push(
@@ -90,6 +93,35 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     Navigator.of(context).pop();
   }
 
+  Future<void> _changePhoto() async {
+    final source = await showAgriBottomSheet<ImageSource>(
+      context,
+      builder: (context) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.of(context).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+            ),
+          ],
+        );
+      },
+    );
+    if (source == null || !mounted) return;
+    final file = await ImagePicker().pickImage(source: source, maxWidth: 1600, imageQuality: 85);
+    if (file == null || !mounted) return;
+    await ref.read(authControllerProvider.notifier).updateAvatar(file.path);
+    if (!mounted) return;
+    showAgriToast(context, 'Profile photo updated');
+  }
+
   Future<void> _deleteAccountData(BuildContext context) async {
     final confirmed = await showAgriDialog(
       context,
@@ -152,12 +184,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    SizedBox(width: 132, height: 132, child: widget.avatarBuilder(132)),
+                    SizedBox(
+                      width: 132,
+                      height: 132,
+                      child: UserAvatar(size: 132, fallback: (context) => widget.avatarBuilder(132)),
+                    ),
                     Positioned(
                       right: -4,
                       bottom: -4,
                       child: GestureDetector(
-                        onTap: () => _openComingSoon(context, 'Change Profile Photo', Icons.camera_alt_outlined),
+                        onTap: _changePhoto,
                         child: Container(
                           width: 40,
                           height: 40,
@@ -176,7 +212,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
               const SizedBox(height: 14),
               Center(
                 child: GestureDetector(
-                  onTap: () => _openComingSoon(context, 'Change Profile Photo', Icons.camera_alt_outlined),
+                  onTap: _changePhoto,
                   child: Text(
                     'Change Profile Photo',
                     style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w700, fontSize: 14.5),

@@ -7,7 +7,9 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/motion.dart';
 import '../application/onboarding_controller.dart';
 
-const _heroImage = 'assets/images/farmer_hero.jpeg';
+const _scanImage = 'assets/images/cropscan_results.jpg';
+const _marketImage = 'assets/images/market.png';
+const _trackingImage = 'assets/images/navigation.jpg';
 const _markAsset = 'assets/images/agri_mark.png';
 
 // Reserved vertical space for the persistent header/footer chrome overlaid
@@ -18,12 +20,14 @@ const _footerReserve = 148.0;
 
 class _OnboardingPageData {
   const _OnboardingPageData({
+    required this.imageAsset,
     required this.badgeLabel,
     required this.badgeIcon,
     required this.title,
     required this.subtitle,
   });
 
+  final String imageAsset;
   final String badgeLabel;
   final IconData badgeIcon;
   final String title;
@@ -32,6 +36,7 @@ class _OnboardingPageData {
 
 const _pages = [
   _OnboardingPageData(
+    imageAsset: _scanImage,
     badgeLabel: 'AI SCAN',
     badgeIcon: Icons.auto_awesome_rounded,
     title: 'Precision Harvesting',
@@ -39,12 +44,14 @@ const _pages = [
         'Use AI to scan your produce for instant freshness scores and market-ready GHS price recommendations.',
   ),
   _OnboardingPageData(
+    imageAsset: _marketImage,
     badgeLabel: 'MARKETPLACE',
     badgeIcon: Icons.storefront_rounded,
     title: 'Sell Direct, Earn More',
     subtitle: 'List your harvest and reach buyers nearby — no middlemen, better prices for every sale.',
   ),
   _OnboardingPageData(
+    imageAsset: _trackingImage,
     badgeLabel: 'LIVE TRACKING',
     badgeIcon: Icons.local_shipping_rounded,
     title: 'Track Every Delivery',
@@ -169,7 +176,7 @@ class _OnboardingBackdrop extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        Image.asset(_heroImage, fit: BoxFit.cover),
+        Image.asset(data.imageAsset, fit: BoxFit.cover),
         BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
           child: Container(color: Colors.black.withValues(alpha: 0.3)),
@@ -217,7 +224,12 @@ class _GlassCard extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _ThumbnailWithBadge(badgeLabel: data.badgeLabel, badgeIcon: data.badgeIcon, accent: accent),
+              _ThumbnailWithBadge(
+                imageAsset: data.imageAsset,
+                badgeLabel: data.badgeLabel,
+                badgeIcon: data.badgeIcon,
+                accent: accent,
+              ),
               const SizedBox(height: 26),
               Text(
                 data.title,
@@ -239,8 +251,14 @@ class _GlassCard extends StatelessWidget {
 }
 
 class _ThumbnailWithBadge extends StatelessWidget {
-  const _ThumbnailWithBadge({required this.badgeLabel, required this.badgeIcon, required this.accent});
+  const _ThumbnailWithBadge({
+    required this.imageAsset,
+    required this.badgeLabel,
+    required this.badgeIcon,
+    required this.accent,
+  });
 
+  final String imageAsset;
   final String badgeLabel;
   final IconData badgeIcon;
   final Color accent;
@@ -260,7 +278,7 @@ class _ThumbnailWithBadge extends StatelessWidget {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(20),
-            child: Image.asset(_heroImage, fit: BoxFit.cover),
+            child: Image.asset(imageAsset, fit: BoxFit.cover),
           ),
         ),
         Positioned(

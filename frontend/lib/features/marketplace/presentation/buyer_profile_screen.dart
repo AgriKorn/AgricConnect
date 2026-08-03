@@ -7,6 +7,7 @@ import '../../../core/widgets/agri_dialog.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/edit_profile_screen.dart';
 import '../../../core/widgets/help_support_screen.dart';
+import '../../../core/widgets/user_avatar.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/models/account_status.dart';
 import '../application/buyer_profile_providers.dart';
@@ -25,21 +26,10 @@ void _openComingSoon(BuildContext context, String title, IconData icon) {
 }
 
 Widget Function(double size) _buyerAvatarBuilder(BuyerProfileDetails profile) {
-  return (size) => Builder(
-        builder: (context) {
-          final colorScheme = Theme.of(context).colorScheme;
-          return ClipOval(
-            child: ColoredBox(
-              color: colorScheme.primary,
-              child: Center(
-                child: Text(
-                  profile.initials,
-                  style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w800, fontSize: size * 0.34),
-                ),
-              ),
-            ),
-          );
-        },
+  return (size) => UserAvatar(
+        size: size,
+        fallback: (context) =>
+            GreenInitialsAvatar(name: profile.name, size: size, colorScheme: Theme.of(context).colorScheme),
       );
 }
 
@@ -321,12 +311,12 @@ class _ProfileHero extends StatelessWidget {
             offset: const Offset(0, -8),
             child: Column(
               children: [
-                CircleAvatar(
-                  radius: 52,
-                  backgroundColor: colorScheme.primary,
-                  child: Text(
-                    profile.initials,
-                    style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w800, fontSize: 30),
+                SizedBox(
+                  width: 104,
+                  height: 104,
+                  child: UserAvatar(
+                    size: 104,
+                    fallback: (context) => GreenInitialsAvatar(name: profile.name, size: 104, colorScheme: colorScheme),
                   ),
                 ),
                 const SizedBox(height: 16),

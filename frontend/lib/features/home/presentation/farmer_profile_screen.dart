@@ -7,37 +7,26 @@ import '../../../core/utils/currency.dart';
 import '../../../core/widgets/account_settings_screen.dart';
 import '../../../core/widgets/agri_dialog.dart';
 import '../../../core/widgets/help_support_screen.dart';
+import '../../../core/widgets/user_avatar.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/models/account_status.dart';
 import '../../auth/data/models/user_model.dart';
 import '../application/farmer_dashboard_providers.dart';
 import '../data/farmer_dashboard_mock.dart';
 
-const _heroImage = 'assets/images/farmer_hero.jpeg';
-
-// Rec. 709 luma weights — desaturates the hero photo for the avatar so it
-// reads as the reference's black & white portrait without a second asset.
-const _grayscaleMatrix = <double>[
-  0.2126, 0.7152, 0.0722, 0, 0,
-  0.2126, 0.7152, 0.0722, 0, 0,
-  0.2126, 0.7152, 0.0722, 0, 0,
-  0, 0, 0, 1, 0,
-];
-
-Widget _farmerAvatar(double size) {
-  return ClipOval(
-    child: ColorFiltered(
-      colorFilter: const ColorFilter.matrix(_grayscaleMatrix),
-      child: Image.asset(_heroImage, fit: BoxFit.cover),
-    ),
-  );
+Widget Function(double size) _farmerAvatarBuilder(String? name) {
+  return (size) => UserAvatar(
+        size: size,
+        fallback: (context) =>
+            GreenInitialsAvatar(name: name, size: size, colorScheme: Theme.of(context).colorScheme),
+      );
 }
 
-void _openFarmerAccountSettings(BuildContext context, bool verified) {
+void _openFarmerAccountSettings(BuildContext context, String? name, bool verified) {
   Navigator.of(context).push(
     MaterialPageRoute(
       builder: (context) => AccountSettingsScreen(
-        avatarBuilder: _farmerAvatar,
+        avatarBuilder: _farmerAvatarBuilder(name),
         roleBadgeLabel: verified ? 'Verified Farmer' : 'Farmer',
         onHelpTap: () => _openFarmerHelp(context),
         locationLabel: 'Farm Location',
@@ -146,7 +135,8 @@ class FarmerProfileScreen extends ConsumerWidget {
                         _ActionRow(
                           colorScheme: colorScheme,
                           label: 'Account Settings',
-                          onTap: () => _openFarmerAccountSettings(context, user?.status == AccountStatus.verified),
+                          onTap: () =>
+                              _openFarmerAccountSettings(context, user?.name, user?.status == AccountStatus.verified),
                         ),
                         _ActionRow(
                           colorScheme: colorScheme,
@@ -278,11 +268,9 @@ class _ProfileHero extends StatelessWidget {
               color: Theme.of(context).scaffoldBackgroundColor,
               border: Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
             ),
-            child: ClipOval(
-              child: ColorFiltered(
-                colorFilter: const ColorFilter.matrix(_grayscaleMatrix),
-                child: Image.asset(_heroImage, fit: BoxFit.cover),
-              ),
+            child: UserAvatar(
+              size: 90,
+              fallback: (context) => GreenInitialsAvatar(name: user?.name, size: 90, colorScheme: colorScheme),
             ),
           ),
         ),

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -11,12 +10,10 @@ import 'widgets/auth_visuals.dart';
 
 const _markAsset = 'assets/images/agri_mark.png';
 
-/// Checklist 1.3: phone number / password (Mobile Money-linked accounts use
-/// phone as the primary identifier, not email). Styled fully off
-/// [ColorScheme] tokens (not fixed hex, unlike the splash/onboarding
-/// screens) so it renders correctly in both light and dark mode. Shares its
-/// visual language (widgets/auth_visuals.dart) with role selection and
-/// registration.
+/// Checklist 1.3: email / password. Styled fully off [ColorScheme] tokens
+/// (not fixed hex, unlike the splash/onboarding screens) so it renders
+/// correctly in both light and dark mode. Shares its visual language
+/// (widgets/auth_visuals.dart) with role selection and registration.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -26,13 +23,13 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -42,9 +39,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ref
         .read(authControllerProvider.notifier)
         .login(
-          phone: _phoneController.text.trim(),
+          email: _emailController.text.trim(),
           password: _passwordController.text,
         );
+  }
+
+  void _continueWithGoogle() {
+    showAgriToast(context, 'Sign in with Google is coming soon', icon: Icons.info_outline_rounded);
   }
 
   @override
@@ -85,19 +86,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             onSignUp: () => context.push('/role-selection'),
                           ),
                           const SizedBox(height: 22),
-                          AuthFieldLabel('Phone Number', colorScheme),
+                          AuthFieldLabel('Email', colorScheme),
                           const SizedBox(height: 8),
                           AuthTextField(
-                            controller: _phoneController,
-                            hint: '+233 00 000 0000',
-                            icon: Icons.phone_outlined,
-                            keyboardType: TextInputType.phone,
+                            controller: _emailController,
+                            hint: 'you@example.com',
+                            icon: Icons.email_outlined,
+                            keyboardType: TextInputType.emailAddress,
                             colorScheme: colorScheme,
                             validator: (value) {
-                              final phone = value?.trim() ?? '';
-                              if (phone.isEmpty) return 'Enter your phone number';
-                              if (!RegExp(r'^[0-9+]{9,15}$').hasMatch(phone)) {
-                                return 'Enter a valid phone number';
+                              final email = value?.trim() ?? '';
+                              if (email.isEmpty) return 'Enter your email';
+                              if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+                                return 'Enter a valid email';
                               }
                               return null;
                             },
@@ -142,6 +143,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             onPressed: _submit,
                             colorScheme: colorScheme,
                           ),
+                          const SizedBox(height: 20),
+                          _OrDivider(colorScheme: colorScheme),
+                          const SizedBox(height: 20),
+                          _GoogleSignInButton(colorScheme: colorScheme, onPressed: _continueWithGoogle),
                         ],
                       ),
                     ),
@@ -162,15 +167,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ],
                     ),
-                    if (kDebugMode) ...[
-                      const SizedBox(height: 20),
-                      Center(
-                        child: TextButton(
-                          onPressed: () => context.push('/debug/components'),
-                          child: const Text('Component gallery (debug)'),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -295,6 +291,84 @@ class _AuthTab extends StatelessWidget {
             fontSize: 14,
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _OrDivider extends StatelessWidget {
+  const _OrDivider({required this.colorScheme});
+
+  final ColorScheme colorScheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final line = Divider(color: colorScheme.outline.withValues(alpha: 0.4), height: 1);
+    return Row(
+      children: [
+        Expanded(child: line),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            'OR',
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w700, fontSize: 12),
+          ),
+        ),
+        Expanded(child: line),
+      ],
+    );
+  }
+}
+
+/// Google isn't wired up yet (no `google_sign_in` package or backend OAuth
+/// exchange) — tapping this surfaces a "coming soon" toast, same mock-first
+/// pattern as the rest of the app's not-yet-implemented actions.
+class _GoogleSignInButton extends StatelessWidget {
+  const _GoogleSignInButton({required this.colorScheme, required this.onPressed});
+
+  final ColorScheme colorScheme;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 54,
+      child: OutlinedButton(
+        onPressed: onPressed,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: colorScheme.onSurface,
+          side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.5)),
+          shape: const StadiumBorder(),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const _GoogleMark(),
+            const SizedBox(width: 10),
+            Text(
+              'Continue with Google',
+              style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 15),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GoogleMark extends StatelessWidget {
+  const _GoogleMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 20,
+      height: 20,
+      decoration: const BoxDecoration(color: Color(0xFF4285F4), shape: BoxShape.circle),
+      alignment: Alignment.center,
+      child: const Text(
+        'G',
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13, height: 1),
       ),
     );
   }

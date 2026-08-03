@@ -24,6 +24,7 @@ class UserModel with _$UserModel {
     String? vehicleCapacity, // Driver
     String? operatingRegion, // Driver
     String? bio, // Farmer / Buyer / Driver — free-text profile description
+    String? avatarPath, // local file path of a user-picked profile photo
   }) = _UserModel;
 
   factory UserModel.fromJson(Map<String, dynamic> json) => _$UserModelFromJson(json);

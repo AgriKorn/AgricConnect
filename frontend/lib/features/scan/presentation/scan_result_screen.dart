@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,8 +13,6 @@ import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../application/scan_controller.dart';
 import '../data/scan_record.dart';
-
-const _heroImage = 'assets/images/farmer_hero.jpeg';
 
 class ScanResultScreen extends ConsumerWidget {
   const ScanResultScreen({super.key});
@@ -60,13 +60,15 @@ class ScanResultScreen extends ConsumerWidget {
                       _FreshnessCard(colorScheme: colorScheme, result: result, tint: tint),
                       const SizedBox(height: 18),
                       _PriceCard(colorScheme: colorScheme, result: result),
-                      const SizedBox(height: 26),
-                      Text(
-                        'Visual Analysis',
-                        style: TextStyle(color: colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 12),
-                      _VisualAnalysisRow(colorScheme: colorScheme, result: result),
+                      if (result.imagePath != null) ...[
+                        const SizedBox(height: 26),
+                        Text(
+                          'Visual Analysis',
+                          style: TextStyle(color: colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 12),
+                        _VisualAnalysisImage(colorScheme: colorScheme, imagePath: result.imagePath!),
+                      ],
                     ],
                   ),
                 ),
@@ -395,74 +397,34 @@ class _PriceCard extends StatelessWidget {
   }
 }
 
-class _VisualAnalysisRow extends StatelessWidget {
-  const _VisualAnalysisRow({required this.colorScheme, required this.result});
+/// Just the actual captured photo — no attribute chips or other overlays.
+class _VisualAnalysisImage extends StatelessWidget {
+  const _VisualAnalysisImage({required this.colorScheme, required this.imagePath});
 
   final ColorScheme colorScheme;
-  final ScanRecord result;
+  final String imagePath;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: Image.asset(_heroImage, width: 92, height: 128, fit: BoxFit.cover),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final attribute in result.attributes) _AttributeChip(colorScheme: colorScheme, attribute: attribute),
-            ],
-          ),
-        ),
-      ],
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: AspectRatio(
+        aspectRatio: 4 / 3,
+        child: kIsWeb
+            ? _fallback()
+            : Image.file(
+                File(imagePath),
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => _fallback(),
+              ),
+      ),
     );
   }
-}
 
-class _AttributeChip extends StatelessWidget {
-  const _AttributeChip({required this.colorScheme, required this.attribute});
-
-  final ColorScheme colorScheme;
-  final ScanAttribute attribute;
-
-  @override
-  Widget build(BuildContext context) {
-    final icon = attribute.kind.icon;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(color: colorScheme.primary, shape: BoxShape.circle),
-              child: Icon(icon, size: 12, color: colorScheme.onPrimary),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Text(
-            attribute.label,
-            style: TextStyle(
-              color: icon == null ? colorScheme.primary : colorScheme.onSurface,
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
-          ),
-        ],
-      ),
+  Widget _fallback() {
+    return ColoredBox(
+      color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+      child: Icon(Icons.image_not_supported_outlined, color: colorScheme.onSurfaceVariant, size: 40),
     );
   }
 }

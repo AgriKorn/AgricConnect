@@ -7,6 +7,7 @@ import '../../../core/utils/freshness.dart';
 import '../../../core/widgets/agri_bottom_sheet.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/user_avatar.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../checkout/presentation/checkout_screen.dart';
 import '../application/marketplace_providers.dart';
@@ -81,15 +82,6 @@ class MarketplaceScreen extends ConsumerWidget {
   }
 }
 
-String _initialsOf(String? name) {
-  final trimmed = name?.trim() ?? '';
-  if (trimmed.isEmpty) return '?';
-  final parts = trimmed.split(RegExp(r'\s+'));
-  final first = parts.first[0];
-  final last = parts.length > 1 ? parts.last[0] : '';
-  return (first + last).toUpperCase();
-}
-
 class _MarketplaceHeader extends StatelessWidget {
   const _MarketplaceHeader({required this.colorScheme, required this.userName});
 
@@ -119,12 +111,12 @@ class _MarketplaceHeader extends StatelessWidget {
         ),
         GestureDetector(
           onTap: () => context.go('/buyer/profile'),
-          child: CircleAvatar(
-            radius: 22,
-            backgroundColor: colorScheme.primary,
-            child: Text(
-              _initialsOf(userName),
-              style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w800, fontSize: 14),
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: UserAvatar(
+              size: 44,
+              fallback: (context) => GreenInitialsAvatar(name: userName, size: 44, colorScheme: colorScheme),
             ),
           ),
         ),

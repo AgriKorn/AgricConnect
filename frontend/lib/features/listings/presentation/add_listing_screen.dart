@@ -1,8 +1,13 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/utils/freshness.dart';
+import '../../../core/widgets/agri_bottom_sheet.dart';
 import '../../../core/widgets/agri_toast.dart';
 import '../../auth/presentation/widgets/auth_visuals.dart';
 import '../../home/application/farmer_dashboard_providers.dart';
@@ -29,7 +34,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   late final TextEditingController _quantityController;
   late final TextEditingController _descriptionController;
   late double _freshnessScore;
-  String? _tag;
+  String? _imagePath;
   bool _submitting = false;
 
   @override
@@ -42,11 +47,34 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
     _quantityController = TextEditingController();
     _descriptionController = TextEditingController();
     _freshnessScore = (scan?.score ?? 100).toDouble();
-    _tag = switch (scan?.qualityGrade) {
-      'Grade A' => 'Premium',
-      'Grade B' => 'Verified',
-      _ => null,
-    };
+    _imagePath = scan?.imagePath;
+  }
+
+  Future<void> _pickImage() async {
+    final source = await showAgriBottomSheet<ImageSource>(
+      context,
+      builder: (context) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Take a photo'),
+              onTap: () => Navigator.of(context).pop(ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+            ),
+          ],
+        );
+      },
+    );
+    if (source == null || !mounted) return;
+    final file = await ImagePicker().pickImage(source: source, maxWidth: 1600, imageQuality: 85);
+    if (file == null || !mounted) return;
+    setState(() => _imagePath = file.path);
   }
 
   @override
@@ -73,7 +101,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
             price: double.tryParse(_priceController.text.trim()) ?? 0,
             unit: _unitController.text.trim(),
             status: 'Active',
-            tag: _tag,
+            imagePath: _imagePath,
           ),
         );
 
@@ -199,60 +227,13 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                             colorScheme: colorScheme,
                           ),
                           const SizedBox(height: 20),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              AuthFieldLabel('Freshness Score', colorScheme),
-                              Text(
-                                '${_freshnessScore.round()}%',
-                                style: TextStyle(
-                                  color: freshnessColorFor(_freshnessScore.round(), Theme.of(context).brightness),
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                          SliderTheme(
-                            data: SliderThemeData(
-                              activeTrackColor: colorScheme.primary,
-                              thumbColor: colorScheme.primary,
-                              inactiveTrackColor: colorScheme.surfaceContainerHighest,
-                              overlayColor: colorScheme.primary.withValues(alpha: 0.15),
-                            ),
-                            child: Slider(
-                              value: _freshnessScore,
-                              min: 0,
-                              max: 100,
-                              divisions: 100,
-                              onChanged: (value) => setState(() => _freshnessScore = value),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          AuthFieldLabel('Tag (optional)', colorScheme),
+                          AuthFieldLabel('Photo', colorScheme),
                           const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            children: [
-                              _TagChoiceChip(
-                                label: 'None',
-                                selected: _tag == null,
-                                colorScheme: colorScheme,
-                                onTap: () => setState(() => _tag = null),
-                              ),
-                              _TagChoiceChip(
-                                label: 'Verified',
-                                selected: _tag == 'Verified',
-                                colorScheme: colorScheme,
-                                onTap: () => setState(() => _tag = 'Verified'),
-                              ),
-                              _TagChoiceChip(
-                                label: 'Premium',
-                                selected: _tag == 'Premium',
-                                colorScheme: colorScheme,
-                                onTap: () => setState(() => _tag = 'Premium'),
-                              ),
-                            ],
+                          _ListingPhotoPicker(
+                            colorScheme: colorScheme,
+                            imagePath: _imagePath,
+                            fromScan: widget.prefill != null && _imagePath == widget.prefill?.imagePath,
+                            onTap: _pickImage,
                           ),
                           const SizedBox(height: 16),
                           AuthFieldLabel('Description (optional)', colorScheme),
@@ -315,38 +296,86 @@ class _PrefillBanner extends StatelessWidget {
   }
 }
 
-class _TagChoiceChip extends StatelessWidget {
-  const _TagChoiceChip({
-    required this.label,
-    required this.selected,
+class _ListingPhotoPicker extends StatelessWidget {
+  const _ListingPhotoPicker({
     required this.colorScheme,
+    required this.imagePath,
+    required this.fromScan,
     required this.onTap,
   });
 
-  final String label;
-  final bool selected;
   final ColorScheme colorScheme;
+  final String? imagePath;
+  final bool fromScan;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        decoration: BoxDecoration(
-          color: selected ? colorScheme.primary : colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(999),
-          border: selected ? null : Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          height: 160,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
+          ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (imagePath != null && !kIsWeb)
+                Image.file(
+                  File(imagePath!),
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => _placeholder(),
+                )
+              else
+                _placeholder(),
+              if (imagePath != null)
+                Positioned(
+                  right: 10,
+                  bottom: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.edit_rounded, size: 14, color: Colors.white),
+                        const SizedBox(width: 4),
+                        Text(
+                          fromScan ? 'From scan · Change' : 'Change',
+                          style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _placeholder() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.add_a_photo_outlined, size: 30, color: colorScheme.onSurfaceVariant),
+          const SizedBox(height: 8),
+          Text(
+            'Add a photo',
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600, fontSize: 12.5),
+          ),
+        ],
       ),
     );
   }

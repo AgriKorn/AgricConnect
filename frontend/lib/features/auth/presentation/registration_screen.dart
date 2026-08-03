@@ -323,29 +323,14 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _SocialButton(
-                            colorScheme: colorScheme,
-                            label: 'Google',
-                            iconBuilder: (color) => Text(
-                              'G',
-                              style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 18),
-                            ),
-                            onTap: () => _openComingSoon(context, 'Sign up with Google', Icons.g_mobiledata_rounded),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _SocialButton(
-                            colorScheme: colorScheme,
-                            label: 'Apple',
-                            iconBuilder: (color) => Icon(Icons.apple_rounded, color: color, size: 20),
-                            onTap: () => _openComingSoon(context, 'Sign up with Apple', Icons.apple_rounded),
-                          ),
-                        ),
-                      ],
+                    _SocialButton(
+                      colorScheme: colorScheme,
+                      label: 'Google',
+                      iconBuilder: (color) => Text(
+                        'G',
+                        style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 18),
+                      ),
+                      onTap: () => _openComingSoon(context, 'Sign up with Google', Icons.g_mobiledata_rounded),
                     ),
                   ],
                 ),
@@ -444,7 +429,7 @@ class _TermsCheckbox extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: value ? colorScheme.primary : Colors.transparent,
-              border: value ? null : Border.all(color: colorScheme.outline.withValues(alpha: 0.5)),
+              border: value ? null : Border.all(color: colorScheme.outline.withValues(alpha: 0.9)),
             ),
             child: value ? Icon(Icons.check_rounded, color: colorScheme.onPrimary, size: 16) : null,
           ),
