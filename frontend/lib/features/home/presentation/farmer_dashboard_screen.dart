@@ -382,27 +382,6 @@ class _ListingCard extends StatelessWidget {
                       '${formatGhs(listing.price)} / ${listing.unit}',
                       style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w600, fontSize: 12),
                     ),
-                    if (listing.tag != null) ...[
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              listing.tag!,
-                              style: TextStyle(color: colorScheme.onSurface, fontSize: 10.5, fontWeight: FontWeight.w600),
-                            ),
-                            const SizedBox(width: 3),
-                            Icon(Icons.auto_awesome_rounded, size: 10, color: colorScheme.onSurface),
-                          ],
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),

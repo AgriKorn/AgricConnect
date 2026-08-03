@@ -375,26 +375,6 @@ class _ListingRow extends StatelessWidget {
                     ),
                   ),
                 ],
-                if (listing.tag != null) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          listing.tag!,
-                          style: TextStyle(color: colorScheme.onSurface, fontSize: 11.5, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      const Spacer(),
-                      Icon(Icons.auto_awesome_rounded, size: 16, color: colorScheme.onSurfaceVariant),
-                    ],
-                  ),
-                ],
               ],
             ),
           ),
