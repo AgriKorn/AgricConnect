@@ -1,0 +1,191 @@
+{
+  "n_runs": 20,
+  "sample_image": "/Users/addosakah/Desktop/AgriConnect_Final_dataset/test/tomato_fresh/t_f001.png",
+  "deterministic_crop": true,
+  "deterministic_fresh": true,
+  "latency_ms_mean": 467.62968444986655,
+  "latency_ms_max": 571.7250659999991,
+  "all_under_5s": true,
+  "runs": [
+    {
+      "run": 1,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 477.6356439997471,
+      "rss_mb": null
+    },
+    {
+      "run": 2,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 412.83171299983223,
+      "rss_mb": null
+    },
+    {
+      "run": 3,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 468.7665190003827,
+      "rss_mb": null
+    },
+    {
+      "run": 4,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 571.7250659999991,
+      "rss_mb": null
+    },
+    {
+      "run": 5,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 537.4615769997035,
+      "rss_mb": null
+    },
+    {
+      "run": 6,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 416.3084259998868,
+      "rss_mb": null
+    },
+    {
+      "run": 7,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 498.6024770005315,
+      "rss_mb": null
+    },
+    {
+      "run": 8,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 389.56562299972575,
+      "rss_mb": null
+    },
+    {
+      "run": 9,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 396.9568729999082,
+      "rss_mb": null
+    },
+    {
+      "run": 10,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 417.9718329996831,
+      "rss_mb": null
+    },
+    {
+      "run": 11,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 400.75418000014906,
+      "rss_mb": null
+    },
+    {
+      "run": 12,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 390.3137819997937,
+      "rss_mb": null
+    },
+    {
+      "run": 13,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 523.4340289998727,
+      "rss_mb": null
+    },
+    {
+      "run": 14,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 528.3603150001,
+      "rss_mb": null
+    },
+    {
+      "run": 15,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 541.5149829996153,
+      "rss_mb": null
+    },
+    {
+      "run": 16,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 415.785751999465,
+      "rss_mb": null
+    },
+    {
+      "run": 17,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 510.0911859999542,
+      "rss_mb": null
+    },
+    {
+      "run": 18,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 397.43726500000776,
+      "rss_mb": null
+    },
+    {
+      "run": 19,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 566.1502409993773,
+      "rss_mb": null
+    },
+    {
+      "run": 20,
+      "crop_pred": "tomato",
+      "crop_conf": 1.0,
+      "fresh_pred": "fresh",
+      "fresh_conf": 0.9992722868919373,
+      "latency_ms": 490.92620499959594,
+      "rss_mb": null
+    }
+  ]
+}
