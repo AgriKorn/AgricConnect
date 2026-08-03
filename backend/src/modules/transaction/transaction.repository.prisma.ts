@@ -3,6 +3,14 @@ import { CreateTransactionRecord, ITransactionRepository } from './transaction.r
 import { Transaction, TransactionStatus } from './transaction.types';
 import { Prisma } from '../../generated/prisma/client';
 
+/** The driver who accepted this delivery job, if any — most recent acceptance wins. */
+const acceptedDriverInclude = {
+  where: { status: 'accepted' as const },
+  orderBy: { responded_at: 'desc' as const },
+  take: 1,
+  include: { users: true },
+};
+
 const mapPrismaToTransaction = (order: any, farmerId?: string): Transaction => {
   let status: TransactionStatus = 'PAYMENT_HELD';
   if (order.order_status === 'completed' || order.payments?.status === 'released') {
@@ -17,6 +25,9 @@ const mapPrismaToTransaction = (order: any, farmerId?: string): Transaction => {
     buyerId: order.buyer_id,
     farmerId: farmerId || order.produce_listings?.farmer_id || 'unknown',
     farmerName: order.produce_listings?.users?.full_name || null,
+    driverName: order.driver_assignments?.[0]?.users?.full_name || null,
+    driverPhone: order.driver_assignments?.[0]?.users?.phone_number || null,
+    driverId: order.driver_assignments?.[0]?.driver_id || null,
     cropType: order.produce_listings?.crop_types?.name || 'crop',
     amountGhs: Number(order.amount),
     status,
@@ -57,7 +68,7 @@ export class PrismaTransactionRepository implements ITransactionRepository {
   async findById(id: string): Promise<Transaction | null> {
     const found = await prisma.orders.findUnique({
       where: { id },
-      include: { payments: true, produce_listings: true },
+      include: { payments: true, produce_listings: true, driver_assignments: acceptedDriverInclude },
     });
     return found ? mapPrismaToTransaction(found) : null;
   }
@@ -95,6 +106,7 @@ export class PrismaTransactionRepository implements ITransactionRepository {
       include: {
         payments: true,
         produce_listings: { include: { crop_types: true, users: true } },
+        driver_assignments: acceptedDriverInclude,
       },
       orderBy: { created_at: 'desc' },
     });
@@ -103,7 +115,7 @@ export class PrismaTransactionRepository implements ITransactionRepository {
 
   async findAll(): Promise<Transaction[]> {
     const list = await prisma.orders.findMany({
-      include: { payments: true, produce_listings: true },
+      include: { payments: true, produce_listings: true, driver_assignments: acceptedDriverInclude },
       orderBy: { created_at: 'desc' },
     });
     return list.map((o) => mapPrismaToTransaction(o));

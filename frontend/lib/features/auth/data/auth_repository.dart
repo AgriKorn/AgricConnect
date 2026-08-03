@@ -32,6 +32,10 @@ class ProfileData {
     this.operatingRegion,
     this.momoNumber,
     this.momoNetwork,
+    this.orderStatusUpdates,
+    this.priceAlerts,
+    this.freshnessNotifications,
+    this.marketingOffers,
   });
 
   final String? farmRegion;
@@ -41,8 +45,13 @@ class ProfileData {
   final String? operatingRegion;
   final String? momoNumber;
   final String? momoNetwork;
+  final bool? orderStatusUpdates;
+  final bool? priceAlerts;
+  final bool? freshnessNotifications;
+  final bool? marketingOffers;
 
   factory ProfileData.fromJson(Map<String, dynamic> json) {
+    final prefs = (json['notificationPreferences'] as Map?)?.cast<String, dynamic>() ?? const {};
     return ProfileData(
       farmRegion: json['farmRegion']?.toString(),
       businessName: json['businessName']?.toString(),
@@ -51,6 +60,10 @@ class ProfileData {
       operatingRegion: json['operatingRegion']?.toString(),
       momoNumber: json['momoNumber']?.toString(),
       momoNetwork: json['momoNetwork']?.toString(),
+      orderStatusUpdates: prefs['orderStatusUpdates'] as bool?,
+      priceAlerts: prefs['priceAlerts'] as bool?,
+      freshnessNotifications: prefs['freshnessNotifications'] as bool?,
+      marketingOffers: prefs['marketingOffers'] as bool?,
     );
   }
 }
@@ -67,6 +80,14 @@ abstract class AuthRepository {
   Future<ProfileData> fetchProfile();
   Future<void> updateProfile(Map<String, dynamic> fields);
   Future<String> resolveMomoAccount({required String accountNumber, required String bankCode});
+
+  /// Uploads [bytes] to S3 via a presigned URL and returns the resulting
+  /// public photo URL — caller still has to PATCH it onto the profile.
+  Future<String> uploadProfilePhoto({
+    required List<int> bytes,
+    required String fileName,
+    required String contentType,
+  });
 }
 
 /// Real HTTP implementation connecting to live AWS backend API
@@ -263,6 +284,42 @@ class HttpAuthRepository implements AuthRepository {
     }
   }
 
+  @override
+  Future<String> uploadProfilePhoto({
+    required List<int> bytes,
+    required String fileName,
+    required String contentType,
+  }) async {
+    try {
+      final urlResponse = await _dio.post(
+        '/users/profile/photo-upload-url',
+        data: {'fileName': fileName, 'contentType': contentType},
+      );
+      final urlData = urlResponse.data['data'] ?? urlResponse.data;
+      final uploadUrl = urlData['uploadUrl']?.toString() ?? '';
+      final publicUrl = urlData['publicUrl']?.toString() ?? '';
+      if (uploadUrl.isEmpty || publicUrl.isEmpty) {
+        throw const ApiException('Could not get a photo upload URL.');
+      }
+
+      // Deliberately a bare Dio instance, not the shared authenticated
+      // client — a presigned S3 PUT must carry exactly the headers it was
+      // signed with (Content-Type only); our bearer token / base URL
+      // interceptor has no business on a request to S3.
+      await Dio().put<void>(
+        uploadUrl,
+        data: Stream.fromIterable([bytes]),
+        options: Options(
+          headers: {'Content-Type': contentType, 'content-length': bytes.length},
+        ),
+      );
+
+      return publicUrl;
+    } on DioException catch (e) {
+      throw ApiException(_extractErrorMessage(e));
+    }
+  }
+
   AuthResponseModel _parseAuthResponse(dynamic json) {
     final data = json['data'] ?? json;
     final token = data['token'] ?? data['accessToken'] ?? '';
@@ -283,6 +340,10 @@ class HttpAuthRepository implements AuthRepository {
   UserModel _parseUserModel(dynamic json) {
     final roleStr = json['role']?.toString().toLowerCase() ?? 'farmer';
     final statusStr = json['status']?.toString().toUpperCase() ?? 'PENDING_VERIFICATION';
+    // toSafeUser() on the backend nests role-specific fields under `profile`
+    // (farmRegion, businessName, truckCapacity, photoUrl, ...) — falling back
+    // to flat top-level keys too in case a caller ever sends a flattened shape.
+    final profile = (json['profile'] as Map?)?.cast<String, dynamic>() ?? const {};
 
     return UserModel(
       id: json['id']?.toString() ?? '',
@@ -291,11 +352,12 @@ class HttpAuthRepository implements AuthRepository {
       phone: json['phone']?.toString() ?? '',
       role: _stringToUserRole(roleStr),
       status: _stringToAccountStatus(statusStr),
-      region: json['region']?.toString(),
-      businessName: json['businessName']?.toString(),
-      businessType: json['businessType']?.toString(),
-      vehicleCapacity: json['vehicleCapacity']?.toString(),
-      operatingRegion: json['operatingRegion']?.toString(),
+      region: (profile['farmRegion'] ?? json['region'])?.toString(),
+      businessName: (profile['businessName'] ?? json['businessName'])?.toString(),
+      businessType: (profile['businessType'] ?? json['businessType'])?.toString(),
+      vehicleCapacity: (profile['truckCapacity'] ?? json['vehicleCapacity'])?.toString(),
+      operatingRegion: (profile['operatingRegion'] ?? json['operatingRegion'])?.toString(),
+      photoUrl: (profile['photoUrl'] ?? json['photoUrl'])?.toString(),
     );
   }
 
@@ -467,6 +529,16 @@ class MockAuthRepository implements AuthRepository {
   Future<String> resolveMomoAccount({required String accountNumber, required String bankCode}) async {
     await _simulateLatency();
     return 'Mock Account Holder';
+  }
+
+  @override
+  Future<String> uploadProfilePhoto({
+    required List<int> bytes,
+    required String fileName,
+    required String contentType,
+  }) async {
+    await _simulateLatency();
+    throw const ApiException('Photo upload is not available in offline/mock mode.');
   }
 
   AuthResponseModel _tokensFor(UserModel user) {

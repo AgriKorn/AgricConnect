@@ -16,14 +16,12 @@ class ActiveShipment {
     required this.itemName,
     required this.status,
     required this.escrowTotal,
+    required this.hasOwnTransport,
     this.farmerName,
     this.farmerInitials,
     this.farmerLocation,
-    this.etaMinutes,
     this.driverName,
-    this.driverRating,
-    this.driverVehicle,
-    this.transitProgress,
+    this.driverPhone,
   });
 
   final String id;
@@ -31,17 +29,17 @@ class ActiveShipment {
   final String itemName;
   final BuyerOrderStatus status;
   final double escrowTotal;
+  /// True for self-collect orders — no driver is ever assigned to these.
+  final bool hasOwnTransport;
   final String? farmerName;
   final String? farmerInitials;
   final String? farmerLocation;
 
-  /// Live-tracking fields (Order Tracking screen) — only populated for
-  /// shipments that are actually en route.
-  final int? etaMinutes;
+  /// The driver who accepted this delivery — null until one has. There's no
+  /// ETA, rating, or vehicle data anywhere in the system (no live GPS, no
+  /// review system), so those aren't modeled here rather than faked.
   final String? driverName;
-  final double? driverRating;
-  final String? driverVehicle;
-  final double? transitProgress;
+  final String? driverPhone;
 }
 
 class OrderHistoryEntry {

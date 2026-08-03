@@ -31,6 +31,7 @@ class MarketplaceListing {
     this.farmerId,
     this.quantityAvailable,
     this.imageAsset,
+    this.imageUrl,
   });
 
   final String id;
@@ -43,6 +44,8 @@ class MarketplaceListing {
   final String? farmerId;
   final double? quantityAvailable;
   final String? imageAsset;
+  /// Real S3 photo the farmer uploaded for this listing, if any.
+  final String? imageUrl;
 }
 
 const mockMarketplaceListings = [

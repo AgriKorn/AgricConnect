@@ -382,7 +382,9 @@ class _OrderItemRow extends StatelessWidget {
           child: SizedBox(
             width: 64,
             height: 64,
-            child: listing.imageAsset != null
+            child: listing.imageUrl != null
+                ? Image.network(listing.imageUrl!, fit: BoxFit.cover)
+                : listing.imageAsset != null
                 ? Image.asset(listing.imageAsset!, fit: BoxFit.cover)
                 : DecoratedBox(
                     decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest),

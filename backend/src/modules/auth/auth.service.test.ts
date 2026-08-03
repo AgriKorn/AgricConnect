@@ -101,6 +101,80 @@ describe('AuthService', () => {
       expect(result.userId).toBe('new-user-uuid');
       expect(result.message).toContain('Registration successful');
     });
+
+    it("should pass the farmer's chosen region through instead of defaulting silently", async () => {
+      mockUserRepo.findByPhone.mockResolvedValue(null);
+      mockUserRepo.findByEmail.mockResolvedValue(null);
+      mockUserRepo.create.mockResolvedValue(createMockUser());
+
+      await authService.register({
+        name: 'Ama Boateng',
+        phone: '+233541234567',
+        email: 'ama@example.com',
+        password: 'Password123',
+        role: 'farmer',
+        region: 'Ashanti',
+      });
+
+      expect(mockUserRepo.create).toHaveBeenCalledWith(expect.objectContaining({ region: 'Ashanti' }));
+    });
+
+    it("should convert a driver's tonnes entry to kg instead of storing the raw number", async () => {
+      mockUserRepo.findByPhone.mockResolvedValue(null);
+      mockUserRepo.findByEmail.mockResolvedValue(null);
+      mockUserRepo.create.mockResolvedValue(createMockUser());
+
+      await authService.register({
+        name: 'Kojo Driver',
+        phone: '+233541234567',
+        email: 'kojo@example.com',
+        password: 'Password123',
+        role: 'driver',
+        operatingRegion: 'Northern',
+        vehicleCapacity: '2 tonnes',
+      });
+
+      expect(mockUserRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ operatingRegion: 'Northern', vehicleCapacityKg: 2000 }),
+      );
+    });
+
+    it('should leave vehicleCapacityKg undefined when the free-text entry has no usable number', async () => {
+      mockUserRepo.findByPhone.mockResolvedValue(null);
+      mockUserRepo.findByEmail.mockResolvedValue(null);
+      mockUserRepo.create.mockResolvedValue(createMockUser());
+
+      await authService.register({
+        name: 'Kojo Driver',
+        phone: '+233541234567',
+        email: 'kojo@example.com',
+        password: 'Password123',
+        role: 'driver',
+        vehicleCapacity: 'a big truck',
+      });
+
+      expect(mockUserRepo.create).toHaveBeenCalledWith(expect.objectContaining({ vehicleCapacityKg: undefined }));
+    });
+
+    it("should pass the buyer's business info through", async () => {
+      mockUserRepo.findByPhone.mockResolvedValue(null);
+      mockUserRepo.findByEmail.mockResolvedValue(null);
+      mockUserRepo.create.mockResolvedValue(createMockUser({ role: 'buyer', status: 'ACTIVE' }));
+
+      await authService.register({
+        name: 'Efua Buyer',
+        phone: '+233541234567',
+        email: 'efua@example.com',
+        password: 'Password123',
+        role: 'buyer',
+        businessName: 'Efua Fresh Produce',
+        businessType: 'Retailer',
+      });
+
+      expect(mockUserRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ businessName: 'Efua Fresh Produce', businessType: 'Retailer' }),
+      );
+    });
   });
 
   describe('login', () => {

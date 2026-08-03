@@ -1,4 +1,5 @@
 import { NotFoundError } from '../../utils/errors';
+import { s3Service, PresignedUploadUrlResult } from '../../services/s3.service';
 import { IUserRepository } from './user.repository';
 import { userRepository } from './user.repository.prisma';
 import { SafeUser, toSafeUser } from './user.types';
@@ -6,6 +7,14 @@ import { UpdateProfileInput } from './user.schema';
 
 export class UserService {
   constructor(private readonly users: IUserRepository) {}
+
+  /** Presigned S3 PUT URL for a profile photo — the client uploads directly to
+   * S3, then confirms via PATCH /profile { photoUrl: publicUrl } once the
+   * upload succeeds. Nothing is persisted here.
+   */
+  getPhotoUploadUrl(fileName: string, contentType: string): Promise<PresignedUploadUrlResult> {
+    return s3Service.generatePublicUploadUrl(fileName, contentType);
+  }
 
   async getProfile(userId: string): Promise<SafeUser> {
     const user = await this.users.findById(userId);

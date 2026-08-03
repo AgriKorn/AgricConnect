@@ -18,6 +18,7 @@ import disputeRoutes from './modules/dispute/dispute.routes';
 import notificationRoutes from './modules/notification/notification.routes';
 import paymentRoutes from './modules/payment/payment.routes';
 import addressRoutes from './modules/address/address.routes';
+import dashboardRoutes from './modules/dashboard/dashboard.routes';
 
 const app = express();
 
@@ -116,6 +117,7 @@ app.use('/api/disputes', disputeRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/users/addresses', addressRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // --------------- Unmatched Routes ---------------
 // Without this, an unknown path falls through to Express's default handler and

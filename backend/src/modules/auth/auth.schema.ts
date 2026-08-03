@@ -40,6 +40,15 @@ export const registerSchema = z.object({
     email: emailSchema,
     password: z.string().min(8, 'Password must be at least 8 characters'),
     role: roleSchema,
+    // Role-specific, all optional here (buyers don't send region; farmers
+    // don't send business info) — previously accepted by nothing in this
+    // schema and silently stripped, so every registration defaulted to a
+    // hardcoded region regardless of what was actually picked.
+    region: z.string().trim().min(1).optional(), // Farmer
+    businessName: z.string().trim().min(1).optional(), // Buyer
+    businessType: z.string().trim().min(1).optional(), // Buyer
+    operatingRegion: z.string().trim().min(1).optional(), // Driver
+    vehicleCapacity: z.string().trim().min(1).optional(), // Driver — free text, parsed in AuthService
   }),
 });
 

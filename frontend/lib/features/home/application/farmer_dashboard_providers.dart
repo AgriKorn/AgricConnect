@@ -2,13 +2,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../marketplace/data/marketplace_repository.dart';
 import '../data/farmer_dashboard_mock.dart';
+import '../data/farmer_dashboard_repository.dart';
+import '../data/weather_repository.dart';
 
-final farmerDashboardSummaryProvider = Provider<FarmerDashboardSummary>((ref) {
-  return mockDashboardSummary;
+/// Real dashboard/profile numbers (earnings, active orders, sales, primary
+/// crops, market trend) — GET /dashboard/farmer-summary.
+final farmerDashboardSummaryProvider = FutureProvider<FarmerDashboardSummary>((ref) {
+  return ref.read(farmerDashboardRepositoryProvider).fetchSummary();
 });
 
-final farmerProfileDetailsProvider = Provider<FarmerProfileDetails>((ref) {
-  return mockFarmerProfileDetails;
+/// Real current weather for the farmer's own region (Open-Meteo, no API
+/// key). Best-effort — a weather outage shouldn't break the dashboard, so
+/// this resolves to null rather than throwing.
+final farmerWeatherProvider = FutureProvider<WeatherSnapshot?>((ref) async {
+  final summary = await ref.watch(farmerDashboardSummaryProvider.future);
+  final (lat, long) = coordinatesForRegion(summary.location);
+  try {
+    return await ref.read(weatherRepositoryProvider).fetchCurrent(lat: lat, long: long);
+  } catch (_) {
+    return null;
+  }
 });
 
 /// Backed by GET/POST /listings — a farmer's real, persisted listings.
@@ -26,6 +39,7 @@ class FarmerListingsController extends AsyncNotifier<List<FarmerListingSummary>>
     required double farmerLat,
     required double farmerLong,
     required double pricePerKg,
+    String? imageUrl,
   }) async {
     await ref.read(marketplaceRepositoryProvider).createListing(
           cropType: cropType,
@@ -35,7 +49,14 @@ class FarmerListingsController extends AsyncNotifier<List<FarmerListingSummary>>
           farmerLat: farmerLat,
           farmerLong: farmerLong,
           pricePerKg: pricePerKg,
+          imageUrl: imageUrl,
         );
+    ref.invalidateSelf();
+    await future;
+  }
+
+  Future<void> deleteListing(String id) async {
+    await ref.read(marketplaceRepositoryProvider).deleteListing(id);
     ref.invalidateSelf();
     await future;
   }
@@ -45,6 +66,11 @@ final farmerListingsProvider = AsyncNotifierProvider<FarmerListingsController, L
   FarmerListingsController.new,
 );
 
-final freshnessAlertsProvider = Provider<List<FreshnessAlertItem>>((ref) {
-  return mockFreshnessAlerts;
+/// Real low-freshness listings pulled straight from the farmer's own active
+/// listings — replaces the old fixed 2-item mock that never matched what
+/// was actually listed.
+final freshnessAlertsProvider = Provider<List<FarmerListingSummary>>((ref) {
+  final listings = ref.watch(farmerListingsProvider).valueOrNull ?? const [];
+  return listings.where((l) => l.status == 'Active' && l.freshnessScore < 60).toList()
+    ..sort((a, b) => a.freshnessScore.compareTo(b.freshnessScore));
 });

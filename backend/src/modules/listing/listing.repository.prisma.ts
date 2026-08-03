@@ -1,5 +1,4 @@
 import { prisma } from '../../config/db';
-import { BadRequestError } from '../../utils/errors';
 import { CreateListingRecord, IListingRepository, ListingFilters, UpdateListingRecord } from './listing.repository';
 import { Listing } from './listing.types';
 import { Prisma } from '../../generated/prisma/client';
@@ -17,6 +16,7 @@ const mapPrismaToListing = (p: any): Listing => ({
   pricePerKg: Number(p.listed_price),
   listingHash: p.listing_hash ? p.listing_hash.trim() : '',
   qrCodeData: p.qr_code_data || '',
+  imageUrl: p.photo_url || undefined,
   status: p.status === 'sold' ? 'SOLD' : p.status === 'active' ? 'ACTIVE' : 'INACTIVE',
   createdAt: p.created_at,
   updatedAt: p.updated_at,
@@ -24,14 +24,20 @@ const mapPrismaToListing = (p: any): Listing => ({
 
 export class PrismaListingRepository implements IListingRepository {
   async create(data: CreateListingRecord): Promise<Listing> {
-    const crop = await prisma.crop_types.findFirst({
+    // Add Listing is a free-text "Crop / Produce Name" field, not a picker
+    // bound to this lookup table — rejecting anything not already seeded
+    // (mango, okra, groundnut, ...) was blocking real produce a farmer
+    // actually grows. Reuse an existing row case-insensitively so "Tomato"
+    // and "tomato" don't fork into duplicates; only create a new one
+    // (always lowercased, for consistency) when it's genuinely new.
+    let crop = await prisma.crop_types.findFirst({
       where: { name: { equals: data.cropType, mode: 'insensitive' } },
     });
 
     if (!crop) {
-      const validCrops = await prisma.crop_types.findMany({ select: { name: true } });
-      const cropList = validCrops.map((c) => c.name).join(', ');
-      throw new BadRequestError(`Unknown crop type '${data.cropType}'. Valid choices are: ${cropList}`);
+      crop = await prisma.crop_types.create({
+        data: { name: data.cropType.trim().toLowerCase() },
+      });
     }
 
     const created = await prisma.produce_listings.create({
@@ -50,6 +56,7 @@ export class PrismaListingRepository implements IListingRepository {
         listed_price: new Prisma.Decimal(data.pricePerKg),
         listing_hash: data.listingHash,
         qr_code_data: data.qrCodeData,
+        ...(data.imageUrl && { photo_url: data.imageUrl }),
         status: 'active',
       },
       include: { crop_types: true },
@@ -59,8 +66,11 @@ export class PrismaListingRepository implements IListingRepository {
   }
 
   async findManyByFarmer(farmerId: string): Promise<Listing[]> {
+    // Excludes 'cancelled' (soft-deleted) — otherwise a deleted listing maps
+    // to the generic INACTIVE status and reappears mislabeled as "Pending"
+    // instead of actually disappearing from the farmer's own list.
     const list = await prisma.produce_listings.findMany({
-      where: { farmer_id: farmerId },
+      where: { farmer_id: farmerId, status: { not: 'cancelled' } },
       include: { crop_types: true },
       orderBy: { created_at: 'desc' },
     });

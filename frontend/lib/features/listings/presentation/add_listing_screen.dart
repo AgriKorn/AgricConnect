@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/utils/freshness.dart';
+import '../../../core/widgets/agri_bottom_sheet.dart';
 import '../../../core/widgets/agri_toast.dart';
 import '../../auth/presentation/widgets/auth_visuals.dart';
 import '../../home/application/farmer_dashboard_providers.dart';
@@ -33,6 +35,7 @@ class AddListingScreen extends ConsumerStatefulWidget {
 
 class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _imagePicker = ImagePicker();
   late final TextEditingController _nameController;
   late final TextEditingController _priceController;
   late final TextEditingController _quantityController;
@@ -40,6 +43,8 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   late final TextEditingController _descriptionController;
   late double _freshnessScore;
   String? _tag;
+  String? _imageUrl;
+  bool _uploadingPhoto = false;
   bool _submitting = false;
   String? _error;
 
@@ -72,6 +77,51 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
     super.dispose();
   }
 
+  Future<void> _pickPhoto() async {
+    final source = await showAgriBottomSheet<ImageSource>(
+      context,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.photo_camera_outlined),
+            title: const Text('Take a photo'),
+            onTap: () => Navigator.of(context).pop(ImageSource.camera),
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library_outlined),
+            title: const Text('Choose from gallery'),
+            onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+          ),
+        ],
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    final picked = await _imagePicker.pickImage(source: source, maxWidth: 1600, imageQuality: 85);
+    if (picked == null || !mounted) return;
+
+    setState(() => _uploadingPhoto = true);
+    try {
+      final bytes = await picked.readAsBytes();
+      final ext = picked.name.contains('.') ? picked.name.split('.').last.toLowerCase() : 'jpg';
+      final contentType = ext == 'png' ? 'image/png' : 'image/jpeg';
+
+      final publicUrl = await ref.read(marketplaceRepositoryProvider).uploadListingPhoto(
+            bytes: bytes,
+            fileName: picked.name,
+            contentType: contentType,
+          );
+
+      if (!mounted) return;
+      setState(() => _imageUrl = publicUrl);
+    } on ApiException catch (e) {
+      if (mounted) showAgriToast(context, e.message);
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
@@ -99,6 +149,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
             farmerLat: lat,
             farmerLong: long,
             pricePerKg: double.parse(_priceController.text.trim()),
+            imageUrl: _imageUrl,
           );
 
       if (!mounted) return;
@@ -165,6 +216,15 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          AuthFieldLabel('Photo', colorScheme),
+                          const SizedBox(height: 8),
+                          _PhotoPicker(
+                            colorScheme: colorScheme,
+                            imageUrl: _imageUrl,
+                            uploading: _uploadingPhoto,
+                            onTap: _uploadingPhoto ? null : _pickPhoto,
+                          ),
+                          const SizedBox(height: 16),
                           AuthFieldLabel('Crop / Produce Name', colorScheme),
                           const SizedBox(height: 8),
                           AuthTextField(
@@ -322,6 +382,74 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PhotoPicker extends StatelessWidget {
+  const _PhotoPicker({
+    required this.colorScheme,
+    required this.imageUrl,
+    required this.uploading,
+    required this.onTap,
+  });
+
+  final ColorScheme colorScheme;
+  final String? imageUrl;
+  final bool uploading;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 160,
+        width: double.infinity,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
+        ),
+        child: uploading
+            ? const Center(child: CircularProgressIndicator())
+            : imageUrl != null
+            ? Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(imageUrl!, fit: BoxFit.cover),
+                  Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.55),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Text(
+                        'Change photo',
+                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add_a_photo_outlined, color: colorScheme.onSurfaceVariant, size: 26),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Add a photo of your produce',
+                      style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12.5, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
       ),
     );
   }

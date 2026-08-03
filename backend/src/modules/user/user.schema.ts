@@ -18,11 +18,30 @@ export const updateProfileSchema = z.object({
     }).optional(),
     // Buyer
     businessName: z.string().optional(),
+    businessType: z.string().optional(),
     deliveryAddress: z.string().optional(),
     // Driver
     truckCapacity: z.number().positive('Truck capacity must be positive').optional(),
     operatingRegion: z.string().optional(),
     isAvailable: z.boolean().optional(),
+    // Shared — set after a successful photo upload (see photoUploadUrlSchema)
+    photoUrl: z.string().url().optional(),
+    // Shared — full object sent on every toggle flip, not a partial patch
+    notificationPreferences: z
+      .object({
+        orderStatusUpdates: z.boolean().optional(),
+        priceAlerts: z.boolean().optional(),
+        freshnessNotifications: z.boolean().optional(),
+        marketingOffers: z.boolean().optional(),
+      })
+      .optional(),
+  }),
+});
+
+export const photoUploadUrlSchema = z.object({
+  body: z.object({
+    fileName: z.string().min(1, 'fileName is required'),
+    contentType: z.string().regex(/^image\//, 'contentType must be an image MIME type'),
   }),
 });
 

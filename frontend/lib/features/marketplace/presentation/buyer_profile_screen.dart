@@ -8,6 +8,8 @@ import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/edit_profile_screen.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/help_support_screen.dart';
+import '../../../core/widgets/privacy_policy_screen.dart';
+import '../../../core/widgets/user_avatar.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/models/account_status.dart';
 import '../application/buyer_profile_providers.dart';
@@ -27,35 +29,14 @@ void _openComingSoon(BuildContext context, String title, IconData icon) {
   );
 }
 
-Widget Function(double size) _buyerAvatarBuilder(BuyerProfileDetails profile) {
-  return (size) => Builder(
-        builder: (context) {
-          final colorScheme = Theme.of(context).colorScheme;
-          return ClipOval(
-            child: ColoredBox(
-              color: colorScheme.primary,
-              child: Center(
-                child: Text(
-                  profile.initials,
-                  style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w800, fontSize: size * 0.34),
-                ),
-              ),
-            ),
-          );
-        },
-      );
-}
-
 void _openBuyerAccountSettings(BuildContext context, BuyerProfileDetails profile, bool verified) {
   Navigator.of(context).push(
     MaterialPageRoute(
       builder: (context) => AccountSettingsScreen(
-        avatarBuilder: _buyerAvatarBuilder(profile),
         roleBadgeLabel: verified ? 'Verified Buyer' : 'Buyer',
         onHelpTap: () => _openBuyerHelp(context),
         locationLabel: 'Location',
         locationHint: 'e.g. Accra, Ghana',
-        bioHint: 'Tell farmers about your business...',
         verifiedSubtitle: 'Your profile badge is visible to all farmers.',
       ),
     ),
@@ -66,10 +47,8 @@ void _openBuyerEditProfile(BuildContext context, BuyerProfileDetails profile) {
   Navigator.of(context).push(
     MaterialPageRoute(
       builder: (context) => EditProfileScreen(
-        avatarBuilder: _buyerAvatarBuilder(profile),
         locationLabel: 'Location',
         locationHint: 'e.g. Accra, Ghana',
-        bioHint: 'Tell farmers about your business...',
         verifiedSubtitle: 'Your profile badge is visible to all farmers.',
       ),
     ),
@@ -116,7 +95,13 @@ class BuyerProfileScreen extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final profile = ref.watch(buyerProfileProvider);
     final addressesAsync = ref.watch(deliveryAddressesProvider);
-    final preferences = ref.watch(buyerPreferencesProvider);
+    final preferences = ref.watch(buyerPreferencesProvider).valueOrNull ??
+        const BuyerPreferences(
+          orderStatusUpdates: true,
+          priceAlerts: true,
+          freshnessNotifications: false,
+          marketingOffers: false,
+        );
     final verified = ref.watch(authControllerProvider).user?.status == AccountStatus.verified;
     final themeMode = ref.watch(themeModeControllerProvider);
 
@@ -279,7 +264,9 @@ class BuyerProfileScreen extends ConsumerWidget {
                           colorScheme: colorScheme,
                           icon: Icons.verified_user_outlined,
                           label: 'Privacy Policy',
-                          onTap: () => _openComingSoon(context, 'Privacy Policy', Icons.verified_user_outlined),
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()),
+                          ),
                           isLast: true,
                         ),
                       ],
@@ -332,14 +319,7 @@ class _ProfileHero extends StatelessWidget {
             offset: const Offset(0, -8),
             child: Column(
               children: [
-                CircleAvatar(
-                  radius: 52,
-                  backgroundColor: colorScheme.primary,
-                  child: Text(
-                    profile.initials,
-                    style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w800, fontSize: 30),
-                  ),
-                ),
+                const SizedBox(width: 104, height: 104, child: UserAvatar(size: 104)),
                 const SizedBox(height: 16),
                 Text(
                   profile.name,
