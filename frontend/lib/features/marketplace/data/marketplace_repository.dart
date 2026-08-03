@@ -25,6 +25,11 @@ const _regionCoordinates = {
 
 abstract class MarketplaceRepository {
   Future<List<MarketplaceListing>> fetchListings();
+
+  /// GET /marketplace/:id — full detail (farmer name/region, quantity,
+  /// shelf life) for the product detail screen.
+  Future<MarketplaceListingDetail> fetchListingDetail(String id);
+
   Future<List<FarmerListingSummary>> fetchMyListings();
   Future<FarmerListingSummary> createListing({
     required String cropType,
@@ -60,15 +65,22 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
       final response = await _dio.get(ApiEndpoints.marketplace);
       final data = response.data['data'];
       final rawList = data?['listings'] as List? ?? [];
-
-      if (rawList.isEmpty) {
-        return mockMarketplaceListings;
-      }
-
       return rawList.map((item) => _parseListing(item)).toList();
-    } catch (_) {
-      // Fallback to initial seed mock listings if network is offline
-      return mockMarketplaceListings;
+    } on DioException catch (e) {
+      final serverMessage = e.response?.data?['error']?['message']?.toString();
+      throw ApiException(serverMessage ?? e.message ?? 'Failed to load the marketplace.');
+    }
+  }
+
+  @override
+  Future<MarketplaceListingDetail> fetchListingDetail(String id) async {
+    try {
+      final response = await _dio.get('${ApiEndpoints.marketplace}/$id');
+      final item = response.data['data'] ?? response.data;
+      return _parseListingDetail(item);
+    } on DioException catch (e) {
+      final serverMessage = e.response?.data?['error']?['message']?.toString();
+      throw ApiException(serverMessage ?? e.message ?? 'Failed to load this listing.');
     }
   }
 
@@ -190,6 +202,25 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
       farmerId: json['farmerId']?.toString(),
       quantityAvailable: double.tryParse(json['quantityKg']?.toString() ?? ''),
       imageUrl: json['imageUrl']?.toString(),
+    );
+  }
+
+  MarketplaceListingDetail _parseListingDetail(dynamic json) {
+    final cropType = json['cropType']?.toString() ?? 'crop';
+
+    return MarketplaceListingDetail(
+      id: json['id']?.toString() ?? '',
+      name: cropType.isEmpty ? cropType : cropType[0].toUpperCase() + cropType.substring(1),
+      category: _stringToCategory((json['cropCategory'] ?? cropType).toString().toUpperCase()),
+      freshnessScore: double.tryParse(json['freshnessScore']?.toString() ?? '')?.round() ?? 0,
+      pricePerUnit: double.tryParse(json['pricePerKg']?.toString() ?? '') ?? 0,
+      unit: 'kg',
+      quantityAvailable: double.tryParse(json['quantityKg']?.toString() ?? ''),
+      shelfLifeDays: int.tryParse(json['shelfLifeDays']?.toString() ?? ''),
+      imageUrl: json['imageUrl']?.toString(),
+      farmerName: json['farmerName']?.toString() ?? 'Local Farmer',
+      farmerId: json['farmerId']?.toString(),
+      farmerRegion: json['farmerRegion']?.toString(),
     );
   }
 

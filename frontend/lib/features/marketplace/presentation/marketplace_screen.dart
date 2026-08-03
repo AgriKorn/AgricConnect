@@ -11,15 +11,27 @@ import '../../../core/widgets/user_avatar.dart';
 import '../../checkout/presentation/checkout_screen.dart';
 import '../application/marketplace_providers.dart';
 import '../data/marketplace_mock.dart';
+import 'product_detail_screen.dart';
+
+/// 2 columns fits a phone; wider viewports (tablet, and the real Flutter Web
+/// build this app also ships) get more columns instead of a couple of tiles
+/// stretched across a mostly-empty row.
+int _crossAxisCountFor(double width) {
+  if (width >= 1100) return 5;
+  if (width >= 800) return 4;
+  if (width >= 560) return 3;
+  return 2;
+}
 
 /// Buyer Marketplace (design system section 7): brand header + avatar ->
-/// search + sort -> category chips -> a 2-column grid of listings.
+/// search + sort -> category chips -> a responsive grid of listings.
 class MarketplaceScreen extends ConsumerWidget {
   const MarketplaceScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
+    final listingsAsync = ref.watch(marketplaceListingsProvider);
     final listings = ref.watch(filteredMarketplaceListingsProvider);
     final selected = ref.watch(selectedMarketplaceListingsProvider);
 
@@ -53,23 +65,50 @@ class MarketplaceScreen extends ConsumerWidget {
                   child: _CategoryChips(colorScheme: colorScheme),
                 ),
                 Expanded(
-                  child: listings.isEmpty
-                      ? const EmptyState(
-                          icon: Icons.search_off_rounded,
-                          message: 'No produce matches your search.',
-                        )
-                      : GridView.builder(
-                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 14,
-                            crossAxisSpacing: 14,
-                            childAspectRatio: 0.74,
+                  child: RefreshIndicator(
+                    onRefresh: () => ref.refresh(marketplaceListingsProvider.future),
+                    child: listingsAsync.when(
+                      loading: () => ListView(
+                        children: const [
+                          SizedBox(height: 120),
+                          Center(child: CircularProgressIndicator()),
+                        ],
+                      ),
+                      error: (error, _) => ListView(
+                        children: [
+                          const SizedBox(height: 60),
+                          EmptyState(
+                            icon: Icons.wifi_off_rounded,
+                            message: 'Could not load the marketplace. Pull down to retry.',
                           ),
-                          itemCount: listings.length,
-                          itemBuilder: (context, index) =>
-                              _ListingTile(listing: listings[index], colorScheme: colorScheme),
-                        ),
+                        ],
+                      ),
+                      data: (_) => listings.isEmpty
+                          ? ListView(
+                              children: const [
+                                SizedBox(height: 60),
+                                EmptyState(
+                                  icon: Icons.search_off_rounded,
+                                  message: 'No produce matches your search.',
+                                ),
+                              ],
+                            )
+                          : LayoutBuilder(
+                              builder: (context, constraints) => GridView.builder(
+                                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: _crossAxisCountFor(constraints.maxWidth),
+                                  mainAxisSpacing: 14,
+                                  crossAxisSpacing: 14,
+                                  childAspectRatio: 0.74,
+                                ),
+                                itemCount: listings.length,
+                                itemBuilder: (context, index) =>
+                                    _ListingTile(listing: listings[index], colorScheme: colorScheme),
+                              ),
+                            ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -333,6 +372,14 @@ class _ListingTile extends ConsumerWidget {
     final freshness = freshnessColorFor(listing.freshnessScore, Theme.of(context).brightness);
     final accent = colorScheme.primary;
     final selected = ref.watch(selectedMarketplaceListingsProvider).contains(listing);
+
+    void toggleSelected() {
+      final notifier = ref.read(selectedMarketplaceListingsProvider.notifier);
+      final next = Set<MarketplaceListing>.from(notifier.state);
+      if (!next.remove(listing)) next.add(listing);
+      notifier.state = next;
+    }
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
@@ -343,12 +390,9 @@ class _ListingTile extends ConsumerWidget {
         child: Material(
           color: colorScheme.surface.withValues(alpha: 0.6),
           child: InkWell(
-            onTap: () {
-              final notifier = ref.read(selectedMarketplaceListingsProvider.notifier);
-              final next = Set<MarketplaceListing>.from(notifier.state);
-              if (!next.remove(listing)) next.add(listing);
-              notifier.state = next;
-            },
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => ProductDetailScreen(listingId: listing.id)),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -356,7 +400,9 @@ class _ListingTile extends ConsumerWidget {
                   child: Stack(
                     children: [
                       Positioned.fill(
-                        child: listing.imageAsset != null
+                        child: listing.imageUrl != null
+                            ? Image.network(listing.imageUrl!, fit: BoxFit.cover)
+                            : listing.imageAsset != null
                             ? Image.asset(listing.imageAsset!, fit: BoxFit.cover)
                             : DecoratedBox(
                                 decoration: BoxDecoration(
@@ -390,17 +436,30 @@ class _ListingTile extends ConsumerWidget {
                           ),
                         ),
                       ),
-                      if (selected)
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(color: colorScheme.primary, shape: BoxShape.circle),
-                            child: Icon(Icons.check_rounded, size: 16, color: colorScheme.onPrimary),
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(999),
+                            onTap: toggleSelected,
+                            child: Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: selected ? colorScheme.primary : Colors.black.withValues(alpha: 0.4),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                selected ? Icons.check_rounded : Icons.add_shopping_cart_rounded,
+                                size: 15,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
                         ),
+                      ),
                     ],
                   ),
                 ),

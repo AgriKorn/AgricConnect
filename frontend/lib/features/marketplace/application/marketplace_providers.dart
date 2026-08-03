@@ -13,10 +13,18 @@ extension ListingSortX on ListingSort {
   };
 }
 
-/// Fetches produce listings directly from live AWS API / fallback repository
+/// Real active listings from GET /marketplace.
 final marketplaceListingsProvider = FutureProvider<List<MarketplaceListing>>((ref) async {
   final repository = ref.watch(marketplaceRepositoryProvider);
   return repository.fetchListings();
+});
+
+/// Real single-listing detail from GET /marketplace/:id, for the product
+/// detail screen — farmer name/region, quantity, shelf life.
+final marketplaceListingDetailProvider =
+    FutureProvider.family<MarketplaceListingDetail, String>((ref, id) async {
+  final repository = ref.watch(marketplaceRepositoryProvider);
+  return repository.fetchListingDetail(id);
 });
 
 /// null means "All Crops".
@@ -30,16 +38,16 @@ final marketplaceSortProvider = StateProvider<ListingSort>((ref) => ListingSort.
 /// cart button that takes them all to checkout together.
 final selectedMarketplaceListingsProvider = StateProvider<Set<MarketplaceListing>>((ref) => {});
 
+/// Filtered/sorted view over whatever [marketplaceListingsProvider] currently
+/// holds. Deliberately doesn't fall back to placeholder data while loading or
+/// on error — [marketplace_screen.dart] renders those states itself from
+/// [marketplaceListingsProvider] directly, so this only needs to handle the
+/// real (possibly stale-while-refetching) list.
 final filteredMarketplaceListingsProvider = Provider<List<MarketplaceListing>>((ref) {
   final category = ref.watch(marketplaceCategoryFilterProvider);
   final query = ref.watch(marketplaceSearchQueryProvider).trim().toLowerCase();
   final sort = ref.watch(marketplaceSortProvider);
-  final listingsAsync = ref.watch(marketplaceListingsProvider);
-
-  final rawList = listingsAsync.maybeWhen(
-    data: (list) => list,
-    orElse: () => mockMarketplaceListings,
-  );
+  final rawList = ref.watch(marketplaceListingsProvider).valueOrNull ?? const <MarketplaceListing>[];
 
   final result = rawList
       .where((listing) => category == null || listing.category == category)
