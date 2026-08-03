@@ -128,7 +128,10 @@ class _DashboardHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const UserAvatar(size: 52),
+        GestureDetector(
+          onTap: () => context.go('/farmer/profile'),
+          child: const SizedBox(width: 52, height: 52, child: UserAvatar(size: 52)),
+        ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(

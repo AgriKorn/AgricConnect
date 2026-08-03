@@ -4,7 +4,6 @@ import { env } from '../../config/env';
 import {
   AccountPendingApprovalError,
   AccountRejectedError,
-  BadRequestError,
   ConflictError,
   InvalidTokenError,
   NotFoundError,

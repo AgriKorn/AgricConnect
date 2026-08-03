@@ -70,6 +70,33 @@ describe('ListingService', () => {
       expect(mockRepo.create).toHaveBeenCalledWith(expect.objectContaining({ farmerId: 'farmer-1', cropType: 'tomato' }));
       expect(result).toEqual(mockListing);
     });
+
+    it('should still return the created listing when the audit write fails', async () => {
+      // Regression: listings commit to their repository before the audit entry
+      // is attempted, so rethrowing here returned a 500 for a listing that had
+      // in fact been created — farmers retried and produced duplicates.
+      jest.spyOn(auditService, 'log').mockRejectedValue(new Error('audit database unreachable'));
+
+      const input = {
+        cropType: 'tomato',
+        quantityKg: 200,
+        freshnessScore: 90,
+        shelfLifeDays: 7,
+        farmerLat: 5.6,
+        farmerLong: -0.18,
+        pricePerKg: 10.0,
+        listingHash: 'hash-1',
+        qrCodeData: 'hash-1',
+      };
+
+      const mockListing = { id: '00000000-0000-0000-0000-000000000001', farmerId: 'farmer-1', ...input, cropCategory: 'vegetables', status: 'ACTIVE' as const, createdAt: new Date(), updatedAt: new Date() };
+      mockRepo.create.mockResolvedValue(mockListing);
+
+      const result = await listingService.createListing(input, 'farmer-1');
+
+      expect(result).toEqual(mockListing);
+      expect(auditService.log).toHaveBeenCalled();
+    });
   });
 
   describe('updateListing', () => {

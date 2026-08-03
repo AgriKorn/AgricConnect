@@ -1,7 +1,7 @@
 import { prisma } from '../../config/db';
 import { CreateListingRecord, IListingRepository, ListingFilters, UpdateListingRecord } from './listing.repository';
 import { Listing } from './listing.types';
-import { listing_status, Prisma } from '../../generated/prisma/client';
+import { Prisma } from '../../generated/prisma/client';
 
 const mapPrismaToListing = (p: any): Listing => ({
   id: p.id,

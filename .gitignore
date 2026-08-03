@@ -54,6 +54,9 @@ frontend/android/app/profile
 frontend/android/app/release
 AgriConnect-Android-Release/
 
+# Claude Code local settings
+.claude/
+
 # Node modules
 node_modules/
 

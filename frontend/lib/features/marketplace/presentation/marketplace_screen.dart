@@ -7,7 +7,7 @@ import '../../../core/utils/freshness.dart';
 import '../../../core/widgets/agri_bottom_sheet.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/empty_state.dart';
-import '../../auth/application/auth_controller.dart';
+import '../../../core/widgets/user_avatar.dart';
 import '../../checkout/presentation/checkout_screen.dart';
 import '../application/marketplace_providers.dart';
 import '../data/marketplace_mock.dart';
@@ -21,7 +21,6 @@ class MarketplaceScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final listings = ref.watch(filteredMarketplaceListingsProvider);
-    final userName = ref.watch(authControllerProvider).user?.name;
     final selected = ref.watch(selectedMarketplaceListingsProvider);
 
     return Scaffold(
@@ -43,7 +42,7 @@ class MarketplaceScreen extends ConsumerWidget {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                  child: _MarketplaceHeader(colorScheme: colorScheme, userName: userName),
+                  child: _MarketplaceHeader(colorScheme: colorScheme),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
@@ -81,20 +80,10 @@ class MarketplaceScreen extends ConsumerWidget {
   }
 }
 
-String _initialsOf(String? name) {
-  final trimmed = name?.trim() ?? '';
-  if (trimmed.isEmpty) return '?';
-  final parts = trimmed.split(RegExp(r'\s+'));
-  final first = parts.first[0];
-  final last = parts.length > 1 ? parts.last[0] : '';
-  return (first + last).toUpperCase();
-}
-
 class _MarketplaceHeader extends StatelessWidget {
-  const _MarketplaceHeader({required this.colorScheme, required this.userName});
+  const _MarketplaceHeader({required this.colorScheme});
 
   final ColorScheme colorScheme;
-  final String? userName;
 
   @override
   Widget build(BuildContext context) {
@@ -119,14 +108,7 @@ class _MarketplaceHeader extends StatelessWidget {
         ),
         GestureDetector(
           onTap: () => context.go('/buyer/profile'),
-          child: CircleAvatar(
-            radius: 22,
-            backgroundColor: colorScheme.primary,
-            child: Text(
-              _initialsOf(userName),
-              style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w800, fontSize: 14),
-            ),
-          ),
+          child: const SizedBox(width: 44, height: 44, child: UserAvatar(size: 44)),
         ),
       ],
     );

@@ -1,10 +1,18 @@
 import fs from 'fs';
 import path from 'path';
-import { generateOpenAPIDocument } from '../docs/openapi.generator';
 
+/**
+ * NOTE: despite the name, this does not derive anything from the OpenAPI
+ * document — the collection below is written by hand. It previously called
+ * generateOpenAPIDocument() and discarded the result, which read as though the
+ * two were kept in sync when nothing connected them.
+ *
+ * The consequence is that the exported collection drifts from the real API
+ * whenever a route changes and nobody edits this file. Generating it from the
+ * OpenAPI document would fix that properly; removing the misleading call is
+ * only the smaller half.
+ */
 export function convertOpenAPIToPostman() {
-  const doc = generateOpenAPIDocument();
-
   const collection = {
     info: {
       name: 'AgriConnect API v1.0.0-stable Collection',

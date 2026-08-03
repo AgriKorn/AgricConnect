@@ -74,7 +74,7 @@ class ScanController extends Notifier<ScanState> {
   String get previewCropType =>
       _sampleResults[_sampleIndex % _sampleResults.length].cropType;
 
-  Future<ScanRecord> captureAndAnalyze() async {
+  Future<ScanRecord> captureAndAnalyze({String? imagePath}) async {
     if (state.isScanning) {
       final existing = state.lastResult;
       if (existing != null) {
@@ -87,7 +87,7 @@ class ScanController extends Notifier<ScanState> {
 
     try {
       await Future<void>.delayed(const Duration(milliseconds: 1400));
-      final result = _sampleResults[_sampleIndex % _sampleResults.length];
+      final result = _sampleResults[_sampleIndex % _sampleResults.length].copyWith(imagePath: imagePath);
       _sampleIndex += 1;
 
       await ref
