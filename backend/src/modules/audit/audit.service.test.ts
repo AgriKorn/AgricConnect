@@ -1,4 +1,3 @@
-import crypto from 'crypto';
 import { AuditService, computePayloadHash, truncateToSeconds } from './audit.service';
 import { PrismaAuditRepository } from './audit.repository.prisma';
 import { AuditEntry } from './audit.types';
