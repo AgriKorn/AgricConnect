@@ -11,6 +11,7 @@ import '../../../core/widgets/user_avatar.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/models/account_status.dart';
 import '../../auth/data/models/user_model.dart';
+import '../../orders/presentation/farmer_sales_screen.dart';
 import '../application/farmer_dashboard_providers.dart';
 import '../data/farmer_dashboard_repository.dart';
 import 'momo_payout_screen.dart';
@@ -129,6 +130,13 @@ class FarmerProfileScreen extends ConsumerWidget {
                           colorScheme: colorScheme,
                           label: 'Account Settings',
                           onTap: () => _openFarmerAccountSettings(context, user?.status == AccountStatus.verified),
+                        ),
+                        _ActionRow(
+                          colorScheme: colorScheme,
+                          label: 'My Sales',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (context) => const FarmerSalesScreen()),
+                          ),
                         ),
                         _ActionRow(
                           colorScheme: colorScheme,

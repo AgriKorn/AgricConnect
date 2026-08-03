@@ -28,6 +28,7 @@ describe('TransactionService', () => {
     buyerId: 'buyer-456',
     farmerId: 'farmer-789',
     farmerName: 'Test Farmer',
+    buyerName: 'Test Buyer',
     driverName: null,
     driverPhone: null,
     driverId: null,

@@ -14,6 +14,7 @@ class OrderItemModel {
     required this.createdAt,
     required this.hasOwnTransport,
     this.farmerName,
+    this.buyerName,
     this.driverName,
     this.driverPhone,
   });
@@ -25,6 +26,8 @@ class OrderItemModel {
   final DateTime createdAt;
   final bool hasOwnTransport;
   final String? farmerName;
+  /// Set when the signed-in user is the farmer on this order — who bought it.
+  final String? buyerName;
   final String? driverName;
   final String? driverPhone;
 }
@@ -107,6 +110,7 @@ class HttpOrdersRepository implements OrdersRepository {
         createdAt: DateTime.tryParse(item['createdAt']?.toString() ?? '') ?? DateTime.now(),
         hasOwnTransport: item['hasOwnTransport'] == true,
         farmerName: item['farmerName']?.toString(),
+        buyerName: item['buyerName']?.toString(),
         driverName: item['driverName']?.toString(),
         driverPhone: item['driverPhone']?.toString(),
       )).toList();

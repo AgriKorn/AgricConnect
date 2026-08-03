@@ -25,6 +25,9 @@ const mapPrismaToTransaction = (order: any, farmerId?: string): Transaction => {
     buyerId: order.buyer_id,
     farmerId: farmerId || order.produce_listings?.farmer_id || 'unknown',
     farmerName: order.produce_listings?.users?.full_name || null,
+    // orders.users is the buyer relation (buyer_id); the farmer comes via
+    // produce_listings.users above — same relation name, different join.
+    buyerName: order.users?.full_name || null,
     driverName: order.driver_assignments?.[0]?.users?.full_name || null,
     driverPhone: order.driver_assignments?.[0]?.users?.phone_number || null,
     driverId: order.driver_assignments?.[0]?.driver_id || null,
@@ -105,6 +108,7 @@ export class PrismaTransactionRepository implements ITransactionRepository {
       },
       include: {
         payments: true,
+        users: true,
         produce_listings: { include: { crop_types: true, users: true } },
         driver_assignments: acceptedDriverInclude,
       },

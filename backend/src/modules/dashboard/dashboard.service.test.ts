@@ -40,6 +40,7 @@ describe('DashboardService', () => {
     buyerId: 'buyer-1',
     farmerId,
     farmerName: 'Test Farmer',
+    buyerName: 'Test Buyer',
     driverName: null,
     driverPhone: null,
     driverId: null,
