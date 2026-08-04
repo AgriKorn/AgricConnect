@@ -14,12 +14,15 @@ export class InMemoryListingRepository implements IListingRepository {
 
   async create(data: CreateListingRecord): Promise<Listing> {
     const now = new Date();
+    const gallery = data.imageUrls?.length ? data.imageUrls : data.imageUrl ? [data.imageUrl] : [];
     const listing: Listing = {
       id: randomUUID(),
       ...data,
       // No crop_types table to resolve against in memory; the Prisma repository
       // fills this from the joined crop row.
       cropCategory: null,
+      imageUrl: gallery[0] ?? data.imageUrl,
+      imageUrls: gallery,
       createdAt: now,
       updatedAt: now,
     };

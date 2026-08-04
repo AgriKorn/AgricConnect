@@ -247,7 +247,11 @@ model produce_listings {
   below_floor_acknowledged Boolean         @default(false)
   listing_hash             String          @unique @db.Char(64)
   qr_code_data             String?
+  // photo_url is the cover image, kept for backward compatibility. image_urls
+  // is the full gallery (SRS "Produce Upload": farmers may upload multiple
+  // images); photo_url mirrors image_urls[0] when a gallery is present.
   photo_url                String?         @db.VarChar(500)
+  image_urls               String[]        @default([])
   description              String?         @db.Text
   status                   listing_status  @default(active)
   created_at               DateTime        @default(now()) @db.Timestamptz(6)

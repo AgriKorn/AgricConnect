@@ -68,6 +68,7 @@ describe('DashboardService', () => {
     pricePerKg: 10,
     listingHash: 'hash',
     qrCodeData: '',
+    imageUrls: [],
     status: 'ACTIVE',
     createdAt: new Date(),
     updatedAt: new Date(),

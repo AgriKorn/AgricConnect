@@ -16,7 +16,11 @@ const mapPrismaToListing = (p: any): Listing => ({
   pricePerKg: Number(p.listed_price),
   listingHash: p.listing_hash ? p.listing_hash.trim() : '',
   qrCodeData: p.qr_code_data || '',
-  imageUrl: p.photo_url || undefined,
+  // Cover falls back to the first gallery image for rows created before
+  // photo_url was populated alongside the gallery; the gallery falls back to
+  // the single photo for legacy rows that predate image_urls.
+  imageUrl: p.photo_url || p.image_urls?.[0] || undefined,
+  imageUrls: p.image_urls?.length ? p.image_urls : p.photo_url ? [p.photo_url] : [],
   description: p.description ?? null,
   status: p.status === 'sold' ? 'SOLD' : p.status === 'active' ? 'ACTIVE' : 'INACTIVE',
   createdAt: p.created_at,
@@ -47,6 +51,12 @@ export class PrismaListingRepository implements IListingRepository {
     // farmer's own price rather than mislabeling that as a MOFA reference.
     const referencePrice = data.mofaReferencePrice ?? data.pricePerKg;
 
+    // Normalise the gallery: prefer an explicit imageUrls array, fall back to a
+    // single imageUrl. The cover (photo_url) is the first image, so the existing
+    // single-image consumers keep working unchanged.
+    const gallery = data.imageUrls?.length ? data.imageUrls : data.imageUrl ? [data.imageUrl] : [];
+    const cover = gallery[0];
+
     const created = await prisma.produce_listings.create({
       data: {
         farmer_id: data.farmerId,
@@ -63,7 +73,8 @@ export class PrismaListingRepository implements IListingRepository {
         listed_price: new Prisma.Decimal(data.pricePerKg),
         listing_hash: data.listingHash,
         qr_code_data: data.qrCodeData,
-        ...(data.imageUrl && { photo_url: data.imageUrl }),
+        ...(cover && { photo_url: cover }),
+        image_urls: gallery,
         ...(data.description && { description: data.description }),
         status: 'active',
       },

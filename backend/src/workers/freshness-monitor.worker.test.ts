@@ -17,6 +17,7 @@ describe('FreshnessMonitorWorker', () => {
     pricePerKg: 10,
     listingHash: 'h',
     qrCodeData: 'q',
+    imageUrls: [],
     status: 'ACTIVE',
     createdAt: day(0),
     updatedAt: day(0),
