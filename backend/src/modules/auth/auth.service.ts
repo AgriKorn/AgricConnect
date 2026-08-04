@@ -15,6 +15,7 @@ import { userRepository } from '../user/user.repository.prisma';
 import { supabase } from '../../config/supabase';
 import { SafeUser, toSafeUser, UserStatus } from '../user/user.types';
 import { ForgotPasswordInput, GoogleAuthInput, LoginInput, RegisterInput, ResetPasswordInput } from './auth.schema';
+import { emailService } from '../../services/email.service';
 import logger from '../../utils/logger';
 
 const ACCESS_TOKEN_TTL = '15m';
@@ -86,12 +87,22 @@ export class AuthService {
 
     const resetToken = jwt.sign({ userId: user.id, purpose: 'password_reset' }, env.JWT_SECRET, { expiresIn: RESET_TOKEN_TTL });
 
-    // No real email/SMS delivery is wired up yet, so logging the token is
-    // how this gets to a developer/tester — but a production log is not a
-    // secure delivery channel, and this token alone is enough to take over
-    // the account. Only ever surface it (log or API response) outside prod.
+    // A production log is not a secure delivery channel, and this token
+    // alone is enough to take over the account — only ever surface it (log
+    // or API response) outside prod. The real delivery channel is email,
+    // sent regardless of environment below.
     if (env.NODE_ENV !== 'production') {
       logger.info(`[password-reset] Password reset token generated for ${user.email}: ${resetToken}`);
+    }
+
+    try {
+      await emailService.sendPasswordResetEmail(data.email, resetToken);
+    } catch (err: any) {
+      // Swallowed, not rethrown: the response must stay identical whether
+      // or not delivery succeeded, both to preserve the generic
+      // anti-enumeration message and so a transient SMTP hiccup doesn't
+      // surface as a 500 to the user.
+      logger.error(`[password-reset] Failed to send reset email to ${data.email}: ${err.message}`);
     }
 
     return {
