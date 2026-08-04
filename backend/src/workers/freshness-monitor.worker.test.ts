@@ -100,4 +100,71 @@ describe('FreshnessMonitorWorker', () => {
 
     expect(count).toBe(1); // 80% is below the 90% threshold within the window
   });
+
+  describe('start/stop lifecycle', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      listings.findAllActive.mockResolvedValue([]);
+    });
+
+    afterEach(() => {
+      worker.stop();
+      jest.useRealTimers();
+    });
+
+    it('runs one sweep immediately on start, then again each interval', async () => {
+      const sweepSpy = jest.spyOn(worker, 'sweep').mockResolvedValue(0);
+
+      worker.start(1000);
+      // Immediate first sweep, without advancing the clock.
+      await jest.advanceTimersByTimeAsync(0);
+      expect(sweepSpy).toHaveBeenCalledTimes(1);
+
+      await jest.advanceTimersByTimeAsync(1000);
+      expect(sweepSpy).toHaveBeenCalledTimes(2);
+
+      await jest.advanceTimersByTimeAsync(1000);
+      expect(sweepSpy).toHaveBeenCalledTimes(3);
+    });
+
+    it('ignores a second start so only one loop runs', async () => {
+      const sweepSpy = jest.spyOn(worker, 'sweep').mockResolvedValue(0);
+
+      worker.start(1000);
+      worker.start(1000);
+      await jest.advanceTimersByTimeAsync(0);
+
+      expect(sweepSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('stops polling once stopped', async () => {
+      const sweepSpy = jest.spyOn(worker, 'sweep').mockResolvedValue(0);
+
+      worker.start(1000);
+      await jest.advanceTimersByTimeAsync(0);
+      expect(sweepSpy).toHaveBeenCalledTimes(1);
+
+      worker.stop();
+      await jest.advanceTimersByTimeAsync(10000);
+      expect(sweepSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('survives a sweep error and keeps polling', async () => {
+      const sweepSpy = jest
+        .spyOn(worker, 'sweep')
+        .mockRejectedValueOnce(new Error('db blip'))
+        .mockResolvedValue(0);
+
+      worker.start(1000);
+      await jest.advanceTimersByTimeAsync(0);
+      expect(sweepSpy).toHaveBeenCalledTimes(1);
+
+      await jest.advanceTimersByTimeAsync(1000);
+      expect(sweepSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('tolerates stop being called before start', () => {
+      expect(() => worker.stop()).not.toThrow();
+    });
+  });
 });
