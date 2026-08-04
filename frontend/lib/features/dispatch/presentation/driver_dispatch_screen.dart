@@ -60,7 +60,9 @@ class DriverDispatchScreen extends ConsumerWidget {
                   loading: () => const Center(child: CircularProgressIndicator()),
                   error: (error, _) => EmptyState(
                     icon: Icons.wifi_off_rounded,
-                    message: 'Could not check your active trip. Pull to refresh.',
+                    message: 'Could not check your active trip. Pull to refresh, or tap Retry.',
+                    ctaLabel: 'Retry',
+                    onCta: () => ref.read(activeTripProvider.notifier).refresh(),
                   ),
                   data: (activeTrip) => activeTrip == null
                       ? _NoActiveTripCard(colorScheme: colorScheme)
@@ -120,9 +122,19 @@ class DriverDispatchScreen extends ConsumerWidget {
                 if (jobsAsync.isLoading)
                   const Center(child: CircularProgressIndicator())
                 else if (jobsAsync.hasError)
-                  EmptyState(icon: Icons.wifi_off_rounded, message: 'Could not load job requests. Pull to refresh.')
+                  EmptyState(
+                    icon: Icons.wifi_off_rounded,
+                    message: 'Could not load job requests. Pull to refresh, or tap Retry.',
+                    ctaLabel: 'Retry',
+                    onCta: () => ref.read(availableJobsProvider.notifier).refresh(),
+                  )
                 else if (jobs.isEmpty)
-                  EmptyState(icon: Icons.local_shipping_outlined, message: 'No jobs match this filter right now.')
+                  EmptyState(
+                    icon: Icons.local_shipping_outlined,
+                    message: filter == JobFilter.all
+                        ? 'No delivery requests are available nearby.'
+                        : 'No jobs match this filter right now.',
+                  )
                 else
                   for (final job in jobs) ...[
                     JobRequestCard(

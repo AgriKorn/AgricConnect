@@ -94,40 +94,72 @@ export class DispatchService {
   async acceptJob(jobId: string, driverId: string): Promise<DriverJob> {
     const job = await this.assertOwnedPendingJob(jobId, driverId);
 
-    return await prisma.$transaction(async (tx) => {
-      const updated = await this.jobs.update(job.id, 'ACCEPTED');
-      await this.users.updateProfile(driverId, { isAvailable: false });
+    // A single atomic UPDATE, not read-then-write: the $transaction wrapper
+    // this replaced only looked atomic — this.jobs.update()/
+    // this.users.updateProfile() go through the raw `prisma` client
+    // internally rather than the `tx` handed to the callback, so neither was
+    // ever actually rolled back by a later failure (e.g. a slow
+    // notification), and neither checked whether a *different*
+    // driver_assignments row for the same order had already been accepted.
+    // Two live offers for one order (a manual admin assignment overlapping
+    // an automatic one, or a race in decline-and-reassign) let two drivers
+    // both successfully "accept" the same delivery — reproduced directly
+    // against the live DB during this audit. This one statement closes both
+    // gaps: it only claims a still-'notified' row, and only when no sibling
+    // assignment for the same order is already 'accepted'.
+    const claimed = await prisma.$queryRaw<Array<{ id: string }>>`
+      UPDATE driver_assignments
+      SET status = 'accepted'::assignment_status, responded_at = NOW()
+      WHERE id = ${job.id}
+        AND status = 'notified'::assignment_status
+        AND NOT EXISTS (
+          SELECT 1 FROM driver_assignments AS rival
+          WHERE rival.order_id = driver_assignments.order_id
+            AND rival.status = 'accepted'::assignment_status
+        )
+      RETURNING id;
+    `;
 
-      await tx.orders.update({
-        where: { id: job.transactionId },
-        data: { order_status: 'driver_assigned' },
+    if (claimed.length === 0) {
+      const rival = await prisma.driver_assignments.findFirst({
+        where: { order_id: job.transactionId, status: 'accepted' },
       });
+      if (rival) throw new ForbiddenError('This order has already been assigned to another driver');
+      throw new ForbiddenError(`Job is no longer pending`);
+    }
 
-      await auditService.log('DRIVER_ACCEPTED', job.transactionId, { driverId, jobId: job.id }, driverId);
+    await this.users.updateProfile(driverId, { isAvailable: false });
 
-      const order = await tx.orders.findUnique({
-        where: { id: job.transactionId },
-        include: { produce_listings: true },
-      });
-
-      if (order) {
-        await notificationService.sendNotification({
-          userId: order.buyer_id,
-          type: 'DRIVER_ACCEPTED_BUYER',
-          message: `A driver has accepted the transport assignment for Order #${order.id}.`,
-          orderId: order.id,
-        });
-
-        await notificationService.sendNotification({
-          userId: order.produce_listings.farmer_id,
-          type: 'DRIVER_ACCEPTED_FARMER',
-          message: `A driver has accepted transport for Order #${order.id}. Produce pickup is scheduled.`,
-          orderId: order.id,
-        });
-      }
-
-      return updated;
+    await prisma.orders.update({
+      where: { id: job.transactionId },
+      data: { order_status: 'driver_assigned' },
     });
+
+    await auditService.log('DRIVER_ACCEPTED', job.transactionId, { driverId, jobId: job.id }, driverId);
+
+    const order = await prisma.orders.findUnique({
+      where: { id: job.transactionId },
+      include: { produce_listings: true },
+    });
+
+    if (order) {
+      await notificationService.sendNotification({
+        userId: order.buyer_id,
+        type: 'DRIVER_ACCEPTED_BUYER',
+        message: `A driver has accepted the transport assignment for Order #${order.id}.`,
+        orderId: order.id,
+      });
+
+      await notificationService.sendNotification({
+        userId: order.produce_listings.farmer_id,
+        type: 'DRIVER_ACCEPTED_FARMER',
+        message: `A driver has accepted transport for Order #${order.id}. Produce pickup is scheduled.`,
+        orderId: order.id,
+      });
+    }
+
+    const updated = await this.jobs.findById(job.id);
+    return updated!;
   }
 
   async declineJob(jobId: string, driverId: string): Promise<{ job: DriverJob; reassigned: DriverJob | null }> {

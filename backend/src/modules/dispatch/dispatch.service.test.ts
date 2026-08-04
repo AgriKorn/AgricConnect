@@ -117,9 +117,10 @@ describe('DispatchService', () => {
     it('should update job status to ACCEPTED when claimed by assigned driver', async () => {
       const driverId = 'assigned-driver-uuid';
       mockRepo.findById.mockResolvedValue(createMockJob({ driverId }));
+      mockPrisma.$queryRaw.mockResolvedValue([{ id: 'job-1' }] as any);
 
       const updatedJob = createMockJob({ driverId, status: 'ACCEPTED' });
-      mockRepo.update.mockResolvedValue(updatedJob);
+      mockRepo.findById.mockResolvedValueOnce(createMockJob({ driverId })).mockResolvedValueOnce(updatedJob);
       mockPrisma.orders.findUnique.mockResolvedValue({
         id: 'tx-1',
         buyer_id: 'buyer-1',
@@ -130,9 +131,36 @@ describe('DispatchService', () => {
 
       const result = await dispatchService.acceptJob('job-1', driverId);
 
-      expect(mockRepo.update).toHaveBeenCalledWith('job-1', 'ACCEPTED');
       expect(mockUsers.updateProfile).toHaveBeenCalledWith(driverId, { isAvailable: false });
       expect(result).toEqual(updatedJob);
+    });
+
+    it('should reject acceptance when the order already has a different driver accepted', async () => {
+      // Two live driver_assignments rows can exist for the same order (a
+      // manual admin assignment overlapping an automatic offer, or a race in
+      // decline-and-reassign) — the atomic claim query's NOT EXISTS guard
+      // must refuse the second acceptance rather than letting both succeed.
+      const driverId = 'second-driver-uuid';
+      mockRepo.findById.mockResolvedValue(createMockJob({ driverId, id: 'job-2' }));
+      mockPrisma.$queryRaw.mockResolvedValue([] as any);
+      mockPrisma.driver_assignments.findFirst.mockResolvedValue({
+        id: 'job-1',
+        status: 'accepted',
+      } as any);
+
+      await expect(dispatchService.acceptJob('job-2', driverId)).rejects.toThrow(
+        'This order has already been assigned to another driver',
+      );
+      expect(mockUsers.updateProfile).not.toHaveBeenCalled();
+    });
+
+    it('should reject acceptance when the assignment is no longer pending and no rival exists', async () => {
+      const driverId = 'assigned-driver-uuid';
+      mockRepo.findById.mockResolvedValue(createMockJob({ driverId }));
+      mockPrisma.$queryRaw.mockResolvedValue([] as any);
+      mockPrisma.driver_assignments.findFirst.mockResolvedValue(null);
+
+      await expect(dispatchService.acceptJob('job-1', driverId)).rejects.toThrow('Job is no longer pending');
     });
   });
 

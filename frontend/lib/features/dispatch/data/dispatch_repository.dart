@@ -57,6 +57,19 @@ class DispatchJobModel {
   }
 }
 
+/// A real backend error response is always `{"error": {"message": "..."}}`,
+/// but a Dio error can also surface a gateway/proxy failure (a 502/504 HTML
+/// error page, or a plain-text body) instead — indexing into that with
+/// `['error']` throws rather than returning null, so the `is Map` check has
+/// to come first.
+String? _extractDioErrorMessage(DioException e) {
+  final data = e.response?.data;
+  if (data is Map) {
+    return data['error']?['message']?.toString();
+  }
+  return null;
+}
+
 abstract class DispatchRepository {
   Future<List<DispatchJobModel>> fetchJobs({String? status});
   Future<void> acceptJob(String jobId);
@@ -80,8 +93,7 @@ class HttpDispatchRepository implements DispatchRepository {
       final rawList = response.data['data']?['jobs'] as List? ?? [];
       return rawList.map((item) => DispatchJobModel.fromJson(item as Map<String, dynamic>)).toList();
     } on DioException catch (e) {
-      final serverMessage = e.response?.data?['error']?['message']?.toString();
-      throw ApiException(serverMessage ?? e.message ?? 'Failed to load jobs.');
+      throw ApiException(_extractDioErrorMessage(e) ?? e.message ?? 'Failed to load jobs.');
     }
   }
 
@@ -90,8 +102,7 @@ class HttpDispatchRepository implements DispatchRepository {
     try {
       await _dio.patch('/dispatch/$jobId/accept');
     } on DioException catch (e) {
-      final serverMessage = e.response?.data?['error']?['message']?.toString();
-      throw ApiException(serverMessage ?? e.message ?? 'Failed to accept job.');
+      throw ApiException(_extractDioErrorMessage(e) ?? e.message ?? 'Failed to accept job.');
     }
   }
 
@@ -100,8 +111,7 @@ class HttpDispatchRepository implements DispatchRepository {
     try {
       await _dio.patch('/dispatch/$jobId/decline');
     } on DioException catch (e) {
-      final serverMessage = e.response?.data?['error']?['message']?.toString();
-      throw ApiException(serverMessage ?? e.message ?? 'Failed to decline job.');
+      throw ApiException(_extractDioErrorMessage(e) ?? e.message ?? 'Failed to decline job.');
     }
   }
 
