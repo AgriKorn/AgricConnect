@@ -163,7 +163,29 @@ export class PrismaUserRepository implements IUserRepository {
       },
       include: { driver_details: true },
     });
-    return list.map(mapPrismaToUser);
+    if (list.length <= 1) return list.map(mapPrismaToUser);
+
+    // assignDriver() always takes candidates[0] — with no ordering here that
+    // meant the exact same driver (whichever row a plain unordered scan
+    // happens to return first) got offered every single delivery, forever,
+    // and every other approved/available/capable driver never received an
+    // offer at all. Ordering by whichever driver has gone longest without a
+    // job offer (nulls — never offered one — first) rotates offers fairly
+    // instead of concentrating them on one account.
+    const lastOffered = await prisma.driver_assignments.groupBy({
+      by: ['driver_id'],
+      where: { driver_id: { in: list.map((d) => d.id) } },
+      _max: { notified_at: true },
+    });
+    const lastOfferedAt = new Map(lastOffered.map((row) => [row.driver_id, row._max.notified_at]));
+
+    const sorted = [...list].sort((a, b) => {
+      const aTime = lastOfferedAt.get(a.id)?.getTime() ?? 0;
+      const bTime = lastOfferedAt.get(b.id)?.getTime() ?? 0;
+      return aTime - bTime;
+    });
+
+    return sorted.map(mapPrismaToUser);
   }
 
   async update(id: string, data: Partial<User>): Promise<User> {
