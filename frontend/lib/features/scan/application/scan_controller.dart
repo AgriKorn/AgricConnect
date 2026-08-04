@@ -1,9 +1,12 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/storage/local_prefs.dart';
+import '../data/crop_scan_model.dart';
+import '../data/crop_scan_presenter.dart';
 import '../data/scan_record.dart';
 
 const _scanCacheKey = 'latest_scan_record';
@@ -40,12 +43,20 @@ class ScanState {
 
 class ScanController extends Notifier<ScanState> {
   int _sampleIndex = 0;
+  Future<CropScanModel>? _modelFuture;
 
   @override
   ScanState build() {
     _restoreCachedResult();
+    ref.onDispose(() {
+      // Fire-and-forget: closing the interpreter is best-effort cleanup,
+      // not something anything downstream waits on.
+      _modelFuture?.then((model) => model.close());
+    });
     return ScanState.initial;
   }
+
+  Future<CropScanModel> _model() => _modelFuture ??= CropScanModel.load();
 
   void _restoreCachedResult() {
     final cachedJson = ref.read(localPrefsProvider).getString(_scanCacheKey);
@@ -67,10 +78,11 @@ class ScanController extends Notifier<ScanState> {
     state = state.copyWith(isFlashOn: !state.isFlashOn);
   }
 
-  /// The crop type the upcoming [captureAndAnalyze] call will resolve to —
-  /// lets the capture screen's "detected" label match the result it's about
-  /// to navigate to, without actually running detection before the mock
-  /// "analysis" delay completes.
+  /// The crop type the upcoming mock-fallback [captureAndAnalyze] call will
+  /// resolve to when no real photo is available (no camera on this
+  /// device/platform) — lets the capture screen's "detected" label match
+  /// the result it's about to navigate to. Meaningless once a real photo is
+  /// captured, since real detection isn't known until inference finishes.
   String get previewCropType =>
       _sampleResults[_sampleIndex % _sampleResults.length].cropType;
 
@@ -86,9 +98,9 @@ class ScanController extends Notifier<ScanState> {
     final stopwatch = Stopwatch()..start();
 
     try {
-      await Future<void>.delayed(const Duration(milliseconds: 1400));
-      final result = _sampleResults[_sampleIndex % _sampleResults.length].copyWith(imagePath: imagePath);
-      _sampleIndex += 1;
+      final result = imagePath != null
+          ? await _analyzeImage(imagePath)
+          : await _analyzeMock();
 
       await ref
           .read(localPrefsProvider)
@@ -110,6 +122,36 @@ class ScanController extends Notifier<ScanState> {
       );
       rethrow;
     }
+  }
+
+  /// Real on-device inference against `ai/model/agriconnect.tflite`. Falls
+  /// back to the mock cycle on web specifically — `tflite_flutter` has no
+  /// web support (see crop_scan_model_web.dart), even though the `camera`
+  /// plugin can still hand us a real [imagePath] there.
+  Future<ScanRecord> _analyzeImage(String imagePath) async {
+    try {
+      final model = await _model();
+      final bytes = await File(imagePath).readAsBytes();
+      final prediction = model.predict(bytes);
+      return buildScanRecord(
+        prediction,
+        id: 'scan-${DateTime.now().millisecondsSinceEpoch}',
+        capturedAt: DateTime.now(),
+        imagePath: imagePath,
+      );
+    } on UnsupportedError {
+      return _analyzeMock(imagePath: imagePath);
+    }
+  }
+
+  /// Platforms with no real inference path available — no camera (desktop,
+  /// simulators), or web (no `tflite_flutter` support) — cycle through
+  /// fixed sample results instead, same as pre-integration behavior.
+  Future<ScanRecord> _analyzeMock({String? imagePath}) async {
+    await Future<void>.delayed(const Duration(milliseconds: 1400));
+    final result = _sampleResults[_sampleIndex % _sampleResults.length].copyWith(imagePath: imagePath);
+    _sampleIndex += 1;
+    return result;
   }
 }
 
