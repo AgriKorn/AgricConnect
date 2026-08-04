@@ -30,21 +30,34 @@ app.use(helmet());
 app.use(cors());
 
 // --------------- Rate Limiting ---------------
+// General API limit. The previous 100 requests / 15 minutes per IP was far too
+// low for a browsing marketplace — a single active user exhausts it in seconds,
+// which is incompatible with the reliability target of many concurrent users.
+// Defaults to 300 requests/minute per IP (sustained ~5 req/s per user) and is
+// env-tunable per environment. Skipped under test so the integration suites
+// aren't throttled, and health checks don't count against it.
+const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS ?? 60 * 1000);
+const RATE_LIMIT_MAX = Number(process.env.RATE_LIMIT_MAX ?? 300);
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per window
+  windowMs: RATE_LIMIT_WINDOW_MS,
+  max: RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => process.env.NODE_ENV === 'test' || req.path === '/api/health',
   message: { success: false, error: { code: 'RATE_LIMIT', message: 'Too many requests, please try again later' } },
 });
 app.use(limiter);
 
-// Strict rate limit for authentication endpoints to prevent brute-force attacks
+// Auth stays deliberately strict to resist credential brute-forcing — a login
+// endpoint has no legitimate need for high request volume from one IP.
+const AUTH_RATE_LIMIT_WINDOW_MS = Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS ?? 15 * 60 * 1000);
+const AUTH_RATE_LIMIT_MAX = Number(process.env.AUTH_RATE_LIMIT_MAX ?? 20);
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // max 20 requests per 15 min per IP
+  windowMs: AUTH_RATE_LIMIT_WINDOW_MS,
+  max: AUTH_RATE_LIMIT_MAX,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test',
   message: { success: false, error: { code: 'AUTH_RATE_LIMIT', message: 'Too many authentication attempts, please try again later' } },
 });
 app.use('/api/auth', authLimiter);

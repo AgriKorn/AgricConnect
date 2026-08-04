@@ -2,6 +2,7 @@ import { prisma } from '../../config/db';
 import { CreateUserRecord, IUserRepository } from './user.repository';
 import { User, UserRole, UserStatus } from './user.types';
 import { account_status, user_role, driver_availability } from '../../generated/prisma/client';
+import { encryptNullable, decryptNullable } from '../../utils/encryption';
 
 // approved_by is a real FK to users.id — a non-UUID actor (a one-off CLI
 // script's sentinel string, for example) would otherwise crash the update
@@ -55,7 +56,9 @@ const mapPrismaToUser = (p: any): User => {
       operatingRegion: driver?.operating_region || p.region || undefined,
       truckCapacity: driver ? Number(driver.truck_capacity_kg) : undefined,
       isAvailable: driver ? driver.availability_status === 'available' : undefined,
-      momoNumber: p.momo_number || undefined,
+      // Decrypt the MoMo number on read. decryptNullable passes legacy
+      // plaintext rows through unchanged, so old data still reads correctly.
+      momoNumber: decryptNullable(p.momo_number) || undefined,
       momoNetwork: p.momo_network || undefined,
       businessName: p.business_name || undefined,
       businessType: p.business_type || undefined,
@@ -202,7 +205,9 @@ export class PrismaUserRepository implements IUserRepository {
         where: { id },
         data: {
           ...((profile.farmRegion || profile.operatingRegion) && { region: profile.farmRegion || profile.operatingRegion }),
-          ...(profile.momoNumber && { momo_number: profile.momoNumber }),
+          // Encrypt the MoMo number at rest (SRS Security NFR). No-op passthrough
+          // when FIELD_ENCRYPTION_KEY is unset (dev/test).
+          ...(profile.momoNumber && { momo_number: encryptNullable(profile.momoNumber) }),
           ...(profile.momoNetwork && { momo_network: profile.momoNetwork }),
           ...(profile.businessName && { business_name: profile.businessName }),
           ...(profile.businessType && { business_type: profile.businessType }),
