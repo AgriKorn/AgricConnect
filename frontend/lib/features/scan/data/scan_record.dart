@@ -38,6 +38,7 @@ class ScanRecord {
     required this.cropType,
     required this.score,
     required this.shelfLifeLabel,
+    required this.shelfLifeDays,
     required this.qualityGrade,
     required this.recommendedPrice,
     required this.priceUnit,
@@ -51,6 +52,13 @@ class ScanRecord {
   final String cropType;
   final int score;
   final String shelfLifeLabel; // short display form, e.g. "12 Days"
+
+  /// The raw days-remaining number `shelfLifeLabel` was formatted from.
+  /// Anything that needs a real number (e.g. prefilling a listing's
+  /// shelf-life field) should read this, not re-parse the display label —
+  /// the label switches to hour units under 1 day, and a naive "grab the
+  /// leading digits" parse would silently read "8 Hours" as 8 *days*.
+  final double shelfLifeDays;
   final String qualityGrade; // e.g. "Grade A"
   final double recommendedPrice;
   final String priceUnit; // e.g. "crate"
@@ -70,6 +78,7 @@ class ScanRecord {
       cropType: cropType,
       score: score,
       shelfLifeLabel: shelfLifeLabel,
+      shelfLifeDays: shelfLifeDays,
       qualityGrade: qualityGrade,
       recommendedPrice: recommendedPrice,
       priceUnit: priceUnit,
@@ -86,6 +95,7 @@ class ScanRecord {
       'cropType': cropType,
       'score': score,
       'shelfLifeLabel': shelfLifeLabel,
+      'shelfLifeDays': shelfLifeDays,
       'qualityGrade': qualityGrade,
       'recommendedPrice': recommendedPrice,
       'priceUnit': priceUnit,
@@ -102,6 +112,7 @@ class ScanRecord {
       cropType: json['cropType'] as String,
       score: json['score'] as int,
       shelfLifeLabel: json['shelfLifeLabel'] as String,
+      shelfLifeDays: (json['shelfLifeDays'] as num).toDouble(),
       qualityGrade: json['qualityGrade'] as String,
       recommendedPrice: (json['recommendedPrice'] as num).toDouble(),
       priceUnit: json['priceUnit'] as String,

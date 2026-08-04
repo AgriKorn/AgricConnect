@@ -63,6 +63,7 @@ ScanRecord buildScanRecord(
     cropType: _capitalize(result.cropType),
     score: score,
     shelfLifeLabel: _shelfLifeLabel(result.shelfLifeDays),
+    shelfLifeDays: result.shelfLifeDays,
     qualityGrade: qualityGrade,
     recommendedPrice: recommendedPrice,
     priceUnit: 'kg',

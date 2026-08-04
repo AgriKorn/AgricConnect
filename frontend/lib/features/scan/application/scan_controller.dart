@@ -165,6 +165,7 @@ final _sampleResults = [
     cropType: 'Tomatoes',
     score: 94,
     shelfLifeLabel: '12 Days',
+    shelfLifeDays: 12,
     qualityGrade: 'Grade A',
     recommendedPrice: 45,
     priceUnit: 'crate',
@@ -182,6 +183,7 @@ final _sampleResults = [
     cropType: 'Cassava',
     score: 54,
     shelfLifeLabel: '2 Days',
+    shelfLifeDays: 2,
     qualityGrade: 'Grade B',
     recommendedPrice: 28,
     priceUnit: 'bag',
@@ -198,6 +200,7 @@ final _sampleResults = [
     cropType: 'Pepper',
     score: 31,
     shelfLifeLabel: '8 Hours',
+    shelfLifeDays: 8 / 24, // kept consistent with the "8 Hours" label above
     qualityGrade: 'Grade C',
     recommendedPrice: 12,
     priceUnit: 'basket',
