@@ -3,6 +3,7 @@ import { paymentService } from '../../services/payment.service';
 import { BadRequestError, UnauthorizedError } from '../../utils/errors';
 import { sendSuccess } from '../../utils/response';
 import { prisma } from '../../config/db';
+import { notificationService } from '../notification/notification.service';
 import logger from '../../utils/logger';
 
 export const resolveMomoAccountHandler = async (req: Request, res: Response, next: NextFunction) => {
@@ -115,6 +116,43 @@ export const paystackWebhookHandler = async (req: Request, res: Response, next: 
           });
 
           logger.info(`[Paystack Webhook] Confirmed held escrow payment for Order #${payment.order_id}`);
+        }
+      } else if (eventType === 'charge.failed') {
+        // purchase() marks the listing sold and creates the order the
+        // moment checkout is initiated — before the buyer has actually
+        // paid — so a declined/failed charge has to be unwound here, or a
+        // farmer's listing is gone forever over a payment that never went
+        // through. Mirrors REFUND_BUYER's dispute-resolution shape: reopen
+        // the listing, cancel the order, tell the buyer why.
+        const payment = await prisma.payments.findFirst({
+          where: { OR: [{ provider_reference: reference }, { id: reference }] },
+          include: { orders: true },
+        });
+
+        if (payment && payment.status === 'held') {
+          await prisma.$transaction(async (tx) => {
+            await tx.payments.update({
+              where: { id: payment.id },
+              data: { status: 'refunded', refunded_at: new Date() },
+            });
+            await tx.orders.update({
+              where: { id: payment.order_id },
+              data: { order_status: 'cancelled' },
+            });
+            await tx.produce_listings.update({
+              where: { id: payment.orders.listing_id },
+              data: { status: 'active' },
+            });
+          });
+
+          await notificationService.sendNotification({
+            userId: payment.orders.buyer_id,
+            type: 'PAYMENT_FAILED',
+            message: 'Your payment could not be completed, so this order was cancelled. The listing is available again if you\'d like to try again.',
+            orderId: payment.order_id,
+          });
+
+          logger.info(`[Paystack Webhook] Reversed listing hold and cancelled Order #${payment.order_id} after a failed charge`);
         }
       }
 
