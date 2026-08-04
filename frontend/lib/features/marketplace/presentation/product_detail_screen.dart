@@ -10,6 +10,7 @@ import '../../auth/application/auth_controller.dart';
 import '../../checkout/presentation/checkout_screen.dart';
 import '../application/marketplace_providers.dart';
 import '../data/marketplace_mock.dart';
+import 'farmer_store_screen.dart';
 
 /// Full detail view for a single marketplace listing — GET /marketplace/:id,
 /// including fields the grid tile has no room for (farmer region, shelf
@@ -141,12 +142,32 @@ class _ProductDetailBody extends ConsumerWidget {
         _InfoCard(
           colorScheme: colorScheme,
           rows: [
-            (Icons.storefront_rounded, 'Farmer', listing.farmerName),
-            if (listing.farmerRegion != null) (Icons.location_on_rounded, 'Location', listing.farmerRegion!),
+            (
+              Icons.storefront_rounded,
+              'Farmer',
+              listing.farmerName,
+              listing.farmerId == null
+                  ? null
+                  : () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => FarmerStoreScreen(
+                            farmerId: listing.farmerId!,
+                            farmerName: listing.farmerName,
+                            farmerRegion: listing.farmerRegion,
+                          ),
+                        ),
+                      ),
+            ),
+            if (listing.farmerRegion != null) (Icons.location_on_rounded, 'Location', listing.farmerRegion!, null),
             if (listing.quantityAvailable != null)
-              (Icons.inventory_2_rounded, 'Available Quantity', '${listing.quantityAvailable!.toStringAsFixed(0)} ${listing.unit}'),
+              (
+                Icons.inventory_2_rounded,
+                'Available Quantity',
+                '${listing.quantityAvailable!.toStringAsFixed(0)} ${listing.unit}',
+                null,
+              ),
             if (listing.shelfLifeDays != null)
-              (Icons.hourglass_bottom_rounded, 'Shelf Life', '${listing.shelfLifeDays} days'),
+              (Icons.hourglass_bottom_rounded, 'Shelf Life', '${listing.shelfLifeDays} days', null),
           ],
         ),
         if (listing.description != null && listing.description!.trim().isNotEmpty) ...[
@@ -221,7 +242,7 @@ class _InfoCard extends StatelessWidget {
   const _InfoCard({required this.colorScheme, required this.rows});
 
   final ColorScheme colorScheme;
-  final List<(IconData, String, String)> rows;
+  final List<(IconData, String, String, VoidCallback?)> rows;
 
   @override
   Widget build(BuildContext context) {
@@ -235,33 +256,40 @@ class _InfoCard extends StatelessWidget {
       child: Column(
         children: [
           for (var i = 0; i < rows.length; i++)
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                border: i == rows.length - 1
-                    ? null
-                    : Border(bottom: BorderSide(color: colorScheme.outline.withValues(alpha: 0.15))),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(color: colorScheme.primary.withValues(alpha: 0.15), shape: BoxShape.circle),
-                    child: Icon(rows[i].$1, color: colorScheme.primary, size: 17),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      rows[i].$2,
-                      style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
+            InkWell(
+              onTap: rows[i].$4,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: i == rows.length - 1
+                      ? null
+                      : Border(bottom: BorderSide(color: colorScheme.outline.withValues(alpha: 0.15))),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(color: colorScheme.primary.withValues(alpha: 0.15), shape: BoxShape.circle),
+                      child: Icon(rows[i].$1, color: colorScheme.primary, size: 17),
                     ),
-                  ),
-                  Text(
-                    rows[i].$3,
-                    style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 14),
-                  ),
-                ],
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Text(
+                        rows[i].$2,
+                        style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
+                      ),
+                    ),
+                    Text(
+                      rows[i].$3,
+                      style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 14),
+                    ),
+                    if (rows[i].$4 != null) ...[
+                      const SizedBox(width: 4),
+                      Icon(Icons.chevron_right_rounded, color: colorScheme.onSurfaceVariant, size: 18),
+                    ],
+                  ],
+                ),
               ),
             ),
         ],

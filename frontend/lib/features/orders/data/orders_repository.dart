@@ -13,6 +13,7 @@ class OrderItemModel {
     required this.status,
     required this.createdAt,
     required this.hasOwnTransport,
+    this.farmerId,
     this.farmerName,
     this.buyerName,
     this.driverName,
@@ -25,6 +26,7 @@ class OrderItemModel {
   final String status;
   final DateTime createdAt;
   final bool hasOwnTransport;
+  final String? farmerId;
   final String? farmerName;
   /// Set when the signed-in user is the farmer on this order — who bought it.
   final String? buyerName;
@@ -109,6 +111,7 @@ class HttpOrdersRepository implements OrdersRepository {
         status: item['status']?.toString() ?? 'PAYMENT_HELD',
         createdAt: DateTime.tryParse(item['createdAt']?.toString() ?? '') ?? DateTime.now(),
         hasOwnTransport: item['hasOwnTransport'] == true,
+        farmerId: item['farmerId']?.toString(),
         farmerName: item['farmerName']?.toString(),
         buyerName: item['buyerName']?.toString(),
         driverName: item['driverName']?.toString(),

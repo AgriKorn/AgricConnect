@@ -27,6 +27,15 @@ final marketplaceListingDetailProvider =
   return repository.fetchListingDetail(id);
 });
 
+/// A single farmer's active listings — GET /marketplace?farmerId=..., for
+/// their store page. Keyed by farmerId so navigating between two different
+/// farmers' stores doesn't show stale data from whichever was viewed first.
+final farmerStoreListingsProvider =
+    FutureProvider.family<List<MarketplaceListing>, String>((ref, farmerId) async {
+  final repository = ref.watch(marketplaceRepositoryProvider);
+  return repository.fetchListings(farmerId: farmerId);
+});
+
 /// null means "All Crops".
 final marketplaceCategoryFilterProvider = StateProvider<ProduceCategory?>((ref) => null);
 

@@ -24,7 +24,13 @@ const _regionCoordinates = {
 }
 
 abstract class MarketplaceRepository {
-  Future<List<MarketplaceListing>> fetchListings();
+  /// GET /marketplace. With [farmerId], returns just that farmer's active
+  /// listings (their store page). Without it, returns every active listing
+  /// in the marketplace, paging through the backend's real 50-per-page
+  /// limit transparently — the server never returns everything in one call,
+  /// so a single unpaginated request here would silently cap the buyer's
+  /// view at whatever the first page happened to contain.
+  Future<List<MarketplaceListing>> fetchListings({String? farmerId});
 
   /// GET /marketplace/:id — full detail (farmer name/region, quantity,
   /// shelf life) for the product detail screen.
@@ -78,12 +84,33 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
   final Dio _dio;
 
   @override
-  Future<List<MarketplaceListing>> fetchListings() async {
+  Future<List<MarketplaceListing>> fetchListings({String? farmerId}) async {
     try {
-      final response = await _dio.get(ApiEndpoints.marketplace);
-      final data = response.data['data'];
-      final rawList = data?['listings'] as List? ?? [];
-      return rawList.map((item) => _parseListing(item)).toList();
+      final all = <MarketplaceListing>[];
+      var page = 1;
+      // A generous ceiling, not a real limit: stops a malformed backend
+      // response (e.g. totalPages stuck above the current page) from looping
+      // forever, while comfortably covering any realistic marketplace size
+      // for a demo. One farmer's store page never needs more than one round.
+      const maxPages = 10;
+      while (page <= maxPages) {
+        final response = await _dio.get(
+          ApiEndpoints.marketplace,
+          queryParameters: {
+            'page': page,
+            'limit': 50,
+            if (farmerId != null) 'farmerId': farmerId,
+          },
+        );
+        final data = response.data['data'];
+        final rawList = data?['listings'] as List? ?? [];
+        all.addAll(rawList.map((item) => _parseListing(item)));
+
+        final totalPages = (data?['pagination']?['totalPages'] as num?)?.toInt() ?? 1;
+        if (rawList.isEmpty || page >= totalPages) break;
+        page++;
+      }
+      return all;
     } on DioException catch (e) {
       throw ApiException(_extractDioErrorMessage(e) ?? 'Failed to load the marketplace.');
     }
@@ -236,6 +263,7 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
       unit: 'kg',
       farmerName: json['farmerName']?.toString() ?? 'Local Farmer',
       farmerId: json['farmerId']?.toString(),
+      farmerRegion: json['farmerRegion']?.toString(),
       quantityAvailable: double.tryParse(json['quantityKg']?.toString() ?? ''),
       imageUrl: json['imageUrl']?.toString(),
     );

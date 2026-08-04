@@ -28,6 +28,7 @@ class MarketplaceListing {
     required this.unit,
     required this.farmerName,
     this.farmerId,
+    this.farmerRegion,
     this.quantityAvailable,
     this.imageAsset,
     this.imageUrl,
@@ -41,6 +42,7 @@ class MarketplaceListing {
   final String unit;
   final String farmerName;
   final String? farmerId;
+  final String? farmerRegion;
   final double? quantityAvailable;
   final String? imageAsset;
   /// Real S3 photo the farmer uploaded for this listing, if any.
