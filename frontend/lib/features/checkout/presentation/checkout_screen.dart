@@ -55,7 +55,41 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
     if (!mounted) return;
     setState(() => _submitting = false);
+
+    // "Pay & Confirm Escrow" IS the payment step, so the order that was just
+    // created has to redirect to Paystack on its own — it can't depend on
+    // the buyer noticing and tapping a second "Open Payment Link" button
+    // buried inside the outcome dialog below. Only one listing's checkout
+    // opens automatically: each listing is its own separate Paystack
+    // transaction, so auto-launching more than one would fire multiple
+    // external browser tabs at once.
+    PurchaseResult? firstPayable;
+    for (final outcome in results) {
+      if (outcome.error == null && (outcome.result?.authorizationUrl.isNotEmpty ?? false)) {
+        firstPayable = outcome.result;
+        break;
+      }
+    }
+    if (firstPayable != null) {
+      await _openPaymentLink(firstPayable.authorizationUrl);
+    }
+
+    if (!mounted) return;
     await _showOutcomeDialog(results);
+  }
+
+  Future<void> _openPaymentLink(String url) async {
+    var launched = false;
+    try {
+      launched = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {
+      launched = false;
+    }
+    if (!launched && mounted) {
+      setState(() {
+        _error = 'Could not open the Paystack payment page automatically. Use "Open Payment Link" below, or find this order in your Orders tab to try again.';
+      });
+    }
   }
 
   Future<void> _showOutcomeDialog(List<_PurchaseOutcome> results) async {
@@ -98,11 +132,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   if (outcome.result!.authorizationUrl.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     TextButton(
-                      onPressed: () => launchUrl(
-                        Uri.parse(outcome.result!.authorizationUrl),
-                        mode: LaunchMode.externalApplication,
-                      ),
+                      onPressed: () => _openPaymentLink(outcome.result!.authorizationUrl),
                       child: const Text('Open Payment Link'),
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'This order was already started moments ago — check the Orders tab to finish payment.',
+                      style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12, fontStyle: FontStyle.italic),
                     ),
                   ],
                 ],

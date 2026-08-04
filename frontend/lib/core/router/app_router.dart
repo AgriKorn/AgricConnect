@@ -64,7 +64,6 @@ bool _isPreAuthRoute(String location) {
       location == '/forgot-password' ||
       location == '/role-selection' ||
       location.startsWith('/register/') ||
-      location == '/pending-verification' ||
       location == '/splash' ||
       location == '/onboarding' ||
       location == '/debug/components';

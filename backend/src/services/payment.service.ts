@@ -3,6 +3,19 @@ import axios from 'axios';
 import logger from '../utils/logger';
 import { BadRequestError } from '../utils/errors';
 
+/**
+ * Every stored momoNumber is normalized to +233XXXXXXXXX on save (see
+ * normalizePhone in auth.schema.ts), but Paystack's Ghana mobile-money
+ * transfer-recipient API rejects that format outright with "Account number
+ * is invalid" — it wants the local 0XXXXXXXXX form. Without this, every
+ * escrow payout to a farmer fails at the final step, every time.
+ */
+const toLocalGhanaPhone = (phone: string): string => {
+  if (phone.startsWith('+233')) return `0${phone.slice(4)}`;
+  if (phone.startsWith('233')) return `0${phone.slice(3)}`;
+  return phone;
+};
+
 export interface InitializeTransactionResult {
   reference: string;
   authorizationUrl: string;
@@ -89,7 +102,7 @@ export class PaystackPaymentService implements IPaymentService {
         {
           type: 'mobile_money',
           name: `Recipient ${recipientPhone}`,
-          account_number: recipientPhone,
+          account_number: toLocalGhanaPhone(recipientPhone),
           bank_code: bankCode,
           currency: 'GHS',
         },
