@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -11,6 +12,27 @@ import '../data/models/user_role.dart';
 import 'widgets/auth_visuals.dart';
 
 const _markAsset = 'assets/images/agri_mark.png';
+
+/// Ghana's 16 administrative regions (post-2018 split), used for the
+/// farmer's Region dropdown.
+const _ghanaRegions = [
+  'Ahafo Region',
+  'Ashanti Region',
+  'Bono Region',
+  'Bono East Region',
+  'Central Region',
+  'Eastern Region',
+  'Greater Accra Region',
+  'North East Region',
+  'Northern Region',
+  'Oti Region',
+  'Savannah Region',
+  'Upper East Region',
+  'Upper West Region',
+  'Volta Region',
+  'Western Region',
+  'Western North Region',
+];
 
 void _openComingSoon(BuildContext context, String title, IconData icon) {
   Navigator.of(context).push(
@@ -45,12 +67,13 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _regionController = TextEditingController();
+  final _cityController = TextEditingController();
   final _businessNameController = TextEditingController();
   final _businessTypeController = TextEditingController();
   final _vehicleCapacityController = TextEditingController();
   final _operatingRegionController = TextEditingController();
 
+  String? _selectedRegion;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreedToTerms = false;
@@ -62,7 +85,7 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
     _phoneController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _regionController.dispose();
+    _cityController.dispose();
     _businessNameController.dispose();
     _businessTypeController.dispose();
     _vehicleCapacityController.dispose();
@@ -90,8 +113,12 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
             email: _emailController.text.trim(),
             phone: _phoneController.text.trim(),
             password: _passwordController.text,
+            // Backend only has a single `region` VarChar column (no
+            // separate city field) — combine the two UI inputs into the
+            // same "Region, City" string the field used to hold as free
+            // text, so the dropdown+city split stays backend-compatible.
             region: widget.role == UserRole.farmer
-                ? _regionController.text.trim()
+                ? '${_selectedRegion ?? ''}, ${_cityController.text.trim()}'
                 : null,
             businessName: widget.role == UserRole.buyer
                 ? _businessNameController.text.trim()
@@ -203,14 +230,24 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                               return null;
                             },
                           ),
-                          if (widget.role == UserRole.farmer)
-                            _Field(
-                              label: 'Region / District',
-                              controller: _regionController,
-                              hint: 'e.g. Ashanti, Kumasi',
+                          if (widget.role == UserRole.farmer) ...[
+                            _DropdownField(
+                              label: 'Region',
+                              value: _selectedRegion,
+                              items: _ghanaRegions,
+                              onChanged: (value) => setState(() => _selectedRegion = value),
+                              hint: 'Select your region',
                               icon: Icons.location_on_outlined,
                               colorScheme: colorScheme,
                             ),
+                            _Field(
+                              label: 'Town / City',
+                              controller: _cityController,
+                              hint: 'e.g. Kumasi',
+                              icon: Icons.location_city_outlined,
+                              colorScheme: colorScheme,
+                            ),
+                          ],
                           if (widget.role == UserRole.buyer) ...[
                             _Field(
                               label: 'Business name (optional)',
@@ -232,9 +269,20 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                             _Field(
                               label: 'Vehicle capacity',
                               controller: _vehicleCapacityController,
-                              hint: 'e.g. 2 tonnes',
+                              hint: 'e.g. 2',
                               icon: Icons.local_shipping_outlined,
                               colorScheme: colorScheme,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                              suffixText: 'tonnes',
+                              validator: (value) {
+                                final text = value?.trim() ?? '';
+                                if (text.isEmpty) return 'Enter vehicle capacity';
+                                if (double.tryParse(text) == null || double.parse(text) <= 0) {
+                                  return 'Enter a valid number';
+                                }
+                                return null;
+                              },
                             ),
                             _Field(
                               label: 'Operating region',
@@ -353,6 +401,8 @@ class _Field extends StatelessWidget {
     this.keyboardType,
     this.obscureText = false,
     this.onToggleObscure,
+    this.suffixText,
+    this.inputFormatters,
     this.validator,
     this.required = true,
   });
@@ -365,6 +415,8 @@ class _Field extends StatelessWidget {
   final TextInputType? keyboardType;
   final bool obscureText;
   final VoidCallback? onToggleObscure;
+  final String? suffixText;
+  final List<TextInputFormatter>? inputFormatters;
   final String? Function(String?)? validator;
   final bool required;
 
@@ -384,6 +436,8 @@ class _Field extends StatelessWidget {
             icon: icon,
             keyboardType: keyboardType,
             obscureText: obscureText,
+            suffixText: suffixText,
+            inputFormatters: inputFormatters,
             suffixIcon: onToggleObscure == null
                 ? null
                 : IconButton(
@@ -400,6 +454,49 @@ class _Field extends StatelessWidget {
                           ? 'This field is required'
                           : null
                     : null),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DropdownField extends StatelessWidget {
+  const _DropdownField({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    required this.hint,
+    required this.colorScheme,
+    this.icon,
+  });
+
+  final String label;
+  final String? value;
+  final List<String> items;
+  final ValueChanged<String?> onChanged;
+  final String hint;
+  final ColorScheme colorScheme;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AuthFieldLabel(label, colorScheme),
+          const SizedBox(height: 8),
+          AuthDropdownField(
+            value: value,
+            items: items,
+            onChanged: onChanged,
+            hint: hint,
+            icon: icon,
+            colorScheme: colorScheme,
+            validator: (value) => (value == null || value.isEmpty) ? 'This field is required' : null,
           ),
         ],
       ),

@@ -52,10 +52,26 @@ void _openFarmerHelp(BuildContext context) {
           HelpContactMethod(icon: Icons.email_outlined, label: 'Email Us', detail: 'addosakah@gmail.com'),
         ],
         faqItems: const [
-          'How do I list my produce for sale?',
-          'When will I receive payment after a sale?',
-          'How does the freshness score work?',
-          'How do I use the Scan feature to price my harvest?',
+          HelpFaqItem(
+            question: 'How do I list my produce for sale?',
+            answer:
+                'Open the Scan tab, take a photo of your harvest, and confirm the AI-suggested crop, price, and quantity. Your listing goes live on the marketplace as soon as you submit it.',
+          ),
+          HelpFaqItem(
+            question: 'When will I receive payment after a sale?',
+            answer:
+                'Payments are held in escrow until the buyer confirms delivery, then released to your linked payout method — usually within 1-2 business days after confirmation.',
+          ),
+          HelpFaqItem(
+            question: 'How does the freshness score work?',
+            answer:
+                'Our on-device AI scans your produce photo and estimates a 0-100 freshness score based on visual condition and predicted shelf life. Higher scores support higher recommended prices.',
+          ),
+          HelpFaqItem(
+            question: 'How do I use the Scan feature to price my harvest?',
+            answer:
+                'Tap Scan, point your camera at the produce, and the app identifies the crop and freshness, then recommends a fair price using real market reference data for your region.',
+          ),
         ],
         resourceLinks: const [
           HelpResourceLink(icon: Icons.description_outlined, label: 'Terms of Service'),

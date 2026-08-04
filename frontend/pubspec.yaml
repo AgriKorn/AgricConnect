@@ -55,11 +55,20 @@ dependencies:
   hive_flutter: ^1.1.0
   camera: ^0.12.0+2
   image_picker: ^1.1.2
+  # On-device crop freshness scan (ai/model/agriconnect.tflite) — see core/ai
+  tflite_flutter: ^0.12.1
+  # Decodes/resizes captured photos into the model's input tensor
+  image: ^4.9.1
   # Launches tel:/mailto: from Help & Support contact rows
   url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  # Runs real on-device tests against an emulator/device — unlike
+  # flutter_test's flutter_tester host, this has the real native
+  # tflite_flutter library, needed to verify actual (not mocked) inference.
+  integration_test:
     sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints to
@@ -87,6 +96,12 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/images/
+    - assets/models/
+    # Bundled so google_fonts never needs a network fetch (PRD 7.1: must
+    # work on patchy rural networks) — see lib/main.dart's
+    # allowRuntimeFetching = false. google_fonts finds these automatically
+    # by filename (Inter-<Weight>.ttf); no `fonts:` section needed.
+    - assets/fonts/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

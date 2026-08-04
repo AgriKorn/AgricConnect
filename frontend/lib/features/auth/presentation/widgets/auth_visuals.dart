@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 export '../../../../core/widgets/ambient_background.dart' show AmbientBackground;
 
@@ -71,6 +72,8 @@ class AuthTextField extends StatelessWidget {
     this.keyboardType,
     this.obscureText = false,
     this.suffixIcon,
+    this.suffixText,
+    this.inputFormatters,
     this.validator,
   });
 
@@ -81,6 +84,8 @@ class AuthTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final bool obscureText;
   final Widget? suffixIcon;
+  final String? suffixText;
+  final List<TextInputFormatter>? inputFormatters;
   final String? Function(String?)? validator;
 
   @override
@@ -89,6 +94,7 @@ class AuthTextField extends StatelessWidget {
       controller: controller,
       keyboardType: keyboardType,
       obscureText: obscureText,
+      inputFormatters: inputFormatters,
       validator: validator,
       style: TextStyle(color: colorScheme.onSurface),
       decoration: InputDecoration(
@@ -98,9 +104,57 @@ class AuthTextField extends StatelessWidget {
         hintStyle: TextStyle(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
         prefixIcon: icon == null ? null : Icon(icon, color: colorScheme.primary, size: 20),
         suffixIcon: suffixIcon,
+        suffixText: suffixText,
+        suffixStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
         contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
       ),
+    );
+  }
+}
+
+class AuthDropdownField extends StatelessWidget {
+  const AuthDropdownField({
+    super.key,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    required this.hint,
+    required this.colorScheme,
+    this.icon,
+    this.validator,
+  });
+
+  final String? value;
+  final List<String> items;
+  final ValueChanged<String?> onChanged;
+  final String hint;
+  final ColorScheme colorScheme;
+  final IconData? icon;
+  final String? Function(String?)? validator;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      initialValue: value,
+      isExpanded: true,
+      validator: validator,
+      icon: Icon(Icons.keyboard_arrow_down_rounded, color: colorScheme.onSurfaceVariant),
+      dropdownColor: colorScheme.surfaceContainerHighest,
+      style: TextStyle(color: colorScheme.onSurface, fontSize: 15),
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: colorScheme.surfaceContainerHighest,
+        hintText: hint,
+        hintStyle: TextStyle(color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7)),
+        prefixIcon: icon == null ? null : Icon(icon, color: colorScheme.primary, size: 20),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      ),
+      items: [
+        for (final item in items) DropdownMenuItem(value: item, child: Text(item, overflow: TextOverflow.ellipsis)),
+      ],
+      onChanged: onChanged,
     );
   }
 }
