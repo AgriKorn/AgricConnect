@@ -17,7 +17,16 @@ import '../../../data/models/user_role.dart';
 ///
 /// One shared instance: renderButton() and onCurrentUserChanged both need
 /// to talk to the same underlying GIS client, not a fresh one per rebuild.
-final GoogleSignIn _webGoogleSignIn = GoogleSignIn(serverClientId: SupabaseConfig.googleWebClientId);
+///
+/// clientId, not serverClientId: google_sign_in_web's GIS implementation
+/// explicitly asserts `serverClientId == null` and otherwise has no client
+/// ID to initialize with (no <meta name="google-signin-client_id"> tag
+/// either), which throws a null check operator error deep inside the
+/// plugin — the "Getting ready" placeholder then waits forever on an
+/// `initialized` Future that can never complete. Using the same Web OAuth
+/// client as clientId here still produces an ID token whose audience
+/// matches what Supabase's Google provider expects.
+final GoogleSignIn _webGoogleSignIn = GoogleSignIn(clientId: SupabaseConfig.googleWebClientId);
 
 Widget buildGoogleAuthButton({
   required ColorScheme colorScheme,
