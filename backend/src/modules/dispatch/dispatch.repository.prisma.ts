@@ -28,6 +28,20 @@ const statusFromPrisma = (status: assignment_status): DriverJobStatus => {
   }
 };
 
+// Farmer (pickup contact) comes via orders.produce_listings.users; buyer
+// (dropoff contact) via orders.users — same "users" relation name, two
+// different joins, same shape needed on every query below.
+const jobInclude = {
+  orders: {
+    include: {
+      users: true,
+      produce_listings: {
+        include: { crop_types: true, users: true },
+      },
+    },
+  },
+} as const;
+
 const mapPrismaToJob = (a: any): DriverJob => ({
   id: a.id,
   transactionId: a.order_id,
@@ -35,9 +49,16 @@ const mapPrismaToJob = (a: any): DriverJob => ({
   driverId: a.driver_id,
   cropType: a.orders?.produce_listings?.crop_types?.name || 'crop',
   quantityKg: a.orders?.produce_listings?.quantity_kg ? Number(a.orders.produce_listings.quantity_kg) : 100,
+  amountGhs: a.orders?.amount ? Number(a.orders.amount) : 0,
   status: statusFromPrisma(a.status),
   createdAt: a.notified_at,
   updatedAt: a.responded_at || a.notified_at,
+  farmerName: a.orders?.produce_listings?.users?.full_name || null,
+  farmerPhone: a.orders?.produce_listings?.users?.phone_number || null,
+  pickupRegion: a.orders?.produce_listings?.region || null,
+  buyerName: a.orders?.users?.full_name || null,
+  buyerPhone: a.orders?.users?.phone_number || null,
+  dropoffRegion: a.orders?.users?.region || null,
 });
 
 export class PrismaDispatchRepository implements IDispatchRepository {
@@ -53,15 +74,7 @@ export class PrismaDispatchRepository implements IDispatchRepository {
         sequence_number: existing + 1,
         status: 'notified',
       },
-      include: {
-        orders: {
-          include: {
-            produce_listings: {
-              include: { crop_types: true },
-            },
-          },
-        },
-      },
+      include: jobInclude,
     });
 
     return mapPrismaToJob(assignment);
@@ -70,15 +83,7 @@ export class PrismaDispatchRepository implements IDispatchRepository {
   async findById(id: string): Promise<DriverJob | null> {
     const found = await prisma.driver_assignments.findUnique({
       where: { id },
-      include: {
-        orders: {
-          include: {
-            produce_listings: {
-              include: { crop_types: true },
-            },
-          },
-        },
-      },
+      include: jobInclude,
     });
     return found ? mapPrismaToJob(found) : null;
   }
@@ -86,15 +91,7 @@ export class PrismaDispatchRepository implements IDispatchRepository {
   async findAllForTransaction(transactionId: string): Promise<DriverJob[]> {
     const list = await prisma.driver_assignments.findMany({
       where: { order_id: transactionId },
-      include: {
-        orders: {
-          include: {
-            produce_listings: {
-              include: { crop_types: true },
-            },
-          },
-        },
-      },
+      include: jobInclude,
       orderBy: { sequence_number: 'asc' },
     });
     return list.map(mapPrismaToJob);
@@ -106,15 +103,7 @@ export class PrismaDispatchRepository implements IDispatchRepository {
         order_id: transactionId,
         status: { in: ['notified', 'accepted'] },
       },
-      include: {
-        orders: {
-          include: {
-            produce_listings: {
-              include: { crop_types: true },
-            },
-          },
-        },
-      },
+      include: jobInclude,
       orderBy: { sequence_number: 'desc' },
     });
     return found ? mapPrismaToJob(found) : null;
@@ -128,15 +117,7 @@ export class PrismaDispatchRepository implements IDispatchRepository {
 
     const list = await prisma.driver_assignments.findMany({
       where,
-      include: {
-        orders: {
-          include: {
-            produce_listings: {
-              include: { crop_types: true },
-            },
-          },
-        },
-      },
+      include: jobInclude,
       orderBy: { notified_at: 'desc' },
     });
     return list.map(mapPrismaToJob);
@@ -149,15 +130,7 @@ export class PrismaDispatchRepository implements IDispatchRepository {
         status: statusToPrisma(status),
         responded_at: new Date(),
       },
-      include: {
-        orders: {
-          include: {
-            produce_listings: {
-              include: { crop_types: true },
-            },
-          },
-        },
-      },
+      include: jobInclude,
     });
 
     return mapPrismaToJob(updated);

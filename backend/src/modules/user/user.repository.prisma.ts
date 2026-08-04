@@ -3,6 +3,13 @@ import { CreateUserRecord, IUserRepository } from './user.repository';
 import { User, UserRole, UserStatus } from './user.types';
 import { account_status, user_role, driver_availability } from '../../generated/prisma/client';
 
+// approved_by is a real FK to users.id — a non-UUID actor (a one-off CLI
+// script's sentinel string, for example) would otherwise crash the update
+// with a raw Postgres "invalid input syntax for type uuid" error instead of
+// just recording no approver. Mirrors audit.repository.prisma.ts's isUuid.
+const isUuid = (str: string): boolean =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+
 const statusToPrisma = (status: UserStatus): account_status => {
   switch (status) {
     case 'ACTIVE':
@@ -34,17 +41,26 @@ const mapPrismaToUser = (p: any): User => {
     id: p.id,
     name: p.full_name,
     phone: p.phone_number,
+    email: p.email || null,
     passwordHash: p.password_hash || '',
     role: p.role as UserRole,
     status: statusFromPrisma(p.account_status),
     otp: null,
     otpExpiry: null,
     refreshToken: p.refresh_token || null,
+    approvedBy: p.approved_by || null,
+    approvedAt: p.approved_at || null,
     profile: {
       farmRegion: p.region || undefined,
       operatingRegion: driver?.operating_region || p.region || undefined,
       truckCapacity: driver ? Number(driver.truck_capacity_kg) : undefined,
       isAvailable: driver ? driver.availability_status === 'available' : undefined,
+      momoNumber: p.momo_number || undefined,
+      momoNetwork: p.momo_network || undefined,
+      businessName: p.business_name || undefined,
+      businessType: p.business_type || undefined,
+      photoUrl: p.photo_url || undefined,
+      notificationPreferences: p.notification_prefs || undefined,
     },
     createdAt: p.created_at,
     updatedAt: p.updated_at,
@@ -57,16 +73,13 @@ export class PrismaUserRepository implements IUserRepository {
       data: {
         phone_number: data.phone,
         full_name: data.name,
-        // Without this the row is created with a null password_hash and the
-        // account can never log in — bcrypt.compare fails against an empty
-        // string, surfacing as "Invalid credentials" for a registration that
-        // reported success.
         password_hash: data.passwordHash,
         role: data.role as user_role,
-        // Registration does not collect a region and the column is NOT NULL.
-        // Overwritten by the first PATCH /api/users/profile.
-        region: 'Greater Accra',
-        account_status: 'pending',
+        region: data.region || 'Greater Accra',
+        account_status: data.role === 'buyer' ? 'approved' : 'pending',
+        ...(data.email && { email: data.email }),
+        ...(data.businessName && { business_name: data.businessName }),
+        ...(data.businessType && { business_type: data.businessType }),
       },
     });
 
@@ -74,8 +87,8 @@ export class PrismaUserRepository implements IUserRepository {
       await prisma.driver_details.create({
         data: {
           user_id: created.id,
-          truck_capacity_kg: 1000,
-          operating_region: 'Greater Accra',
+          truck_capacity_kg: data.vehicleCapacityKg || 1000,
+          operating_region: data.operatingRegion || data.region || 'Greater Accra',
           availability_status: 'available',
         },
       });
@@ -93,6 +106,14 @@ export class PrismaUserRepository implements IUserRepository {
     return found ? mapPrismaToUser(found) : null;
   }
 
+  async findByEmail(email: string): Promise<User | null> {
+    const found = await prisma.user.findUnique({
+      where: { email },
+      include: { driver_details: true },
+    });
+    return found ? mapPrismaToUser(found) : null;
+  }
+
   async findById(id: string): Promise<User | null> {
     const found = await prisma.user.findUnique({
       where: { id },
@@ -105,6 +126,18 @@ export class PrismaUserRepository implements IUserRepository {
     const list = await prisma.user.findMany({
       where: { account_status: statusToPrisma(status) },
       include: { driver_details: true },
+      // Newest first — an admin reviewing a growing queue should see what
+      // just came in without scrolling past everything already waiting.
+      orderBy: { created_at: 'desc' },
+    });
+    return list.map(mapPrismaToUser);
+  }
+
+  async findManyByRole(role: UserRole): Promise<User[]> {
+    const list = await prisma.user.findMany({
+      where: { role: role as user_role },
+      include: { driver_details: true },
+      orderBy: { created_at: 'desc' },
     });
     return list.map(mapPrismaToUser);
   }
@@ -136,8 +169,11 @@ export class PrismaUserRepository implements IUserRepository {
   async update(id: string, data: Partial<User>): Promise<User> {
     const updateData: any = {};
     if (data.name) updateData.full_name = data.name;
+    if (data.email !== undefined) updateData.email = data.email;
     if (data.status) updateData.account_status = statusToPrisma(data.status);
     if (data.refreshToken !== undefined) updateData.refresh_token = data.refreshToken;
+    if (data.approvedBy !== undefined) updateData.approved_by = data.approvedBy && isUuid(data.approvedBy) ? data.approvedBy : null;
+    if (data.approvedAt !== undefined) updateData.approved_at = data.approvedAt;
     // AuthService.resetPassword writes the new hash through this method; without
     // this line the reset reports success and silently changes nothing.
     if (data.passwordHash !== undefined) updateData.password_hash = data.passwordHash;
@@ -152,10 +188,27 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   async updateProfile(id: string, profile: Partial<User['profile']>): Promise<User> {
-    if (profile.farmRegion || profile.operatingRegion) {
+    if (
+      profile.farmRegion ||
+      profile.operatingRegion ||
+      profile.momoNumber ||
+      profile.momoNetwork ||
+      profile.businessName ||
+      profile.businessType ||
+      profile.photoUrl ||
+      profile.notificationPreferences
+    ) {
       await prisma.user.update({
         where: { id },
-        data: { region: profile.farmRegion || profile.operatingRegion },
+        data: {
+          ...((profile.farmRegion || profile.operatingRegion) && { region: profile.farmRegion || profile.operatingRegion }),
+          ...(profile.momoNumber && { momo_number: profile.momoNumber }),
+          ...(profile.momoNetwork && { momo_network: profile.momoNetwork }),
+          ...(profile.businessName && { business_name: profile.businessName }),
+          ...(profile.businessType && { business_type: profile.businessType }),
+          ...(profile.photoUrl && { photo_url: profile.photoUrl }),
+          ...(profile.notificationPreferences && { notification_prefs: profile.notificationPreferences }),
+        },
       });
     }
 

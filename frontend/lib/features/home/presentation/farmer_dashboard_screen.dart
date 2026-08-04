@@ -1,6 +1,3 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,10 +7,14 @@ import '../../../core/utils/currency.dart';
 import '../../../core/utils/freshness.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../orders/presentation/farmer_sales_screen.dart';
 import '../application/farmer_dashboard_providers.dart';
 import '../data/farmer_dashboard_mock.dart';
+import '../data/farmer_dashboard_repository.dart';
+import '../data/weather_repository.dart';
 
 /// Farmer Home: greeting header -> Market trend banner -> Scan CTA ->
 /// Active Listings carousel -> Overview stats grid.
@@ -23,8 +24,10 @@ class FarmerDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
-    final summary = ref.watch(farmerDashboardSummaryProvider);
-    final listings = ref.watch(farmerListingsProvider).where((listing) => listing.status == 'Active').toList();
+    final summaryAsync = ref.watch(farmerDashboardSummaryProvider);
+    final weatherAsync = ref.watch(farmerWeatherProvider);
+    final listingsAsync = ref.watch(farmerListingsProvider);
+    final listings = listingsAsync.valueOrNull?.where((listing) => listing.status == 'Active').toList() ?? const [];
     final alertCount = ref.watch(freshnessAlertsProvider).length;
     final rawName = ref.watch(authControllerProvider).user?.name.trim();
     final firstName = (rawName != null && rawName.isNotEmpty) ? rawName.split(RegExp(r'\s+')).first : 'Farmer';
@@ -35,17 +38,19 @@ class FarmerDashboardScreen extends ConsumerWidget {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: ListView(
+            child: ResponsiveContent(
+              child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               children: [
                 _DashboardHeader(
                   colorScheme: colorScheme,
                   name: firstName,
-                  summary: summary,
+                  location: summaryAsync.valueOrNull?.location,
+                  weather: weatherAsync.valueOrNull,
                   onBell: () => context.go('/farmer/alerts'),
                 ),
                 const SizedBox(height: 20),
-                _MarketTrendCard(colorScheme: colorScheme, summary: summary),
+                _MarketTrendCard(colorScheme: colorScheme, summary: summaryAsync.valueOrNull),
                 const SizedBox(height: 20),
                 _ScanCard(colorScheme: colorScheme, onScan: () => context.go('/farmer/scan')),
                 const SizedBox(height: 28),
@@ -68,7 +73,9 @@ class FarmerDashboardScreen extends ConsumerWidget {
                 const SizedBox(height: 12),
                 SizedBox(
                   height: 210,
-                  child: listings.isEmpty
+                  child: listingsAsync.isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : listings.isEmpty
                       ? EmptyState(
                           icon: Icons.inventory_2_outlined,
                           message: 'You have no active listings yet.',
@@ -88,8 +95,9 @@ class FarmerDashboardScreen extends ConsumerWidget {
                   style: TextStyle(color: colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 12),
-                _OverviewGrid(colorScheme: colorScheme, summary: summary, alertCount: alertCount),
+                _OverviewGrid(colorScheme: colorScheme, summary: summaryAsync.valueOrNull, alertCount: alertCount),
               ],
+              ),
             ),
           ),
         ],
@@ -109,13 +117,15 @@ class _DashboardHeader extends StatelessWidget {
   const _DashboardHeader({
     required this.colorScheme,
     required this.name,
-    required this.summary,
+    required this.location,
+    required this.weather,
     required this.onBell,
   });
 
   final ColorScheme colorScheme;
   final String name;
-  final FarmerDashboardSummary summary;
+  final String? location;
+  final WeatherSnapshot? weather;
   final VoidCallback onBell;
 
   @override
@@ -124,14 +134,7 @@ class _DashboardHeader extends StatelessWidget {
       children: [
         GestureDetector(
           onTap: () => context.go('/farmer/profile'),
-          child: SizedBox(
-            width: 52,
-            height: 52,
-            child: UserAvatar(
-              size: 52,
-              fallback: (context) => GreenInitialsAvatar(name: name, size: 52, colorScheme: colorScheme),
-            ),
-          ),
+          child: const SizedBox(width: 52, height: 52, child: UserAvatar(size: 52)),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -145,16 +148,23 @@ class _DashboardHeader extends StatelessWidget {
                 style: TextStyle(color: colorScheme.onSurface, fontSize: 19, fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 3),
-              Row(
-                children: [
-                  Icon(summary.weatherIcon, size: 14, color: colorScheme.onSurfaceVariant),
-                  const SizedBox(width: 4),
-                  Text(
-                    '${summary.weatherTempC}°C · ${summary.location}',
-                    style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12.5),
-                  ),
-                ],
-              ),
+              if (weather != null || location != null)
+                Row(
+                  children: [
+                    if (weather != null) ...[
+                      Icon(weather!.icon, size: 14, color: colorScheme.onSurfaceVariant),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${weather!.tempC.round()}°C${location != null ? ' · $location' : ''}',
+                        style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12.5),
+                      ),
+                    ] else if (location != null)
+                      Text(
+                        location!,
+                        style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12.5),
+                      ),
+                  ],
+                ),
             ],
           ),
         ),
@@ -182,11 +192,12 @@ class _MarketTrendCard extends StatelessWidget {
   const _MarketTrendCard({required this.colorScheme, required this.summary});
 
   final ColorScheme colorScheme;
-  final FarmerDashboardSummary summary;
+  final FarmerDashboardSummary? summary;
 
   @override
   Widget build(BuildContext context) {
-    final isUp = summary.marketTrendPercent >= 0;
+    final trend = summary?.marketTrendPercent;
+    final isUp = (trend ?? 0) >= 0;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -205,13 +216,17 @@ class _MarketTrendCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Market is ${isUp ? 'Up' : 'Down'}',
+                  trend == null ? 'Market Trend' : 'Market is ${isUp ? 'Up' : 'Down'}',
                   style: TextStyle(color: colorScheme.onPrimary, fontSize: 14, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '${isUp ? '+' : ''}${summary.marketTrendPercent.toStringAsFixed(1)}% Today',
-                  style: TextStyle(color: colorScheme.onPrimary, fontSize: 26, fontWeight: FontWeight.w800),
+                  trend == null ? 'Not enough price history yet' : '${isUp ? '+' : ''}${trend.toStringAsFixed(1)}%',
+                  style: TextStyle(
+                    color: colorScheme.onPrimary,
+                    fontSize: trend == null ? 18 : 26,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: 14),
                 Row(
@@ -229,7 +244,7 @@ class _MarketTrendCard extends StatelessWidget {
             ),
           ),
           Icon(
-            isUp ? Icons.trending_up_rounded : Icons.trending_down_rounded,
+            trend == null ? Icons.show_chart_rounded : (isUp ? Icons.trending_up_rounded : Icons.trending_down_rounded),
             color: colorScheme.onPrimary,
             size: 30,
           ),
@@ -323,7 +338,22 @@ class _ListingCard extends StatelessWidget {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: _dashboardListingImage(listing, accent),
+                      child: listing.imageUrl != null
+                          ? Image.network(listing.imageUrl!, fit: BoxFit.cover)
+                          : listing.imageAsset != null
+                          ? Image.asset(listing.imageAsset!, fit: BoxFit.cover)
+                          : DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.12)],
+                                ),
+                              ),
+                              child: Center(
+                                child: Icon(Icons.eco_rounded, size: 40, color: accent.withValues(alpha: 0.8)),
+                              ),
+                            ),
                     ),
                     Positioned(
                       top: 8,
@@ -367,40 +397,11 @@ class _ListingCard extends StatelessWidget {
   }
 }
 
-Widget _dashboardListingImage(FarmerListingSummary listing, Color accent) {
-  Widget fallback() {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.12)],
-        ),
-      ),
-      child: Center(
-        child: Icon(Icons.eco_rounded, size: 40, color: accent.withValues(alpha: 0.8)),
-      ),
-    );
-  }
-
-  if (!kIsWeb && listing.imagePath != null) {
-    return Image.file(
-      File(listing.imagePath!),
-      fit: BoxFit.cover,
-      errorBuilder: (context, error, stackTrace) => fallback(),
-    );
-  }
-  if (listing.imageAsset != null) {
-    return Image.asset(listing.imageAsset!, fit: BoxFit.cover);
-  }
-  return fallback();
-}
-
 class _OverviewGrid extends StatelessWidget {
   const _OverviewGrid({required this.colorScheme, required this.summary, required this.alertCount});
 
   final ColorScheme colorScheme;
-  final FarmerDashboardSummary summary;
+  final FarmerDashboardSummary? summary;
   final int alertCount;
 
   @override
@@ -414,7 +415,7 @@ class _OverviewGrid extends StatelessWidget {
               child: _StatTile(
                 colorScheme: colorScheme,
                 dotColor: colorScheme.primary,
-                value: formatGhs(summary.todaysEarnings),
+                value: formatGhs(summary?.todaysEarningsGhs ?? 0),
                 label: "Today's Earnings",
               ),
             ),
@@ -423,8 +424,11 @@ class _OverviewGrid extends StatelessWidget {
               child: _StatTile(
                 colorScheme: colorScheme,
                 dotColor: colorScheme.primary,
-                value: '${summary.activeOrders}',
+                value: '${summary?.activeOrders ?? 0}',
                 label: 'Active Orders',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const FarmerSalesScreen()),
+                ),
               ),
             ),
           ],
@@ -445,8 +449,8 @@ class _OverviewGrid extends StatelessWidget {
               child: _StatTile(
                 colorScheme: colorScheme,
                 dotColor: colorScheme.secondary,
-                value: '${summary.profileViews}',
-                label: 'Profile Views',
+                value: formatGhs(summary?.totalEarningsGhs ?? 0),
+                label: 'Total Earnings',
               ),
             ),
           ],
@@ -462,16 +466,18 @@ class _StatTile extends StatelessWidget {
     required this.dotColor,
     required this.value,
     required this.label,
+    this.onTap,
   });
 
   final ColorScheme colorScheme;
   final Color dotColor;
   final String value;
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final content = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         border: Border.all(color: dotColor.withValues(alpha: 0.5)),
@@ -500,8 +506,11 @@ class _StatTile extends StatelessWidget {
               ],
             ),
           ),
+          if (onTap != null) Icon(Icons.chevron_right_rounded, color: colorScheme.onSurfaceVariant, size: 18),
         ],
       ),
     );
+    if (onTap == null) return content;
+    return InkWell(borderRadius: BorderRadius.circular(20), onTap: onTap, child: content);
   }
 }

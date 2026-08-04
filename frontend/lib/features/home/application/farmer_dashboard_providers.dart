@@ -1,30 +1,87 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../marketplace/data/marketplace_repository.dart';
 import '../data/farmer_dashboard_mock.dart';
+import '../data/farmer_dashboard_repository.dart';
+import '../data/weather_repository.dart';
 
-final farmerDashboardSummaryProvider = Provider<FarmerDashboardSummary>((ref) {
-  return mockDashboardSummary;
+/// Real dashboard/profile numbers (earnings, active orders, sales, primary
+/// crops, market trend) — GET /dashboard/farmer-summary.
+final farmerDashboardSummaryProvider = FutureProvider<FarmerDashboardSummary>((ref) {
+  return ref.read(farmerDashboardRepositoryProvider).fetchSummary();
 });
 
-final farmerProfileDetailsProvider = Provider<FarmerProfileDetails>((ref) {
-  return mockFarmerProfileDetails;
+/// Real current weather for the farmer's own region (Open-Meteo, no API
+/// key). Best-effort — a weather outage shouldn't break the dashboard, so
+/// this resolves to null rather than throwing.
+final farmerWeatherProvider = FutureProvider<WeatherSnapshot?>((ref) async {
+  final summary = await ref.watch(farmerDashboardSummaryProvider.future);
+  final (lat, long) = coordinatesForRegion(summary.location);
+  try {
+    return await ref.read(weatherRepositoryProvider).fetchCurrent(lat: lat, long: long);
+  } catch (_) {
+    return null;
+  }
 });
 
-/// Mutable so [AddListingScreen] (scan-assisted or manual entry) can append
-/// a real listing that then shows up in My Listings — not just a static mock.
-class FarmerListingsController extends Notifier<List<FarmerListingSummary>> {
+/// Backed by GET/POST /listings — a farmer's real, persisted listings.
+class FarmerListingsController extends AsyncNotifier<List<FarmerListingSummary>> {
   @override
-  List<FarmerListingSummary> build() => List.of(mockFarmerListings);
+  Future<List<FarmerListingSummary>> build() {
+    return ref.read(marketplaceRepositoryProvider).fetchMyListings();
+  }
 
-  void addListing(FarmerListingSummary listing) {
-    state = [listing, ...state];
+  Future<void> addListing({
+    required String cropType,
+    required double quantityKg,
+    required int freshnessScore,
+    required int shelfLifeDays,
+    required double farmerLat,
+    required double farmerLong,
+    required double pricePerKg,
+    String? imageUrl,
+    String? description,
+  }) async {
+    await ref.read(marketplaceRepositoryProvider).createListing(
+          cropType: cropType,
+          quantityKg: quantityKg,
+          freshnessScore: freshnessScore,
+          shelfLifeDays: shelfLifeDays,
+          farmerLat: farmerLat,
+          farmerLong: farmerLong,
+          pricePerKg: pricePerKg,
+          imageUrl: imageUrl,
+          description: description,
+        );
+    ref.invalidateSelf();
+    await future;
+  }
+
+  Future<void> deleteListing(String id) async {
+    await ref.read(marketplaceRepositoryProvider).deleteListing(id);
+    ref.invalidateSelf();
+    await future;
+  }
+
+  /// Price and quantity are the only fields the backend allows editing after
+  /// a listing is created (PATCH /listings/:id) — crop, freshness, and shelf
+  /// life are fixed at creation time.
+  Future<void> updateListing(String id, {double? pricePerKg, double? quantityKg}) async {
+    await ref.read(marketplaceRepositoryProvider).updateListing(id, pricePerKg: pricePerKg, quantityKg: quantityKg);
+    ref.invalidateSelf();
+    await future;
   }
 }
 
-final farmerListingsProvider = NotifierProvider<FarmerListingsController, List<FarmerListingSummary>>(
+final farmerListingsProvider = AsyncNotifierProvider<FarmerListingsController, List<FarmerListingSummary>>(
   FarmerListingsController.new,
 );
 
-final freshnessAlertsProvider = Provider<List<FreshnessAlertItem>>((ref) {
-  return mockFreshnessAlerts;
+/// Real low-freshness listings pulled straight from the farmer's own active
+/// listings — replaces the old fixed 2-item mock that never matched what
+/// was actually listed.
+final freshnessAlertsProvider = Provider<List<FarmerListingSummary>>((ref) {
+  final listings = ref.watch(farmerListingsProvider).valueOrNull ?? const [];
+  return listings.where((l) => l.status == 'Active' && l.freshnessScore < 60).toList()
+    ..sort((a, b) => a.freshnessScore.compareTo(b.freshnessScore));
 });

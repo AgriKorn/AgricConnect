@@ -3,6 +3,29 @@ import { CreateTransactionRecord, ITransactionRepository } from './transaction.r
 import { Transaction, TransactionStatus } from './transaction.types';
 import { Prisma } from '../../generated/prisma/client';
 
+/** The driver who accepted this delivery job, if any — most recent acceptance wins. */
+const acceptedDriverInclude = {
+  where: { status: 'accepted' as const },
+  orderBy: { responded_at: 'desc' as const },
+  take: 1,
+  include: { users: true },
+};
+
+/**
+ * Every relation mapPrismaToTransaction actually reads: the buyer (top-level
+ * `users`), the farmer and crop name (via `produce_listings`), the driver,
+ * and the payment/escrow record. Without the nested `produce_listings`
+ * include, farmerName/cropType silently fall back to null/'crop' — this is
+ * the one complete shape; every read method below should use it rather than
+ * re-declaring its own partial version.
+ */
+const transactionInclude = {
+  payments: true,
+  users: true,
+  produce_listings: { include: { crop_types: true, users: true } },
+  driver_assignments: acceptedDriverInclude,
+} as const;
+
 const mapPrismaToTransaction = (order: any, farmerId?: string): Transaction => {
   let status: TransactionStatus = 'PAYMENT_HELD';
   if (order.order_status === 'completed' || order.payments?.status === 'released') {
@@ -16,11 +39,19 @@ const mapPrismaToTransaction = (order: any, farmerId?: string): Transaction => {
     listingId: order.listing_id,
     buyerId: order.buyer_id,
     farmerId: farmerId || order.produce_listings?.farmer_id || 'unknown',
+    farmerName: order.produce_listings?.users?.full_name || null,
+    // orders.users is the buyer relation (buyer_id); the farmer comes via
+    // produce_listings.users above — same relation name, different join.
+    buyerName: order.users?.full_name || null,
+    driverName: order.driver_assignments?.[0]?.users?.full_name || null,
+    driverPhone: order.driver_assignments?.[0]?.users?.phone_number || null,
+    driverId: order.driver_assignments?.[0]?.driver_id || null,
+    cropType: order.produce_listings?.crop_types?.name || 'crop',
     amountGhs: Number(order.amount),
     status,
     hasOwnTransport: order.transport_mode === 'self_collect',
     paymentReference: order.payments?.provider_reference || `ref-${order.id.slice(0, 8)}`,
-    transferCode: null,
+    transferCode: order.payments?.payout_reference || null,
     createdAt: order.created_at,
     updatedAt: order.updated_at,
   };
@@ -46,7 +77,7 @@ export class PrismaTransactionRepository implements ITransactionRepository {
           },
         },
       },
-      include: { payments: true, produce_listings: true },
+      include: transactionInclude,
     });
 
     return mapPrismaToTransaction(order, data.farmerId);
@@ -55,7 +86,7 @@ export class PrismaTransactionRepository implements ITransactionRepository {
   async findById(id: string): Promise<Transaction | null> {
     const found = await prisma.orders.findUnique({
       where: { id },
-      include: { payments: true, produce_listings: true },
+      include: transactionInclude,
     });
     return found ? mapPrismaToTransaction(found) : null;
   }
@@ -66,7 +97,7 @@ export class PrismaTransactionRepository implements ITransactionRepository {
         listing_id: listingId,
         order_status: { notIn: ['cancelled', 'completed'] },
       },
-      include: { payments: true, produce_listings: true },
+      include: transactionInclude,
     });
     return found ? mapPrismaToTransaction(found) : null;
   }
@@ -79,7 +110,7 @@ export class PrismaTransactionRepository implements ITransactionRepository {
         listing_id: listingId,
         created_at: { gte: cutoff },
       },
-      include: { payments: true, produce_listings: true },
+      include: transactionInclude,
       orderBy: { created_at: 'desc' },
     });
     return found ? mapPrismaToTransaction(found) : null;
@@ -90,7 +121,7 @@ export class PrismaTransactionRepository implements ITransactionRepository {
       where: {
         OR: [{ buyer_id: userId }, { produce_listings: { farmer_id: userId } }],
       },
-      include: { payments: true, produce_listings: true },
+      include: transactionInclude,
       orderBy: { created_at: 'desc' },
     });
     return list.map((o) => mapPrismaToTransaction(o));
@@ -98,7 +129,7 @@ export class PrismaTransactionRepository implements ITransactionRepository {
 
   async findAll(): Promise<Transaction[]> {
     const list = await prisma.orders.findMany({
-      include: { payments: true, produce_listings: true },
+      include: transactionInclude,
       orderBy: { created_at: 'desc' },
     });
     return list.map((o) => mapPrismaToTransaction(o));
@@ -112,7 +143,11 @@ export class PrismaTransactionRepository implements ITransactionRepository {
       updateData.completed_at = new Date();
       await prisma.payments.updateMany({
         where: { order_id: id },
-        data: { status: 'released', released_at: new Date() },
+        data: {
+          status: 'released',
+          released_at: new Date(),
+          ...(data.transferCode && { payout_reference: data.transferCode }),
+        },
       });
     } else if (data.status === 'CANCELLED') {
       updateData.order_status = 'cancelled';
@@ -125,7 +160,7 @@ export class PrismaTransactionRepository implements ITransactionRepository {
     const updated = await prisma.orders.update({
       where: { id },
       data: updateData,
-      include: { payments: true, produce_listings: true },
+      include: transactionInclude,
     });
 
     return mapPrismaToTransaction(updated);

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,11 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/storage/local_prefs.dart';
 import '../../../core/storage/secure_storage.dart';
+import '../../home/application/farmer_dashboard_providers.dart';
 import '../data/auth_repository.dart';
 import '../data/models/account_status.dart';
 import '../data/models/auth_response_model.dart';
 import '../data/models/register_request.dart';
 import '../data/models/user_model.dart';
+import '../data/models/user_role.dart';
 import 'session_state.dart';
 
 const _sessionSnapshotKey = 'auth_session_snapshot';
@@ -18,11 +21,8 @@ const _sessionSnapshotKey = 'auth_session_snapshot';
 /// this via [authControllerProvider] (claude.md: role/verificationStatus
 /// claims drive the redirect guard).
 class AuthController extends Notifier<SessionState> {
-  late String? _phoneForDebugApproval;
-
   @override
   SessionState build() {
-    _phoneForDebugApproval = null;
     Future.microtask(_restoreSession);
     return SessionState.initial();
   }
@@ -73,46 +73,64 @@ class AuthController extends Notifier<SessionState> {
   Future<void> register(RegisterRequest request) async {
     state = state.copyWith(isSubmitting: true, errorMessage: null);
     try {
-      final response = await ref.read(authRepositoryProvider).register(request);
-      _phoneForDebugApproval = request.phone;
-      await _applyAuthResponse(response);
+      final result = await ref.read(authRepositoryProvider).register(request);
+
+      // Registration succeeded. The backend does NOT return tokens on
+      // registration, so we set a success message and direct the user to log
+      // in (buyers) or wait for approval (farmers/drivers).
+      state = SessionState(
+        status: result.isBuyer
+            ? AuthStatus.unauthenticated
+            : AuthStatus.pendingVerification,
+        isSubmitting: false,
+        errorMessage: null,
+        successMessage: result.message,
+      );
     } on ApiException catch (e) {
       state = state.copyWith(isSubmitting: false, errorMessage: e.message);
     }
   }
 
-  /// Local-only edit (checklist: no `PATCH /users/me` endpoint yet) — updates
-  /// the signed-in [UserModel] and persists it the same way the post-login
-  /// snapshot is, so the change survives app restarts and shows up anywhere
-  /// [authControllerProvider] is read from.
+  /// Saves through PATCH /users/profile — name and region are the only
+  /// fields this screen can actually change. Phone and email aren't in
+  /// updateProfileSchema at all (changing your login email needs its own
+  /// verified flow, not a silent free-text edit), so EditProfileScreen
+  /// shows them read-only rather than accepting edits it can't persist.
+  /// The local snapshot is only updated after the server confirms the
+  /// write, so a failed save can't leave the UI showing something the
+  /// backend never actually stored.
   Future<void> updateProfile({
     required String name,
-    required String phone,
-    required String email,
     String? region,
-    String? bio,
   }) async {
     final currentUser = state.user;
     if (currentUser == null) return;
 
-    final updated = currentUser.copyWith(
-      name: name,
-      phone: phone,
-      email: email,
-      region: region,
-      bio: bio,
-    );
+    await ref.read(authRepositoryProvider).updateProfile({
+      'name': name,
+      if (region != null && region.isNotEmpty) 'farmRegion': region,
+    });
+
+    final updated = currentUser.copyWith(name: name, region: region);
     state = state.copyWith(user: updated);
     await _persistUser(updated);
+
+    // farmerDashboardSummaryProvider caches its GET /dashboard/farmer-summary
+    // fetch for the app's lifetime — without this, a region edit here (or the
+    // weather it drives) keeps showing whatever was fetched at login.
+    ref.invalidate(farmerDashboardSummaryProvider);
   }
 
-  /// Local-only, same persistence path as [updateProfile] — applies
-  /// immediately on pick rather than waiting for a form "Save".
-  Future<void> updateAvatar(String avatarPath) async {
+  /// Separate from [updateProfile] so changing the photo doesn't force a
+  /// name re-submit — the upload itself already happened by the time this
+  /// runs, this just persists the resulting URL.
+  Future<void> updatePhotoUrl(String photoUrl) async {
     final currentUser = state.user;
     if (currentUser == null) return;
 
-    final updated = currentUser.copyWith(avatarPath: avatarPath);
+    await ref.read(authRepositoryProvider).updateProfile({'photoUrl': photoUrl});
+
+    final updated = currentUser.copyWith(photoUrl: photoUrl);
     state = state.copyWith(user: updated);
     await _persistUser(updated);
   }
@@ -123,7 +141,16 @@ class AuthController extends Notifier<SessionState> {
       final response = await ref
           .read(authRepositoryProvider)
           .login(email: email, password: password);
-      _phoneForDebugApproval = response.user.phone;
+      await _applyAuthResponse(response);
+    } on ApiException catch (e) {
+      state = state.copyWith(isSubmitting: false, errorMessage: e.message);
+    }
+  }
+
+  Future<void> loginWithGoogle({UserRole? role}) async {
+    state = state.copyWith(isSubmitting: true, errorMessage: null);
+    try {
+      final response = await ref.read(authRepositoryProvider).loginWithGoogle(role: role);
       await _applyAuthResponse(response);
     } on ApiException catch (e) {
       state = state.copyWith(isSubmitting: false, errorMessage: e.message);
@@ -147,19 +174,29 @@ class AuthController extends Notifier<SessionState> {
     );
   }
 
-  /// Dev-only: stands in for Admin approval (Phase 9 not yet built).
-  Future<void> debugApprove() async {
-    final phone = _phoneForDebugApproval;
-    if (phone == null) return;
-    final user = await ref.read(authRepositoryProvider).debugApprove(phone);
-    state = state.copyWith(status: AuthStatus.authenticated, user: user);
-    await ref
-        .read(localPrefsProvider)
-        .setString(_sessionSnapshotKey, jsonEncode({'user': user.toJson()}));
+  Future<void> logout() async {
+    try {
+      final refreshToken = await ref.read(secureStorageProvider).readRefreshToken();
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        await ref.read(authRepositoryProvider).logout(refreshToken);
+      }
+    } catch (_) {
+      // Best-effort server-side revocation — the user must still end up
+      // signed out locally even if this call fails (offline, already
+      // expired, backend unreachable).
+    }
+    await _clearPersistedSession();
+    state = const SessionState(status: AuthStatus.unauthenticated);
   }
 
-  Future<void> logout() async {
-    await _clearPersistedSession();
+  /// Called when a background token refresh discovers the refresh token
+  /// itself is dead (expired/revoked elsewhere) — without this, the app
+  /// silently wipes local tokens but keeps showing authenticated screens
+  /// while every subsequent request quietly 401s, since nothing ever tells
+  /// the router's redirect guard the session actually ended.
+  void forceLogout() {
+    if (state.status == AuthStatus.unauthenticated) return;
+    unawaited(_clearPersistedSession());
     state = const SessionState(status: AuthStatus.unauthenticated);
   }
 }

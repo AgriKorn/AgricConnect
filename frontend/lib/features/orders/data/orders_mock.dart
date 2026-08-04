@@ -1,6 +1,3 @@
-/// Mock data standing in for the real buyer Orders/Escrow endpoint until its
-/// backend contract is confirmed — same "build against a mock first"
-/// pattern used throughout the checklist (see features/home/data).
 enum BuyerOrderStatus { inTransit, processing, completed, cancelled }
 
 extension BuyerOrderStatusX on BuyerOrderStatus {
@@ -19,14 +16,13 @@ class ActiveShipment {
     required this.itemName,
     required this.status,
     required this.escrowTotal,
+    required this.hasOwnTransport,
+    this.farmerId,
     this.farmerName,
     this.farmerInitials,
     this.farmerLocation,
-    this.etaMinutes,
     this.driverName,
-    this.driverRating,
-    this.driverVehicle,
-    this.transitProgress,
+    this.driverPhone,
   });
 
   final String id;
@@ -34,43 +30,19 @@ class ActiveShipment {
   final String itemName;
   final BuyerOrderStatus status;
   final double escrowTotal;
+  /// True for self-collect orders — no driver is ever assigned to these.
+  final bool hasOwnTransport;
+  final String? farmerId;
   final String? farmerName;
   final String? farmerInitials;
   final String? farmerLocation;
 
-  /// Live-tracking fields (Order Tracking screen) — only populated for
-  /// shipments that are actually en route.
-  final int? etaMinutes;
+  /// The driver who accepted this delivery — null until one has. There's no
+  /// ETA, rating, or vehicle data anywhere in the system (no live GPS, no
+  /// review system), so those aren't modeled here rather than faked.
   final String? driverName;
-  final double? driverRating;
-  final String? driverVehicle;
-  final double? transitProgress;
+  final String? driverPhone;
 }
-
-const mockActiveShipments = [
-  ActiveShipment(
-    id: 'o1',
-    orderNumber: 'AGR-8821',
-    itemName: 'Fresh Organic Tomatoes',
-    status: BuyerOrderStatus.inTransit,
-    escrowTotal: 450,
-    farmerName: 'Kofi Mensah',
-    farmerInitials: 'KW',
-    farmerLocation: 'Kumasi Central Farm • 12km away',
-    etaMinutes: 18,
-    driverName: 'Kofi Mensah',
-    driverRating: 4.8,
-    driverVehicle: 'White Isuzu NPR',
-    transitProgress: 0.55,
-  ),
-  ActiveShipment(
-    id: 'o2',
-    orderNumber: 'AGR-7902',
-    itemName: 'Sweet Yellow Maize',
-    status: BuyerOrderStatus.processing,
-    escrowTotal: 1200,
-  ),
-];
 
 class OrderHistoryEntry {
   const OrderHistoryEntry({
@@ -87,15 +59,3 @@ class OrderHistoryEntry {
   final double amount;
   final BuyerOrderStatus status;
 }
-
-const mockOrderHistory = [
-  OrderHistoryEntry(
-    id: 'h1',
-    itemName: 'Premium Arabica Coffee',
-    deliveredLabel: 'Delivered Oct 12 • 5.0kg',
-    amount: 85,
-    status: BuyerOrderStatus.completed,
-  ),
-];
-
-const List<OrderHistoryEntry> mockCancelledOrders = [];

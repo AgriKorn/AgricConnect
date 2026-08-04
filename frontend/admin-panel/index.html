@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgriConnect Admin</title>
+<style>
+  :root {
+    --bg: #0f1512;
+    --surface: #161f1a;
+    --surface-2: #1e2b23;
+    --border: #2a3a30;
+    --text: #e8f0ea;
+    --text-dim: #9fb3a6;
+    --primary: #3fae5c;
+    --primary-dim: #2c7f43;
+    --danger: #d9534f;
+    --warning: #e0a940;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  #login-view {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .login-card {
+    width: 340px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+  }
+  .login-card h1 {
+    font-size: 20px;
+    margin: 0 0 4px;
+  }
+  .login-card p {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin: 0 0 24px;
+  }
+  label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  input, select, textarea {
+    width: 100%;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+  button {
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .btn-primary { background: var(--primary); color: #062b0f; width: 100%; }
+  .btn-primary:hover { background: var(--primary-dim); }
+  .btn-approve { background: var(--primary); color: #062b0f; }
+  .btn-reject { background: var(--danger); color: #fff; }
+  .btn-secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+  .error-banner {
+    background: rgba(217, 83, 79, 0.15);
+    border: 1px solid var(--danger);
+    color: #ffb4b1;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  #app-view { display: none; }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 16px; margin: 0; }
+  header .who { color: var(--text-dim); font-size: 12px; }
+  nav {
+    display: flex;
+    gap: 4px;
+    padding: 12px 28px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  nav button {
+    background: transparent;
+    color: var(--text-dim);
+    padding: 10px 16px;
+    border-radius: 8px 8px 0 0;
+  }
+  nav button.active {
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-bottom-color: var(--surface);
+  }
+  main { padding: 24px 28px 60px; max-width: 1100px; margin: 0 auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  th { color: var(--text-dim); font-weight: 600; background: var(--surface-2); }
+  tr:last-child td { border-bottom: none; }
+  .badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .badge-pending { background: rgba(224, 169, 64, 0.2); color: var(--warning); }
+  .badge-active { background: rgba(63, 174, 92, 0.2); color: var(--primary); }
+  .badge-rejected { background: rgba(217, 83, 79, 0.2); color: var(--danger); }
+  .nav-badge {
+    display: inline-block;
+    min-width: 18px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    background: var(--warning);
+    color: #2b1c00;
+  }
+  .row-actions { display: flex; gap: 8px; }
+  .empty { color: var(--text-dim); padding: 40px; text-align: center; }
+  .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .toolbar h2 { font-size: 15px; margin: 0; }
+  .btn-refresh { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); font-size: 12px; padding: 6px 12px; }
+  dialog {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    width: 360px;
+  }
+  dialog h3 { margin-top: 0; }
+  dialog::backdrop { background: rgba(0,0,0,0.6); }
+  .dialog-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<div id="login-view">
+  <div class="login-card">
+    <h1>AgriConnect Admin</h1>
+    <p>Internal tool — admin accounts only.</p>
+    <div id="login-error" class="error-banner" style="display:none"></div>
+    <label for="email">Email</label>
+    <input id="email" type="email" placeholder="you@agriconnect.com" autocomplete="username">
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password">
+    <button class="btn-primary" onclick="login()">Log In</button>
+  </div>
+</div>
+
+<div id="app-view">
+  <header>
+    <h1>AgriConnect Admin</h1>
+    <div>
+      <span class="who" id="who"></span>
+      <button class="btn-secondary" style="margin-left:12px" onclick="logout()">Log Out</button>
+    </div>
+  </header>
+  <nav>
+    <button data-tab="pending" onclick="switchTab('pending')">Pending Approvals <span id="pending-badge" class="nav-badge" style="display:none"></span></button>
+    <button data-tab="transactions" onclick="switchTab('transactions')">Transactions</button>
+    <button data-tab="disputes" onclick="switchTab('disputes')">Disputes</button>
+    <button data-tab="audit" onclick="switchTab('audit')">Audit Log</button>
+    <button data-tab="admins" onclick="switchTab('admins')">Admins</button>
+  </nav>
+  <main id="main"></main>
+</div>
+
+<dialog id="resolve-dialog">
+  <h3>Resolve Dispute</h3>
+  <label>Action</label>
+  <select id="resolve-action">
+    <option value="REFUND_BUYER">Refund buyer</option>
+    <option value="RELEASE_FARMER">Release to farmer</option>
+  </select>
+  <label>Resolution notes</label>
+  <textarea id="resolve-notes" rows="3" placeholder="At least 5 characters..."></textarea>
+  <div class="dialog-actions">
+    <button class="btn-secondary" onclick="document.getElementById('resolve-dialog').close()">Cancel</button>
+    <button class="btn-primary" style="width:auto" onclick="submitResolve()">Submit</button>
+  </div>
+</dialog>
+
+<dialog id="add-admin-dialog">
+  <h3>Add Admin</h3>
+  <div id="add-admin-error" class="error-banner" style="display:none"></div>
+  <label>Name</label>
+  <input id="new-admin-name" type="text" placeholder="Full name">
+  <label>Email</label>
+  <input id="new-admin-email" type="email" placeholder="colleague@agriconnect.com">
+  <label>Phone</label>
+  <input id="new-admin-phone" type="text" placeholder="+233241234567">
+  <label>Password</label>
+  <input id="new-admin-password" type="password" placeholder="At least 8 characters">
+  <div class="dialog-actions">
+    <button class="btn-secondary" onclick="closeAddAdmin()">Cancel</button>
+    <button class="btn-primary" style="width:auto" onclick="submitAddAdmin()">Create Admin</button>
+  </div>
+</dialog>
+
+<script>
+const API_BASE = 'https://container-service-1.veg2jxqsfecbm.eu-west-1.cs.amazonlightsail.com/api';
+let currentTab = 'pending';
+let resolvingDisputeId = null;
+
+function getToken() { return sessionStorage.getItem('agri_admin_token'); }
+function setToken(t) { sessionStorage.setItem('agri_admin_token', t); }
+function clearToken() { sessionStorage.removeItem('agri_admin_token'); sessionStorage.removeItem('agri_admin_who'); }
+
+async function api(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getToken() ? { Authorization: `Bearer ${getToken()}` } : {}),
+      ...(options.headers || {}),
+    },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.error?.message || `Request failed (${res.status})`);
+  return body.data;
+}
+
+async function login() {
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const errorEl = document.getElementById('login-error');
+  errorEl.style.display = 'none';
+  try {
+    const data = await api('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
+    if (data.user.role !== 'admin') {
+      throw new Error('This account is not an admin.');
+    }
+    setToken(data.accessToken);
+    sessionStorage.setItem('agri_admin_who', `${data.user.name} (${data.user.email})`);
+    showApp();
+  } catch (e) {
+    errorEl.textContent = e.message;
+    errorEl.style.display = 'block';
+  }
+}
+
+function logout() {
+  clearToken();
+  document.getElementById('app-view').style.display = 'none';
+  document.getElementById('login-view').style.display = 'flex';
+}
+
+function showApp() {
+  document.getElementById('login-view').style.display = 'none';
+  document.getElementById('app-view').style.display = 'block';
+  document.getElementById('who').textContent = sessionStorage.getItem('agri_admin_who') || '';
+  switchTab('pending');
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+  const renderers = { pending: renderPending, transactions: renderTransactions, disputes: renderDisputes, audit: renderAudit, admins: renderAdmins };
+  renderers[tab]();
+}
+
+function toolbar(title) {
+  return `<div class="toolbar"><h2>${title}</h2><button class="btn-refresh" onclick="switchTab('${currentTab}')">Refresh</button></div>`;
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function setPendingBadge(count) {
+  const badge = document.getElementById('pending-badge');
+  if (count > 0) {
+    badge.textContent = count;
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+async function renderPending() {
+  const main = document.getElementById('main');
+  main.innerHTML = toolbar('Pending Approvals') + '<div class="empty">Loading...</div>';
+  try {
+    const { users } = await api('/admin/users/pending');
+    setPendingBadge(users.length);
+    if (!users.length) {
+      main.innerHTML = toolbar('Pending Approvals') + '<div class="empty">No accounts awaiting approval.</div>';
+      return;
+    }
+    const rows = users.map((u) => `
+      <tr>
+        <td>${escapeHtml(u.name)}</td>
+        <td>${escapeHtml(u.email || '—')}</td>
+        <td>${escapeHtml(u.phone)}</td>
+        <td>${escapeHtml(u.role)}</td>
+        <td>${escapeHtml(u.profile?.farmRegion || u.profile?.operatingRegion || '—')}</td>
+        <td>${new Date(u.createdAt).toLocaleString()}</td>
+        <td class="row-actions">
+          <button class="btn-approve" onclick="actOnUser('${u.id}', 'approve', '${escapeHtml(u.name).replace(/'/g, "\\'")}')">Approve</button>
+          <button class="btn-reject" onclick="actOnUser('${u.id}', 'reject', '${escapeHtml(u.name).replace(/'/g, "\\'")}')">Reject</button>
+        </td>
+      </tr>`).join('');
+    main.innerHTML = toolbar('Pending Approvals') + `
+      <table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Region</th><th>Registered</th><th>Action</th></tr></thead>
+      <tbody>${rows}</tbody></table>`;
+  } catch (e) {
+    main.innerHTML = toolbar('Pending Approvals') + `<div class="error-banner">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function actOnUser(id, action, name) {
+  const msg = action === 'approve'
+    ? `Approve ${name}? They'll be able to log in immediately.`
+    : `Reject ${name}? They will not be able to log in.`;
+  if (!confirm(msg)) return;
+  try {
+    await api(`/admin/users/${id}/${action}`, { method: 'PATCH' });
+    renderPending();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function renderTransactions() {
+  const main = document.getElementById('main');
+  main.innerHTML = toolbar('Transactions') + '<div class="empty">Loading...</div>';
+  try {
+    const { transactions } = await api('/admin/transactions');
+    if (!transactions.length) {
+      main.innerHTML = toolbar('Transactions') + '<div class="empty">No transactions yet.</div>';
+      return;
+    }
+    const rows = transactions.map((t) => `
+      <tr>
+        <td>${t.id.slice(0, 8)}</td>
+        <td>GHS ${Number(t.amountGhs).toFixed(2)}</td>
+        <td><span class="badge ${t.status === 'RELEASED' ? 'badge-active' : t.status === 'CANCELLED' ? 'badge-rejected' : 'badge-pending'}">${escapeHtml(t.status)}</span></td>
+        <td>${t.hasOwnTransport ? 'Self-collect' : 'Driver'}</td>
+        <td>${new Date(t.createdAt).toLocaleString()}</td>
+      </tr>`).join('');
+    main.innerHTML = toolbar('Transactions') + `
+      <table><thead><tr><th>ID</th><th>Amount</th><th>Status</th><th>Delivery</th><th>Created</th></tr></thead>
+      <tbody>${rows}</tbody></table>`;
+  } catch (e) {
+    main.innerHTML = toolbar('Transactions') + `<div class="error-banner">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function renderDisputes() {
+  const main = document.getElementById('main');
+  main.innerHTML = toolbar('Disputes') + '<div class="empty">Loading...</div>';
+  try {
+    const { disputes } = await api('/admin/disputes');
+    if (!disputes.length) {
+      main.innerHTML = toolbar('Disputes') + '<div class="empty">No disputes raised.</div>';
+      return;
+    }
+    const rows = disputes.map((d) => `
+      <tr>
+        <td>${d.id.slice(0, 8)}</td>
+        <td>${d.transactionId.slice(0, 8)}</td>
+        <td>${escapeHtml(d.type)}</td>
+        <td>${escapeHtml(d.description)}</td>
+        <td><span class="badge ${d.status === 'RESOLVED' ? 'badge-active' : 'badge-pending'}">${escapeHtml(d.status)}</span></td>
+        <td>${d.status === 'RESOLVED' ? '—' : `<button class="btn-approve" onclick="openResolve('${d.id}')">Resolve</button>`}</td>
+      </tr>`).join('');
+    main.innerHTML = toolbar('Disputes') + `
+      <table><thead><tr><th>ID</th><th>Transaction</th><th>Type</th><th>Description</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody>${rows}</tbody></table>`;
+  } catch (e) {
+    main.innerHTML = toolbar('Disputes') + `<div class="error-banner">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function openResolve(id) {
+  resolvingDisputeId = id;
+  document.getElementById('resolve-notes').value = '';
+  document.getElementById('resolve-dialog').showModal();
+}
+
+async function submitResolve() {
+  const action = document.getElementById('resolve-action').value;
+  const resolution = document.getElementById('resolve-notes').value.trim();
+  if (resolution.length < 5) { alert('Resolution notes must be at least 5 characters.'); return; }
+  try {
+    await api(`/admin/disputes/${resolvingDisputeId}/resolve`, { method: 'PATCH', body: JSON.stringify({ action, resolution }) });
+    document.getElementById('resolve-dialog').close();
+    renderDisputes();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+async function renderAudit() {
+  const main = document.getElementById('main');
+  main.innerHTML = toolbar('Audit Log') + '<div class="empty">Loading...</div>';
+  try {
+    const { entries } = await api('/admin/audit?limit=50');
+    if (!entries.length) {
+      main.innerHTML = toolbar('Audit Log') + '<div class="empty">No audit events recorded.</div>';
+      return;
+    }
+    const rows = entries.map((l) => `
+      <tr>
+        <td>${new Date(l.createdAt).toLocaleString()}</td>
+        <td>${escapeHtml(l.eventType)}</td>
+        <td>${escapeHtml((l.entityId || '').toString().slice(0, 8))}</td>
+        <td>${escapeHtml((l.userId || '').toString().slice(0, 8))}</td>
+      </tr>`).join('');
+    main.innerHTML = toolbar('Audit Log') + `
+      <table><thead><tr><th>When</th><th>Event</th><th>Entity ID</th><th>Actor</th></tr></thead>
+      <tbody>${rows}</tbody></table>`;
+  } catch (e) {
+    main.innerHTML = toolbar('Audit Log') + `<div class="error-banner">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function renderAdmins() {
+  const main = document.getElementById('main');
+  main.innerHTML = toolbar('Admins') + '<div class="empty">Loading...</div>';
+  try {
+    const { admins } = await api('/admin/admins');
+    const addBar = `<div style="margin-bottom:14px"><button class="btn-primary" style="width:auto" onclick="openAddAdmin()">+ Add Admin</button></div>`;
+    if (!admins.length) {
+      main.innerHTML = toolbar('Admins') + addBar + '<div class="empty">No admin accounts found.</div>';
+      return;
+    }
+    const rows = admins.map((a) => `
+      <tr>
+        <td>${escapeHtml(a.name)}</td>
+        <td>${escapeHtml(a.email || '—')}</td>
+        <td>${escapeHtml(a.phone)}</td>
+        <td>${new Date(a.createdAt).toLocaleDateString()}</td>
+        <td><button class="btn-reject" onclick="removeAdmin('${a.id}', '${escapeHtml(a.name).replace(/'/g, "\\'")}')">Remove</button></td>
+      </tr>`).join('');
+    main.innerHTML = toolbar('Admins') + addBar + `
+      <table><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Added</th><th>Action</th></tr></thead>
+      <tbody>${rows}</tbody></table>`;
+  } catch (e) {
+    main.innerHTML = toolbar('Admins') + `<div class="error-banner">${escapeHtml(e.message)}</div>`;
+  }
+}
+
+function openAddAdmin() {
+  ['new-admin-name', 'new-admin-email', 'new-admin-phone', 'new-admin-password'].forEach((id) => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('add-admin-error').style.display = 'none';
+  document.getElementById('add-admin-dialog').showModal();
+}
+
+function closeAddAdmin() {
+  document.getElementById('add-admin-dialog').close();
+}
+
+async function submitAddAdmin() {
+  const name = document.getElementById('new-admin-name').value.trim();
+  const email = document.getElementById('new-admin-email').value.trim();
+  const phone = document.getElementById('new-admin-phone').value.trim();
+  const password = document.getElementById('new-admin-password').value;
+  const errorEl = document.getElementById('add-admin-error');
+  errorEl.style.display = 'none';
+
+  if (!name || !email || !phone || !password) {
+    errorEl.textContent = 'All fields are required.';
+    errorEl.style.display = 'block';
+    return;
+  }
+
+  try {
+    await api('/admin/admins', { method: 'POST', body: JSON.stringify({ name, email, phone, password }) });
+    closeAddAdmin();
+    renderAdmins();
+  } catch (e) {
+    errorEl.textContent = e.message;
+    errorEl.style.display = 'block';
+  }
+}
+
+async function removeAdmin(id, name) {
+  // Revokes access (REJECTED status) rather than deleting the row — see
+  // AdminService.removeAdmin. The backend also refuses to remove yourself
+  // or the last remaining active admin; this just surfaces those messages.
+  if (!confirm(`Remove admin access for ${name}? They will no longer be able to log in.`)) return;
+  try {
+    await api(`/admin/admins/${id}`, { method: 'DELETE' });
+    renderAdmins();
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+if (getToken()) showApp();
+</script>
+</body>
+</html>

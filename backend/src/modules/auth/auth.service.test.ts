@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { AuthService } from './auth.service';
 import { PrismaUserRepository } from '../user/user.repository.prisma';
-import { ConflictError, InvalidTokenError, UnauthorizedError } from '../../utils/errors';
+import { AccountPendingApprovalError, ConflictError, InvalidTokenError, UnauthorizedError } from '../../utils/errors';
 import { supabase } from '../../config/supabase';
 import { User } from '../user/user.types';
 import { env } from '../../config/env';
@@ -15,6 +15,7 @@ describe('AuthService', () => {
     id: 'user-uuid-1',
     name: 'Kofi Mensah',
     phone: '+233541234567',
+    email: null,
     passwordHash: '$2a$10$hashedpasswordstring',
     role: 'farmer',
     status: 'ACTIVE',
@@ -31,6 +32,7 @@ describe('AuthService', () => {
     jest.clearAllMocks();
     mockUserRepo = {
       findByPhone: jest.fn(),
+      findByEmail: jest.fn(),
       create: jest.fn(),
       findById: jest.fn(),
       update: jest.fn(),
@@ -51,6 +53,22 @@ describe('AuthService', () => {
         authService.register({
           name: 'Kofi Mensah',
           phone: '+233541234567',
+          email: 'kofi@example.com',
+          password: 'Password123',
+          role: 'farmer',
+        }),
+      ).rejects.toThrow(ConflictError);
+    });
+
+    it('should throw ConflictError if email is already registered', async () => {
+      mockUserRepo.findByPhone.mockResolvedValue(null);
+      mockUserRepo.findByEmail.mockResolvedValue(createMockUser());
+
+      await expect(
+        authService.register({
+          name: 'Kofi Mensah',
+          phone: '+233541234567',
+          email: 'kofi@example.com',
           password: 'Password123',
           role: 'farmer',
         }),
@@ -59,6 +77,7 @@ describe('AuthService', () => {
 
     it('should hash password and create user with status PENDING_APPROVAL', async () => {
       mockUserRepo.findByPhone.mockResolvedValue(null);
+      mockUserRepo.findByEmail.mockResolvedValue(null);
 
       const mockCreated = createMockUser({ id: 'new-user-uuid', status: 'PENDING_APPROVAL' });
       mockUserRepo.create.mockResolvedValue(mockCreated);
@@ -66,6 +85,7 @@ describe('AuthService', () => {
       const result = await authService.register({
         name: 'Kofi Mensah',
         phone: '+233541234567',
+        email: 'kofi@example.com',
         password: 'Password123',
         role: 'farmer',
       });
@@ -74,29 +94,105 @@ describe('AuthService', () => {
         expect.objectContaining({
           name: 'Kofi Mensah',
           phone: '+233541234567',
+          email: 'kofi@example.com',
           role: 'farmer',
         }),
       );
       expect(result.userId).toBe('new-user-uuid');
       expect(result.message).toContain('Registration successful');
     });
+
+    it("should pass the farmer's chosen region through instead of defaulting silently", async () => {
+      mockUserRepo.findByPhone.mockResolvedValue(null);
+      mockUserRepo.findByEmail.mockResolvedValue(null);
+      mockUserRepo.create.mockResolvedValue(createMockUser());
+
+      await authService.register({
+        name: 'Ama Boateng',
+        phone: '+233541234567',
+        email: 'ama@example.com',
+        password: 'Password123',
+        role: 'farmer',
+        region: 'Ashanti',
+      });
+
+      expect(mockUserRepo.create).toHaveBeenCalledWith(expect.objectContaining({ region: 'Ashanti' }));
+    });
+
+    it("should convert a driver's tonnes entry to kg instead of storing the raw number", async () => {
+      mockUserRepo.findByPhone.mockResolvedValue(null);
+      mockUserRepo.findByEmail.mockResolvedValue(null);
+      mockUserRepo.create.mockResolvedValue(createMockUser());
+
+      await authService.register({
+        name: 'Kojo Driver',
+        phone: '+233541234567',
+        email: 'kojo@example.com',
+        password: 'Password123',
+        role: 'driver',
+        operatingRegion: 'Northern',
+        vehicleCapacity: '2 tonnes',
+      });
+
+      expect(mockUserRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ operatingRegion: 'Northern', vehicleCapacityKg: 2000 }),
+      );
+    });
+
+    it('should leave vehicleCapacityKg undefined when the free-text entry has no usable number', async () => {
+      mockUserRepo.findByPhone.mockResolvedValue(null);
+      mockUserRepo.findByEmail.mockResolvedValue(null);
+      mockUserRepo.create.mockResolvedValue(createMockUser());
+
+      await authService.register({
+        name: 'Kojo Driver',
+        phone: '+233541234567',
+        email: 'kojo@example.com',
+        password: 'Password123',
+        role: 'driver',
+        vehicleCapacity: 'a big truck',
+      });
+
+      expect(mockUserRepo.create).toHaveBeenCalledWith(expect.objectContaining({ vehicleCapacityKg: undefined }));
+    });
+
+    it("should pass the buyer's business info through", async () => {
+      mockUserRepo.findByPhone.mockResolvedValue(null);
+      mockUserRepo.findByEmail.mockResolvedValue(null);
+      mockUserRepo.create.mockResolvedValue(createMockUser({ role: 'buyer', status: 'ACTIVE' }));
+
+      await authService.register({
+        name: 'Efua Buyer',
+        phone: '+233541234567',
+        email: 'efua@example.com',
+        password: 'Password123',
+        role: 'buyer',
+        businessName: 'Efua Fresh Produce',
+        businessType: 'Retailer',
+      });
+
+      expect(mockUserRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ businessName: 'Efua Fresh Produce', businessType: 'Retailer' }),
+      );
+    });
   });
 
   describe('login', () => {
     it('should throw UnauthorizedError if user does not exist or password invalid', async () => {
-      mockUserRepo.findByPhone.mockResolvedValue(null);
+      mockUserRepo.findByEmail.mockResolvedValue(null);
 
-      await expect(authService.login({ phone: '+233541234567', password: 'WrongPassword' })).rejects.toThrow(UnauthorizedError);
+      await expect(authService.login({ email: 'nobody@example.com', password: 'WrongPassword' })).rejects.toThrow(UnauthorizedError);
     });
 
     it('should return auth payload when credentials are correct and account is ACTIVE', async () => {
       const hashedPassword = await bcrypt.hash('Password123', 10);
-      const mockUser = createMockUser({ passwordHash: hashedPassword, status: 'ACTIVE' });
-      mockUserRepo.findByPhone.mockResolvedValue(mockUser);
+      const mockUser = createMockUser({ email: 'kofi@example.com', passwordHash: hashedPassword, status: 'ACTIVE' });
+      mockUserRepo.findByEmail.mockResolvedValue(mockUser);
       mockUserRepo.update.mockResolvedValue(mockUser);
 
-      const result = await authService.login({ phone: '+233541234567', password: 'Password123' });
+      const result = await authService.login({ email: 'kofi@example.com', password: 'Password123' });
 
+      expect(mockUserRepo.findByEmail).toHaveBeenCalledWith('kofi@example.com');
       expect(result.accessToken).toBeDefined();
       expect(result.refreshToken).toBeDefined();
       expect(result.user.id).toBe('user-uuid-1');
@@ -105,14 +201,14 @@ describe('AuthService', () => {
 
   describe('forgotPassword & resetPassword', () => {
     it('should return generic message for non-existent user on forgotPassword', async () => {
-      mockUserRepo.findByPhone.mockResolvedValue(null);
-      const result = await authService.forgotPassword({ phone: '+233999999999' });
-      expect(result.message).toContain('If an account with that phone number exists');
+      mockUserRepo.findByEmail.mockResolvedValue(null);
+      const result = await authService.forgotPassword({ email: 'nobody@example.com' });
+      expect(result.message).toContain('If an account with that email exists');
     });
 
     it('should generate resetToken for existing user on forgotPassword', async () => {
-      mockUserRepo.findByPhone.mockResolvedValue(createMockUser());
-      const result = await authService.forgotPassword({ phone: '+233541234567' });
+      mockUserRepo.findByEmail.mockResolvedValue(createMockUser({ email: 'kofi@example.com' }));
+      const result = await authService.forgotPassword({ email: 'kofi@example.com' });
       expect(result.message).toBeDefined();
       expect(result.resetToken).toBeDefined();
     });
@@ -169,26 +265,80 @@ describe('AuthService', () => {
       expect(result.url).toContain('google.com');
     });
 
-    it('should authenticate existing user via Supabase Google OAuth and return token pair', async () => {
+    it('should authenticate an existing user by email via Supabase Google OAuth and return token pair', async () => {
       jest.spyOn(supabase.auth, 'getUser').mockResolvedValue({
         data: {
           user: {
             id: 'supabase-user-id',
             email: 'kofi@gmail.com',
-            user_metadata: { full_name: 'Kofi OAuth', phone: '+233550000000' },
+            user_metadata: { full_name: 'Kofi OAuth' },
           } as any,
         },
         error: null,
       });
 
-      const mockUser = createMockUser({ id: 'user-uuid-oauth', name: 'Kofi OAuth', phone: '+233550000000' });
-      mockUserRepo.findByPhone.mockResolvedValue(mockUser);
+      const mockUser = createMockUser({ id: 'user-uuid-oauth', name: 'Kofi OAuth', email: 'kofi@gmail.com' });
+      mockUserRepo.findByEmail.mockResolvedValue(mockUser);
       mockUserRepo.update.mockResolvedValue(mockUser);
 
       const result = await authService.googleAuth({ token: 'mock-id-token', role: 'buyer' });
 
       expect(result.accessToken).toBeDefined();
       expect(result.user.id).toBe('user-uuid-oauth');
+      // Regression guard: Google never supplies a phone number, so the lookup
+      // must resolve by email — falling back to a randomly-generated phone
+      // here would never match, and would create a duplicate account on
+      // every single login.
+      expect(mockUserRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('should create a new user via Google OAuth when no matching email or phone exists', async () => {
+      jest.spyOn(supabase.auth, 'getUser').mockResolvedValue({
+        data: {
+          user: {
+            id: 'supabase-user-id-2',
+            email: 'ama@gmail.com',
+            user_metadata: { full_name: 'Ama OAuth' },
+          } as any,
+        },
+        error: null,
+      });
+
+      mockUserRepo.findByEmail.mockResolvedValue(null);
+      const created = createMockUser({ id: 'user-uuid-new', name: 'Ama OAuth', email: 'ama@gmail.com', status: 'PENDING_APPROVAL' });
+      const activated = { ...created, status: 'ACTIVE' as const };
+      mockUserRepo.create.mockResolvedValue(created);
+      mockUserRepo.update.mockResolvedValueOnce(activated).mockResolvedValueOnce(activated);
+
+      const result = await authService.googleAuth({ token: 'mock-id-token', role: 'buyer' });
+
+      expect(mockUserRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'ama@gmail.com', role: 'buyer' }),
+      );
+      expect(mockUserRepo.update).toHaveBeenCalledWith('user-uuid-new', { status: 'ACTIVE' });
+      expect(result.user.id).toBe('user-uuid-new');
+    });
+
+    it('should require admin approval for a brand-new farmer/driver signing up via Google, same as phone registration', async () => {
+      jest.spyOn(supabase.auth, 'getUser').mockResolvedValue({
+        data: {
+          user: {
+            id: 'supabase-user-id-3',
+            email: 'kwame-farmer@gmail.com',
+            user_metadata: { full_name: 'Kwame Farmer' },
+          } as any,
+        },
+        error: null,
+      });
+
+      mockUserRepo.findByEmail.mockResolvedValue(null);
+      const created = createMockUser({ id: 'user-uuid-farmer', name: 'Kwame Farmer', email: 'kwame-farmer@gmail.com', role: 'farmer', status: 'PENDING_APPROVAL' });
+      mockUserRepo.create.mockResolvedValue(created);
+      mockUserRepo.update.mockResolvedValue({ ...created, status: 'PENDING_APPROVAL' });
+
+      await expect(authService.googleAuth({ token: 'mock-id-token', role: 'farmer' })).rejects.toThrow(AccountPendingApprovalError);
+
+      expect(mockUserRepo.update).toHaveBeenCalledWith('user-uuid-farmer', { status: 'PENDING_APPROVAL' });
     });
   });
 });

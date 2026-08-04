@@ -1,9 +1,39 @@
 import { Request, Response, NextFunction } from 'express';
 import { sendSuccess } from '../../utils/response';
 import { disputeService } from '../dispute/dispute.service';
+import { dispatchService } from '../dispatch/dispatch.service';
 import { adminService } from './admin.service';
 
 import { auditService } from '../audit/audit.service';
+
+export const listAdminsHandler = async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    const admins = await adminService.listAdmins();
+    sendSuccess(res, { admins, count: admins.length });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const createAdminHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const requestingAdminId = (req as any).user.userId;
+    const admin = await adminService.createAdmin(req.body, requestingAdminId);
+    sendSuccess(res, admin, 201);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const removeAdminHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const requestingAdminId = (req as any).user.userId;
+    const admin = await adminService.removeAdmin(req.params.id, requestingAdminId);
+    sendSuccess(res, admin);
+  } catch (err) {
+    next(err);
+  }
+};
 
 export const listPendingUsersHandler = async (_req: Request, res: Response, next: NextFunction) => {
   try {
@@ -16,7 +46,8 @@ export const listPendingUsersHandler = async (_req: Request, res: Response, next
 
 export const approveUserHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = await adminService.approveUser(req.params.id);
+    const requestingAdminId = (req as any).user.userId;
+    const user = await adminService.approveUser(req.params.id, requestingAdminId);
     sendSuccess(res, user);
   } catch (err) {
     next(err);
@@ -25,7 +56,8 @@ export const approveUserHandler = async (req: Request, res: Response, next: Next
 
 export const rejectUserHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = await adminService.rejectUser(req.params.id);
+    const requestingAdminId = (req as any).user.userId;
+    const user = await adminService.rejectUser(req.params.id, requestingAdminId);
     sendSuccess(res, user);
   } catch (err) {
     next(err);
@@ -52,9 +84,21 @@ export const listDisputesHandler = async (_req: Request, res: Response, next: Ne
 
 export const resolveDisputeHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const requestingAdminId = (req as any).user.userId;
     const action = req.body.action || 'REFUND_BUYER';
-    const dispute = await disputeService.resolve(req.params.id, req.body.resolution, action);
+    const dispute = await disputeService.resolve(req.params.id, req.body.resolution, action, requestingAdminId);
     sendSuccess(res, dispute);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const manualAssignDriverHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const requestingAdminId = (req as any).user.userId;
+    const { transactionId, driverId } = req.body;
+    const job = await dispatchService.manualAssignDriver(transactionId, driverId, requestingAdminId);
+    sendSuccess(res, job, 201);
   } catch (err) {
     next(err);
   }

@@ -3,6 +3,7 @@ import { env } from './config/env';
 import { prisma } from './config/db';
 import logger from './utils/logger';
 import { seedDevAdmin } from './modules/user/seedAdmin';
+import { freshnessMonitorWorker } from './workers/freshness-monitor.worker';
 
 const PORT = env.PORT;
 
@@ -78,6 +79,11 @@ const start = async () => {
     logger.info(`📋 Environment: ${env.NODE_ENV}`);
     logger.info(`💚 Health check: http://localhost:${PORT}/api/health`);
   });
+
+  // Freshness-threshold alerts (SRS "System Notification"). A read-and-notify
+  // sweep, safe to run in every environment. Sweeps hourly by default; the
+  // window and threshold are configurable via FRESHNESS_ALERT_* env vars.
+  freshnessMonitorWorker.start();
 };
 
 start().catch((err) => {

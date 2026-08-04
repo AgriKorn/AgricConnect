@@ -16,6 +16,12 @@ export class InMemoryTransactionRepository implements ITransactionRepository {
     const transaction: Transaction = {
       id: randomUUID(),
       ...data,
+      farmerName: null,
+      buyerName: null,
+      driverName: null,
+      driverPhone: null,
+      driverId: null,
+      cropType: 'crop',
       status: 'PAYMENT_HELD',
       transferCode: null,
       createdAt: now,

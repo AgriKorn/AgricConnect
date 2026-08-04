@@ -1,5 +1,4 @@
 import { prisma } from '../../config/db';
-import { BadRequestError } from '../../utils/errors';
 import { CreateListingRecord, IListingRepository, ListingFilters, UpdateListingRecord } from './listing.repository';
 import { Listing } from './listing.types';
 import { Prisma } from '../../generated/prisma/client';
@@ -17,6 +16,12 @@ const mapPrismaToListing = (p: any): Listing => ({
   pricePerKg: Number(p.listed_price),
   listingHash: p.listing_hash ? p.listing_hash.trim() : '',
   qrCodeData: p.qr_code_data || '',
+  // Cover falls back to the first gallery image for rows created before
+  // photo_url was populated alongside the gallery; the gallery falls back to
+  // the single photo for legacy rows that predate image_urls.
+  imageUrl: p.photo_url || p.image_urls?.[0] || undefined,
+  imageUrls: p.image_urls?.length ? p.image_urls : p.photo_url ? [p.photo_url] : [],
+  description: p.description ?? null,
   status: p.status === 'sold' ? 'SOLD' : p.status === 'active' ? 'ACTIVE' : 'INACTIVE',
   createdAt: p.created_at,
   updatedAt: p.updated_at,
@@ -24,32 +29,53 @@ const mapPrismaToListing = (p: any): Listing => ({
 
 export class PrismaListingRepository implements IListingRepository {
   async create(data: CreateListingRecord): Promise<Listing> {
-    const crop = await prisma.crop_types.findFirst({
+    // Add Listing is a free-text "Crop / Produce Name" field, not a picker
+    // bound to this lookup table — rejecting anything not already seeded
+    // (mango, okra, groundnut, ...) was blocking real produce a farmer
+    // actually grows. Reuse an existing row case-insensitively so "Tomato"
+    // and "tomato" don't fork into duplicates; only create a new one
+    // (always lowercased, for consistency) when it's genuinely new.
+    let crop = await prisma.crop_types.findFirst({
       where: { name: { equals: data.cropType, mode: 'insensitive' } },
     });
 
     if (!crop) {
-      const validCrops = await prisma.crop_types.findMany({ select: { name: true } });
-      const cropList = validCrops.map((c) => c.name).join(', ');
-      throw new BadRequestError(`Unknown crop type '${data.cropType}'. Valid choices are: ${cropList}`);
+      crop = await prisma.crop_types.create({
+        data: { name: data.cropType.trim().toLowerCase() },
+      });
     }
+
+    // Anchor the ceiling/floor to a real government reference price when one
+    // exists for this crop and region — without it there's no real market
+    // data to compare against, so fall back to a plain band around the
+    // farmer's own price rather than mislabeling that as a MOFA reference.
+    const referencePrice = data.mofaReferencePrice ?? data.pricePerKg;
+
+    // Normalise the gallery: prefer an explicit imageUrls array, fall back to a
+    // single imageUrl. The cover (photo_url) is the first image, so the existing
+    // single-image consumers keep working unchanged.
+    const gallery = data.imageUrls?.length ? data.imageUrls : data.imageUrl ? [data.imageUrl] : [];
+    const cover = gallery[0];
 
     const created = await prisma.produce_listings.create({
       data: {
         farmer_id: data.farmerId,
         crop_type_id: crop.id,
         quantity_kg: new Prisma.Decimal(data.quantityKg),
-        region: 'Greater Accra',
+        region: data.region || 'Greater Accra',
         gps_lat: new Prisma.Decimal(data.farmerLat),
         gps_lng: new Prisma.Decimal(data.farmerLong),
         freshness_score: new Prisma.Decimal(data.freshnessScore),
         estimated_viable_days: data.shelfLifeDays,
-        mofa_reference_price: new Prisma.Decimal(data.pricePerKg),
-        price_ceiling: new Prisma.Decimal(data.pricePerKg * 1.2),
-        price_floor: new Prisma.Decimal(data.pricePerKg * 0.8),
+        mofa_reference_price: new Prisma.Decimal(referencePrice),
+        price_ceiling: new Prisma.Decimal(referencePrice * 1.2),
+        price_floor: new Prisma.Decimal(referencePrice * 0.8),
         listed_price: new Prisma.Decimal(data.pricePerKg),
         listing_hash: data.listingHash,
         qr_code_data: data.qrCodeData,
+        ...(cover && { photo_url: cover }),
+        image_urls: gallery,
+        ...(data.description && { description: data.description }),
         status: 'active',
       },
       include: { crop_types: true },
@@ -59,8 +85,11 @@ export class PrismaListingRepository implements IListingRepository {
   }
 
   async findManyByFarmer(farmerId: string): Promise<Listing[]> {
+    // Excludes 'cancelled' (soft-deleted) — otherwise a deleted listing maps
+    // to the generic INACTIVE status and reappears mislabeled as "Pending"
+    // instead of actually disappearing from the farmer's own list.
     const list = await prisma.produce_listings.findMany({
-      where: { farmer_id: farmerId },
+      where: { farmer_id: farmerId, status: { not: 'cancelled' } },
       include: { crop_types: true },
       orderBy: { created_at: 'desc' },
     });
@@ -111,6 +140,14 @@ export class PrismaListingRepository implements IListingRepository {
     ]);
 
     return { listings: list.map(mapPrismaToListing), total };
+  }
+
+  async findAllActive(): Promise<Listing[]> {
+    const list = await prisma.produce_listings.findMany({
+      where: { status: 'active' },
+      include: { crop_types: true },
+    });
+    return list.map(mapPrismaToListing);
   }
 
   async findById(id: string): Promise<Listing | null> {

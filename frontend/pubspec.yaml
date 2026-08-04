@@ -53,7 +53,16 @@ dependencies:
   # Local storage backing ThemeMode persistence (checklist 0.3)
   hive: ^2.2.3
   hive_flutter: ^1.1.0
+  # Opens the Paystack checkout link in an external browser (buyer checkout)
+  url_launcher: ^6.3.1
+  # QR scanning for delivery confirmation (Android/iOS/Web camera support)
+  mobile_scanner: ^6.0.2
+  # Google Sign-In (native ID-token flow) + Supabase client to exchange it
+  # for a session, which the backend then verifies to issue our own JWT
+  google_sign_in: ^6.2.2
+  supabase_flutter: ^2.8.0
   camera: ^0.12.0+2
+  # Real profile photo upload (Edit Profile "Change Profile Photo")
   image_picker: ^1.1.2
   # On-device crop freshness scan (ai/model/agriconnect.tflite) — see core/ai
   tflite_flutter: ^0.12.1

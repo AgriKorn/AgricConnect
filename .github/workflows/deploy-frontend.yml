@@ -1,0 +1,72 @@
+name: Frontend CD (AWS ECR & Lightsail Containers)
+
+on:
+  push:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+    branches:
+      - main
+      - feature/frontend-integration
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy-frontend:
+    name: Build Flutter Web & Push Docker Image to AWS ECR
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install Flutter Dependencies
+        run: flutter pub get
+
+      - name: Build Flutter Web Release with Live Backend API URL
+        run: flutter build web --release --base-href "/" --dart-define=API_BASE_URL=https://container-service-1.veg2jxqsfecbm.eu-west-1.cs.amazonlightsail.com/api
+
+      - name: Add Admin Panel as a static sibling path (/admin)
+        run: |
+          mkdir -p build/web/admin
+          cp admin-panel/index.html build/web/admin/index.html
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-1
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push Frontend Docker Image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: agriconnect-backend
+          IMAGE_TAG: frontend-${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:frontend-latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:frontend-latest
+
+      - name: Deploy to AWS Lightsail Container Service (container-service-2)
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: agriconnect-backend
+          IMAGE_TAG: frontend-${{ github.sha }}
+        run: |
+          aws lightsail create-container-service-deployment \
+            --service-name container-service-2 \
+            --containers "{\"frontend\":{\"image\":\"$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\",\"ports\":{\"80\":\"HTTP\"}}}" \
+            --public-endpoint "{\"containerName\":\"frontend\",\"containerPort\":80,\"healthCheck\":{\"path\":\"/\"}}" || true

@@ -20,7 +20,7 @@ _$UserModelImpl _$$UserModelImplFromJson(Map<String, dynamic> json) =>
       vehicleCapacity: json['vehicleCapacity'] as String?,
       operatingRegion: json['operatingRegion'] as String?,
       bio: json['bio'] as String?,
-      avatarPath: json['avatarPath'] as String?,
+      photoUrl: json['photoUrl'] as String?,
     );
 
 Map<String, dynamic> _$$UserModelImplToJson(_$UserModelImpl instance) =>
@@ -37,14 +37,14 @@ Map<String, dynamic> _$$UserModelImplToJson(_$UserModelImpl instance) =>
       'vehicleCapacity': instance.vehicleCapacity,
       'operatingRegion': instance.operatingRegion,
       'bio': instance.bio,
-      'avatarPath': instance.avatarPath,
+      'photoUrl': instance.photoUrl,
     };
 
 const _$UserRoleEnumMap = {
-  UserRole.farmer: 'FARMER',
-  UserRole.buyer: 'BUYER',
-  UserRole.driver: 'DRIVER',
-  UserRole.admin: 'ADMIN',
+  UserRole.farmer: 'farmer',
+  UserRole.buyer: 'buyer',
+  UserRole.driver: 'driver',
+  UserRole.admin: 'admin',
 };
 
 const _$AccountStatusEnumMap = {

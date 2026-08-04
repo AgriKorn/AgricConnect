@@ -14,12 +14,15 @@ export class InMemoryListingRepository implements IListingRepository {
 
   async create(data: CreateListingRecord): Promise<Listing> {
     const now = new Date();
+    const gallery = data.imageUrls?.length ? data.imageUrls : data.imageUrl ? [data.imageUrl] : [];
     const listing: Listing = {
       id: randomUUID(),
       ...data,
       // No crop_types table to resolve against in memory; the Prisma repository
       // fills this from the joined crop row.
       cropCategory: null,
+      imageUrl: gallery[0] ?? data.imageUrl,
+      imageUrls: gallery,
       createdAt: now,
       updatedAt: now,
     };
@@ -31,6 +34,10 @@ export class InMemoryListingRepository implements IListingRepository {
     return [...this.listings.values()]
       .filter((listing) => listing.farmerId === farmerId && listing.status === 'ACTIVE')
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async findAllActive(): Promise<Listing[]> {
+    return [...this.listings.values()].filter((listing) => listing.status === 'ACTIVE');
   }
 
   async findActive(filters: ListingFilters): Promise<{ listings: Listing[]; total: number }> {

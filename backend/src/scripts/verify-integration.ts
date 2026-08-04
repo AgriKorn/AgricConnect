@@ -114,7 +114,7 @@ async function runVerification() {
   console.log(`✅ Dispute #${dispute.id} raised on Order #${tx2.id}.`);
 
   // Admin resolves dispute with REFUND_BUYER
-  await disputeService.resolve(dispute.id, 'Refunding buyer due to non-delivery', 'REFUND_BUYER');
+  await disputeService.resolve(dispute.id, 'Refunding buyer due to non-delivery', 'REFUND_BUYER', 'verify-script');
   const refundedTx = await transactionService.getTransaction(tx2.id, buyer.id, 'buyer');
   if (refundedTx.status !== 'CANCELLED') {
     throw new Error(`❌ Expected transaction status to be CANCELLED, got ${refundedTx.status}`);

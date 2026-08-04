@@ -1,45 +1,51 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/auth/application/auth_controller.dart';
 
-/// Renders the signed-in user's picked profile photo
-/// ([UserModel.avatarPath]) when one exists, otherwise falls back to
-/// [fallback] (typically a [GreenInitialsAvatar]). The single place that
-/// decides "does this user have a custom photo", so every avatar across the
-/// app (dashboard header, profile hero, account settings, edit profile)
-/// stays in sync the moment [AuthController.updateAvatar] is called.
+/// Real uploaded profile photo when the logged-in user has one, otherwise a
+/// colored initials circle — replaces the old per-role static stock photos
+/// (every farmer used to show the exact same asset as if it were their own
+/// picture).
 class UserAvatar extends ConsumerWidget {
-  const UserAvatar({super.key, required this.size, required this.fallback});
+  const UserAvatar({super.key, required this.size});
 
   final double size;
-  final WidgetBuilder fallback;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final avatarPath = ref.watch(authControllerProvider.select((s) => s.user?.avatarPath));
-    if (avatarPath == null || kIsWeb) {
-      return fallback(context);
+    final user = ref.watch(authControllerProvider).user;
+    final colorScheme = Theme.of(context).colorScheme;
+    final photoUrl = user?.photoUrl;
+
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          photoUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _InitialsCircle(name: user?.name, size: size, colorScheme: colorScheme),
+          loadingBuilder: (context, child, progress) =>
+              progress == null ? child : _InitialsCircle(name: user?.name, size: size, colorScheme: colorScheme),
+        ),
+      );
     }
-    return ClipOval(
-      child: Image.file(
-        File(avatarPath),
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => fallback(context),
-      ),
-    );
+
+    return _InitialsCircle(name: user?.name, size: size, colorScheme: colorScheme);
   }
 }
 
-/// Default avatar for a new user: a green circle with their initials —
-/// no bundled headshot placeholder.
-class GreenInitialsAvatar extends StatelessWidget {
-  const GreenInitialsAvatar({super.key, required this.name, required this.size, required this.colorScheme});
+String _initialsFor(String? name) {
+  final trimmed = name?.trim() ?? '';
+  if (trimmed.isEmpty) return '?';
+  final parts = trimmed.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+  if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+  return (parts.first.substring(0, 1) + parts.last.substring(0, 1)).toUpperCase();
+}
+
+class _InitialsCircle extends StatelessWidget {
+  const _InitialsCircle({required this.name, required this.size, required this.colorScheme});
 
   final String? name;
   final double size;
@@ -47,26 +53,19 @@ class GreenInitialsAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipOval(
-      child: ColoredBox(
-        color: colorScheme.primary,
-        child: Center(
-          child: Text(
-            initialsOf(name),
-            style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w800, fontSize: size * 0.34),
-          ),
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(color: colorScheme.primary, shape: BoxShape.circle),
+      alignment: Alignment.center,
+      child: Text(
+        _initialsFor(name),
+        style: TextStyle(
+          color: colorScheme.onPrimary,
+          fontWeight: FontWeight.w800,
+          fontSize: size * 0.38,
         ),
       ),
     );
   }
-}
-
-/// Shared "first + last initial" derivation, e.g. "Ama Owusu" -> "AO".
-String initialsOf(String? name) {
-  final trimmed = name?.trim() ?? '';
-  if (trimmed.isEmpty) return '?';
-  final parts = trimmed.split(RegExp(r'\s+'));
-  final first = parts.first[0];
-  final last = parts.length > 1 ? parts.last[0] : '';
-  return (first + last).toUpperCase();
 }

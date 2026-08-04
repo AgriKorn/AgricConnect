@@ -32,6 +32,12 @@ export class InMemoryDisputeRepository implements IDisputeRepository {
     this.disputes.set(id, updated);
     return updated;
   }
+
+  async findOpenByTransaction(transactionId: string): Promise<Dispute | null> {
+    return (
+      [...this.disputes.values()].find((d) => d.transactionId === transactionId && d.status === 'OPEN') ?? null
+    );
+  }
 }
 
 export const disputeRepository = new InMemoryDisputeRepository();

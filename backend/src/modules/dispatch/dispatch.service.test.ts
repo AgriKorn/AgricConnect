@@ -27,9 +27,16 @@ describe('DispatchService', () => {
     driverId: 'driver-100',
     cropType: 'tomato',
     quantityKg: 200,
+    amountGhs: 500,
     status: 'PENDING',
     createdAt: new Date(),
     updatedAt: new Date(),
+    farmerName: 'Test Farmer',
+    farmerPhone: '+233541111111',
+    pickupRegion: 'Greater Accra',
+    buyerName: 'Test Buyer',
+    buyerPhone: '+233542222222',
+    dropoffRegion: 'Ashanti',
     ...overrides,
   });
 

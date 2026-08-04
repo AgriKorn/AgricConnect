@@ -2,33 +2,31 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/utils/currency.dart';
-import '../../../core/utils/freshness.dart';
 import '../../../core/widgets/agri_bottom_sheet.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/user_avatar.dart';
-import '../../auth/application/auth_controller.dart';
 import '../../checkout/presentation/checkout_screen.dart';
 import '../application/marketplace_providers.dart';
 import '../data/marketplace_mock.dart';
+import 'widgets/listing_grid_tile.dart';
 
 /// Buyer Marketplace (design system section 7): brand header + avatar ->
-/// search + sort -> category chips -> a 2-column grid of listings.
+/// search + sort -> category chips -> a responsive grid of listings.
 class MarketplaceScreen extends ConsumerWidget {
   const MarketplaceScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
+    final listingsAsync = ref.watch(marketplaceListingsProvider);
     final listings = ref.watch(filteredMarketplaceListingsProvider);
-    final userName = ref.watch(authControllerProvider).user?.name;
     final selected = ref.watch(selectedMarketplaceListingsProvider);
 
     return Scaffold(
       floatingActionButton: selected.isEmpty
           ? null
-          : _CartFab(
+          : MarketplaceCartFab(
               colorScheme: colorScheme,
               count: selected.length,
               onPressed: () => Navigator.of(context).push(
@@ -44,7 +42,7 @@ class MarketplaceScreen extends ConsumerWidget {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                  child: _MarketplaceHeader(colorScheme: colorScheme, userName: userName),
+                  child: _MarketplaceHeader(colorScheme: colorScheme),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
@@ -55,23 +53,50 @@ class MarketplaceScreen extends ConsumerWidget {
                   child: _CategoryChips(colorScheme: colorScheme),
                 ),
                 Expanded(
-                  child: listings.isEmpty
-                      ? const EmptyState(
-                          icon: Icons.search_off_rounded,
-                          message: 'No produce matches your search.',
-                        )
-                      : GridView.builder(
-                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 14,
-                            crossAxisSpacing: 14,
-                            childAspectRatio: 0.74,
+                  child: RefreshIndicator(
+                    onRefresh: () => ref.refresh(marketplaceListingsProvider.future),
+                    child: listingsAsync.when(
+                      loading: () => ListView(
+                        children: const [
+                          SizedBox(height: 120),
+                          Center(child: CircularProgressIndicator()),
+                        ],
+                      ),
+                      error: (error, _) => ListView(
+                        children: [
+                          const SizedBox(height: 60),
+                          EmptyState(
+                            icon: Icons.wifi_off_rounded,
+                            message: 'Could not load the marketplace. Pull down to retry.',
                           ),
-                          itemCount: listings.length,
-                          itemBuilder: (context, index) =>
-                              _ListingTile(listing: listings[index], colorScheme: colorScheme),
-                        ),
+                        ],
+                      ),
+                      data: (_) => listings.isEmpty
+                          ? ListView(
+                              children: const [
+                                SizedBox(height: 60),
+                                EmptyState(
+                                  icon: Icons.search_off_rounded,
+                                  message: 'No produce matches your search.',
+                                ),
+                              ],
+                            )
+                          : LayoutBuilder(
+                              builder: (context, constraints) => GridView.builder(
+                                padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: crossAxisCountForWidth(constraints.maxWidth),
+                                  mainAxisSpacing: 14,
+                                  crossAxisSpacing: 14,
+                                  childAspectRatio: 0.74,
+                                ),
+                                itemCount: listings.length,
+                                itemBuilder: (context, index) =>
+                                    ListingGridTile(listing: listings[index], colorScheme: colorScheme),
+                              ),
+                            ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -83,10 +108,9 @@ class MarketplaceScreen extends ConsumerWidget {
 }
 
 class _MarketplaceHeader extends StatelessWidget {
-  const _MarketplaceHeader({required this.colorScheme, required this.userName});
+  const _MarketplaceHeader({required this.colorScheme});
 
   final ColorScheme colorScheme;
-  final String? userName;
 
   @override
   Widget build(BuildContext context) {
@@ -111,14 +135,7 @@ class _MarketplaceHeader extends StatelessWidget {
         ),
         GestureDetector(
           onTap: () => context.go('/buyer/profile'),
-          child: SizedBox(
-            width: 44,
-            height: 44,
-            child: UserAvatar(
-              size: 44,
-              fallback: (context) => GreenInitialsAvatar(name: userName, size: 44, colorScheme: colorScheme),
-            ),
-          ),
+          child: const SizedBox(width: 44, height: 44, child: UserAvatar(size: 44)),
         ),
       ],
     );
@@ -291,157 +308,3 @@ class _CategoryChip extends StatelessWidget {
   }
 }
 
-class _CartFab extends StatelessWidget {
-  const _CartFab({required this.colorScheme, required this.count, required this.onPressed});
-
-  final ColorScheme colorScheme;
-  final int count;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        FloatingActionButton(
-          backgroundColor: colorScheme.primary,
-          foregroundColor: colorScheme.onPrimary,
-          onPressed: onPressed,
-          child: const Icon(Icons.shopping_cart_rounded),
-        ),
-        Positioned(
-          top: -4,
-          right: -4,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            constraints: const BoxConstraints(minWidth: 22),
-            decoration: BoxDecoration(
-              color: colorScheme.error,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: colorScheme.surface, width: 2),
-            ),
-            child: Text(
-              '$count',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: colorScheme.onError, fontSize: 12, fontWeight: FontWeight.w800),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ListingTile extends ConsumerWidget {
-  const _ListingTile({required this.listing, required this.colorScheme});
-
-  final MarketplaceListing listing;
-  final ColorScheme colorScheme;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final freshness = freshnessColorFor(listing.freshnessScore, Theme.of(context).brightness);
-    final accent = colorScheme.primary;
-    final selected = ref.watch(selectedMarketplaceListingsProvider).contains(listing);
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(22),
-        border: selected ? Border.all(color: colorScheme.primary, width: 3) : null,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(selected ? 19 : 22),
-        child: Material(
-          color: colorScheme.surface.withValues(alpha: 0.6),
-          child: InkWell(
-            onTap: () {
-              final notifier = ref.read(selectedMarketplaceListingsProvider.notifier);
-              final next = Set<MarketplaceListing>.from(notifier.state);
-              if (!next.remove(listing)) next.add(listing);
-              notifier.state = next;
-            },
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: listing.imageAsset != null
-                            ? Image.asset(listing.imageAsset!, fit: BoxFit.cover)
-                            : DecoratedBox(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.12)],
-                                  ),
-                                ),
-                                child: Center(
-                                  child: Icon(listing.category.icon, size: 44, color: accent.withValues(alpha: 0.8)),
-                                ),
-                              ),
-                      ),
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(color: freshness, borderRadius: BorderRadius.circular(999)),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.eco_rounded, size: 11, color: Colors.white),
-                              const SizedBox(width: 3),
-                              Text(
-                                '${listing.freshnessScore}% Fresh',
-                                style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (selected)
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(color: colorScheme.primary, shape: BoxShape.circle),
-                            child: Icon(Icons.check_rounded, size: 16, color: colorScheme.onPrimary),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        listing.name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: colorScheme.onSurface,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${formatGhs(listing.pricePerUnit)} / ${listing.unit}',
-                        style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w600, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

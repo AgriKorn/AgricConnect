@@ -30,6 +30,26 @@ export class PrismaMofaPriceRepository implements IMofaPriceRepository {
       effectiveDate: new Date(),
     };
   }
+
+  async findPriceHistory(cropTypes: string[], region: string): Promise<MofaPriceReference[]> {
+    if (cropTypes.length === 0) return [];
+
+    const found = await prisma.mofa_price_references.findMany({
+      where: {
+        crop_types: { name: { in: cropTypes.map((c) => c.toLowerCase()) } },
+        region: { equals: region, mode: 'insensitive' },
+      },
+      include: { crop_types: true },
+      orderBy: { effective_date: 'desc' },
+    });
+
+    return found.map((f) => ({
+      cropType: f.crop_types.name,
+      region: f.region,
+      pricePerKg: Number(f.price_per_kg),
+      effectiveDate: f.effective_date,
+    }));
+  }
 }
 
 export const mofaPriceRepository = new PrismaMofaPriceRepository();

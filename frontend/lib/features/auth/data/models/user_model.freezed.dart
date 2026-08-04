@@ -33,9 +33,8 @@ mixin _$UserModel {
   String? get businessType => throw _privateConstructorUsedError; // Buyer
   String? get vehicleCapacity => throw _privateConstructorUsedError; // Driver
   String? get operatingRegion => throw _privateConstructorUsedError; // Driver
-  String? get bio =>
-      throw _privateConstructorUsedError; // Farmer / Buyer / Driver — free-text profile description
-  String? get avatarPath => throw _privateConstructorUsedError;
+  String? get bio => throw _privateConstructorUsedError;
+  String? get photoUrl => throw _privateConstructorUsedError;
 
   /// Serializes this UserModel to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -65,7 +64,7 @@ abstract class $UserModelCopyWith<$Res> {
     String? vehicleCapacity,
     String? operatingRegion,
     String? bio,
-    String? avatarPath,
+    String? photoUrl,
   });
 }
 
@@ -96,7 +95,7 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
     Object? vehicleCapacity = freezed,
     Object? operatingRegion = freezed,
     Object? bio = freezed,
-    Object? avatarPath = freezed,
+    Object? photoUrl = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -148,9 +147,9 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
                 ? _value.bio
                 : bio // ignore: cast_nullable_to_non_nullable
                       as String?,
-            avatarPath: freezed == avatarPath
-                ? _value.avatarPath
-                : avatarPath // ignore: cast_nullable_to_non_nullable
+            photoUrl: freezed == photoUrl
+                ? _value.photoUrl
+                : photoUrl // ignore: cast_nullable_to_non_nullable
                       as String?,
           )
           as $Val,
@@ -180,7 +179,7 @@ abstract class _$$UserModelImplCopyWith<$Res>
     String? vehicleCapacity,
     String? operatingRegion,
     String? bio,
-    String? avatarPath,
+    String? photoUrl,
   });
 }
 
@@ -210,7 +209,7 @@ class __$$UserModelImplCopyWithImpl<$Res>
     Object? vehicleCapacity = freezed,
     Object? operatingRegion = freezed,
     Object? bio = freezed,
-    Object? avatarPath = freezed,
+    Object? photoUrl = freezed,
   }) {
     return _then(
       _$UserModelImpl(
@@ -262,9 +261,9 @@ class __$$UserModelImplCopyWithImpl<$Res>
             ? _value.bio
             : bio // ignore: cast_nullable_to_non_nullable
                   as String?,
-        avatarPath: freezed == avatarPath
-            ? _value.avatarPath
-            : avatarPath // ignore: cast_nullable_to_non_nullable
+        photoUrl: freezed == photoUrl
+            ? _value.photoUrl
+            : photoUrl // ignore: cast_nullable_to_non_nullable
                   as String?,
       ),
     );
@@ -287,7 +286,7 @@ class _$UserModelImpl implements _UserModel {
     this.vehicleCapacity,
     this.operatingRegion,
     this.bio,
-    this.avatarPath,
+    this.photoUrl,
   });
 
   factory _$UserModelImpl.fromJson(Map<String, dynamic> json) =>
@@ -322,13 +321,12 @@ class _$UserModelImpl implements _UserModel {
   // Driver
   @override
   final String? bio;
-  // Farmer / Buyer / Driver — free-text profile description
   @override
-  final String? avatarPath;
+  final String? photoUrl;
 
   @override
   String toString() {
-    return 'UserModel(id: $id, role: $role, name: $name, email: $email, phone: $phone, status: $status, region: $region, businessName: $businessName, businessType: $businessType, vehicleCapacity: $vehicleCapacity, operatingRegion: $operatingRegion, bio: $bio, avatarPath: $avatarPath)';
+    return 'UserModel(id: $id, role: $role, name: $name, email: $email, phone: $phone, status: $status, region: $region, businessName: $businessName, businessType: $businessType, vehicleCapacity: $vehicleCapacity, operatingRegion: $operatingRegion, bio: $bio, photoUrl: $photoUrl)';
   }
 
   @override
@@ -352,8 +350,7 @@ class _$UserModelImpl implements _UserModel {
             (identical(other.operatingRegion, operatingRegion) ||
                 other.operatingRegion == operatingRegion) &&
             (identical(other.bio, bio) || other.bio == bio) &&
-            (identical(other.avatarPath, avatarPath) ||
-                other.avatarPath == avatarPath));
+            (identical(other.photoUrl, photoUrl) || other.photoUrl == photoUrl));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -372,7 +369,7 @@ class _$UserModelImpl implements _UserModel {
     vehicleCapacity,
     operatingRegion,
     bio,
-    avatarPath,
+    photoUrl,
   );
 
   /// Create a copy of UserModel
@@ -403,7 +400,7 @@ abstract class _UserModel implements UserModel {
     final String? vehicleCapacity,
     final String? operatingRegion,
     final String? bio,
-    final String? avatarPath,
+    final String? photoUrl,
   }) = _$UserModelImpl;
 
   factory _UserModel.fromJson(Map<String, dynamic> json) =
@@ -432,9 +429,9 @@ abstract class _UserModel implements UserModel {
   @override
   String? get operatingRegion; // Driver
   @override
-  String? get bio; // Farmer / Buyer / Driver — free-text profile description
+  String? get bio;
   @override
-  String? get avatarPath;
+  String? get photoUrl;
 
   /// Create a copy of UserModel
   /// with the given fields replaced by the non-null parameter values.

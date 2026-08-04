@@ -1,43 +1,165 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/utils/currency.dart';
 import '../../../core/utils/freshness.dart';
-import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/ambient_background.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../marketplace/data/marketplace_mock.dart';
+import '../../orders/data/orders_repository.dart';
 import '../application/checkout_providers.dart';
 import '../data/checkout_mock.dart';
 
-/// Secure Checkout: escrow explainer -> order summary -> payment method ->
-/// sticky "Pay & Confirm Escrow" footer. Handles one or more listings
-/// selected together on the marketplace grid, each with its own +/-
-/// adjustable quantity (starting from [quantity] as the initial stand-in —
-/// there's no real cart quantity carried over from the marketplace yet).
+/// Secure Checkout: escrow explainer -> order summary -> delivery choice ->
+/// payment method -> sticky "Pay & Confirm Escrow" footer.
+///
+/// Handles one or more listings selected together on the marketplace grid.
+/// The backend purchases one whole listing per call (no partial quantity,
+/// no multi-item basket endpoint), so each selected listing is bought for
+/// its full available quantity via a separate, sequential real API call —
+/// there is no editable quantity stepper because there is nothing to adjust.
 class CheckoutScreen extends ConsumerStatefulWidget {
-  const CheckoutScreen({super.key, required this.listings, this.quantity = 25});
+  const CheckoutScreen({super.key, required this.listings});
 
   final List<MarketplaceListing> listings;
-  final double quantity;
 
   @override
   ConsumerState<CheckoutScreen> createState() => _CheckoutScreenState();
 }
 
 class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
-  late final Map<String, double> _quantities;
+  bool _hasOwnTransport = false;
+  bool _submitting = false;
+  String? _error;
 
-  @override
-  void initState() {
-    super.initState();
-    _quantities = {for (final listing in widget.listings) listing.id: widget.quantity};
+  Future<void> _pay() async {
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+
+    final results = <_PurchaseOutcome>[];
+    for (final listing in widget.listings) {
+      try {
+        final result = await ref.read(ordersRepositoryProvider).purchaseListing(
+              listingId: listing.id,
+              hasOwnTransport: _hasOwnTransport,
+            );
+        results.add(_PurchaseOutcome(listing: listing, result: result));
+      } on ApiException catch (e) {
+        results.add(_PurchaseOutcome(listing: listing, error: e.message));
+      }
+    }
+
+    if (!mounted) return;
+    setState(() => _submitting = false);
+
+    // "Pay & Confirm Escrow" IS the payment step, so the order that was just
+    // created has to redirect to Paystack on its own — it can't depend on
+    // the buyer noticing and tapping a second "Open Payment Link" button
+    // buried inside the outcome dialog below. Only one listing's checkout
+    // opens automatically: each listing is its own separate Paystack
+    // transaction, so auto-launching more than one would fire multiple
+    // external browser tabs at once.
+    PurchaseResult? firstPayable;
+    for (final outcome in results) {
+      if (outcome.error == null && (outcome.result?.authorizationUrl.isNotEmpty ?? false)) {
+        firstPayable = outcome.result;
+        break;
+      }
+    }
+    if (firstPayable != null) {
+      await _openPaymentLink(firstPayable.authorizationUrl);
+    }
+
+    if (!mounted) return;
+    await _showOutcomeDialog(results);
   }
 
-  void _adjustQuantity(String listingId, double delta) {
-    setState(() {
-      final next = (_quantities[listingId] ?? widget.quantity) + delta;
-      _quantities[listingId] = next.clamp(1, 999);
-    });
+  Future<void> _openPaymentLink(String url) async {
+    var launched = false;
+    try {
+      launched = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {
+      launched = false;
+    }
+    if (!launched && mounted) {
+      setState(() {
+        _error = 'Could not open the Paystack payment page automatically. Use "Open Payment Link" below, or find this order in your Orders tab to try again.';
+      });
+    }
+  }
+
+  Future<void> _showOutcomeDialog(List<_PurchaseOutcome> results) async {
+    final colorScheme = Theme.of(context).colorScheme;
+    final allSucceeded = results.every((r) => r.error == null);
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: colorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text(
+          allSucceeded ? 'Order placed' : 'Some items could not be purchased',
+          style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w800),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final outcome in results) ...[
+                Text(
+                  outcome.listing.name,
+                  style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 4),
+                if (outcome.error != null)
+                  Text(
+                    outcome.error!,
+                    style: TextStyle(color: colorScheme.error, fontSize: 13),
+                  )
+                else ...[
+                  Text(
+                    _hasOwnTransport
+                        ? 'Complete payment to confirm your order for ${formatGhs(outcome.result!.amount)}. You\'ll collect the produce yourself.'
+                        : 'Complete payment to confirm your order for ${formatGhs(outcome.result!.amount)}. A driver will be assigned automatically.',
+                    style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13, height: 1.4),
+                  ),
+                  if (outcome.result!.authorizationUrl.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    TextButton(
+                      onPressed: () => _openPaymentLink(outcome.result!.authorizationUrl),
+                      child: const Text('Open Payment Link'),
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      'This order was already started moments ago — check the Orders tab to finish payment.',
+                      style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12, fontStyle: FontStyle.italic),
+                    ),
+                  ],
+                ],
+                const SizedBox(height: 12),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: colorScheme.primary, foregroundColor: colorScheme.onPrimary),
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              if (mounted) Navigator.of(context).pop();
+            },
+            child: const Text('Done'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -46,11 +168,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final method = ref.watch(selectedPaymentMethodProvider);
     final listings = widget.listings;
 
-    final subtotal = listings.fold<double>(
+    final total = listings.fold<double>(
       0,
-      (sum, listing) => sum + listing.pricePerUnit * (_quantities[listing.id] ?? widget.quantity),
+      (sum, listing) => sum + listing.pricePerUnit * (listing.quantityAvailable ?? 0),
     );
-    final total = subtotal + mockDeliveryFee + mockEscrowServiceFee;
 
     return Scaffold(
       body: Stack(
@@ -58,7 +179,8 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: Column(
+            child: ResponsiveContent(
+              child: Column(
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 8, 20, 0),
@@ -91,17 +213,21 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                     children: [
                       _EscrowBanner(colorScheme: colorScheme),
                       const SizedBox(height: 24),
-                      _OrderSummaryCard(
+                      _OrderSummaryCard(colorScheme: colorScheme, listings: listings, total: total),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Delivery',
+                        style: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600, fontSize: 13.5),
+                      ),
+                      const SizedBox(height: 12),
+                      _TransportChoice(
                         colorScheme: colorScheme,
-                        listings: listings,
-                        quantities: _quantities,
-                        onAdjustQuantity: _adjustQuantity,
-                        subtotal: subtotal,
-                        total: total,
+                        hasOwnTransport: _hasOwnTransport,
+                        onChanged: (value) => setState(() => _hasOwnTransport = value),
                       ),
                       const SizedBox(height: 24),
                       Text(
-                        'Select Payment Method',
+                        'Preferred Mobile Money Network',
                         style: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600, fontSize: 13.5),
                       ),
                       const SizedBox(height: 12),
@@ -127,6 +253,25 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                           ),
                         ],
                       ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'You\'ll confirm the exact network and complete payment on the secure Paystack page that opens next.',
+                        style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12, height: 1.3),
+                      ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: colorScheme.errorContainer.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Text(
+                            _error!,
+                            style: TextStyle(color: colorScheme.onErrorContainer, fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 20),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -150,18 +295,24 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 _CheckoutFooter(
                   colorScheme: colorScheme,
                   total: total,
-                  onPay: () {
-                    showAgriToast(context, 'Payment confirmed — funds are held in escrow until delivery.');
-                    Navigator.of(context).pop();
-                  },
+                  submitting: _submitting,
+                  onPay: _pay,
                 ),
               ],
+              ),
             ),
           ),
         ],
       ),
     );
   }
+}
+
+class _PurchaseOutcome {
+  _PurchaseOutcome({required this.listing, this.result, this.error});
+  final MarketplaceListing listing;
+  final PurchaseResult? result;
+  final String? error;
 }
 
 class _EscrowBanner extends StatelessWidget {
@@ -206,20 +357,10 @@ class _EscrowBanner extends StatelessWidget {
 }
 
 class _OrderSummaryCard extends StatelessWidget {
-  const _OrderSummaryCard({
-    required this.colorScheme,
-    required this.listings,
-    required this.quantities,
-    required this.onAdjustQuantity,
-    required this.subtotal,
-    required this.total,
-  });
+  const _OrderSummaryCard({required this.colorScheme, required this.listings, required this.total});
 
   final ColorScheme colorScheme;
   final List<MarketplaceListing> listings;
-  final Map<String, double> quantities;
-  final void Function(String listingId, double delta) onAdjustQuantity;
-  final double subtotal;
   final double total;
 
   @override
@@ -242,22 +383,10 @@ class _OrderSummaryCard extends StatelessWidget {
           Divider(color: colorScheme.outline.withValues(alpha: 0.2), height: 1),
           const SizedBox(height: 18),
           for (var i = 0; i < listings.length; i++) ...[
-            _OrderItemRow(
-              colorScheme: colorScheme,
-              listing: listings[i],
-              quantity: quantities[listings[i].id]!,
-              onDecrement: () => onAdjustQuantity(listings[i].id, -1),
-              onIncrement: () => onAdjustQuantity(listings[i].id, 1),
-            ),
+            _OrderItemRow(colorScheme: colorScheme, listing: listings[i]),
             if (i != listings.length - 1) const SizedBox(height: 18),
           ],
           const SizedBox(height: 20),
-          _SummaryRow(colorScheme: colorScheme, label: 'Subtotal', value: formatGhs(subtotal)),
-          const SizedBox(height: 12),
-          _SummaryRow(colorScheme: colorScheme, label: 'Delivery Fee', value: formatGhs(mockDeliveryFee)),
-          const SizedBox(height: 12),
-          _SummaryRow(colorScheme: colorScheme, label: 'Escrow Service Fee', value: formatGhs(mockEscrowServiceFee)),
-          const SizedBox(height: 16),
           Divider(color: colorScheme.outline.withValues(alpha: 0.2), height: 1),
           const SizedBox(height: 16),
           _SummaryRow(
@@ -273,24 +402,18 @@ class _OrderSummaryCard extends StatelessWidget {
 }
 
 class _OrderItemRow extends StatelessWidget {
-  const _OrderItemRow({
-    required this.colorScheme,
-    required this.listing,
-    required this.quantity,
-    required this.onDecrement,
-    required this.onIncrement,
-  });
+  const _OrderItemRow({required this.colorScheme, required this.listing});
 
   final ColorScheme colorScheme;
   final MarketplaceListing listing;
-  final double quantity;
-  final VoidCallback onDecrement;
-  final VoidCallback onIncrement;
 
   @override
   Widget build(BuildContext context) {
     final freshness = freshnessColorFor(listing.freshnessScore, Theme.of(context).brightness);
-    final quantityLabel = quantity == quantity.roundToDouble() ? quantity.toStringAsFixed(0) : quantity.toString();
+    final quantity = listing.quantityAvailable;
+    final quantityLabel = quantity != null ? '${quantity.toStringAsFixed(0)} ${listing.unit}' : 'Full listing';
+    final lineTotal = quantity != null ? listing.pricePerUnit * quantity : listing.pricePerUnit;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -299,7 +422,9 @@ class _OrderItemRow extends StatelessWidget {
           child: SizedBox(
             width: 64,
             height: 64,
-            child: listing.imageAsset != null
+            child: listing.imageUrl != null
+                ? Image.network(listing.imageUrl!, fit: BoxFit.cover)
+                : listing.imageAsset != null
                 ? Image.asset(listing.imageAsset!, fit: BoxFit.cover)
                 : DecoratedBox(
                     decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest),
@@ -324,7 +449,7 @@ class _OrderItemRow extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    formatGhs(listing.pricePerUnit * quantity),
+                    formatGhs(lineTotal),
                     style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w700, fontSize: 14),
                   ),
                 ],
@@ -338,12 +463,10 @@ class _OrderItemRow extends StatelessWidget {
                   style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
                 ),
               ),
-              const SizedBox(height: 10),
-              _QuantityStepper(
-                colorScheme: colorScheme,
-                quantityLabel: '$quantityLabel ${listing.unit.toUpperCase()}',
-                onDecrement: onDecrement,
-                onIncrement: onIncrement,
+              const SizedBox(height: 8),
+              Text(
+                'Buying: $quantityLabel (whole listing)',
+                style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ],
           ),
@@ -353,61 +476,82 @@ class _OrderItemRow extends StatelessWidget {
   }
 }
 
-class _QuantityStepper extends StatelessWidget {
-  const _QuantityStepper({
-    required this.colorScheme,
-    required this.quantityLabel,
-    required this.onDecrement,
-    required this.onIncrement,
-  });
+class _TransportChoice extends StatelessWidget {
+  const _TransportChoice({required this.colorScheme, required this.hasOwnTransport, required this.onChanged});
 
   final ColorScheme colorScheme;
-  final String quantityLabel;
-  final VoidCallback onDecrement;
-  final VoidCallback onIncrement;
+  final bool hasOwnTransport;
+  final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _StepperButton(icon: Icons.remove_rounded, colorScheme: colorScheme, onTap: onDecrement),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Text(
-              quantityLabel,
-              style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 13),
-            ),
+    return Row(
+      children: [
+        Expanded(
+          child: _ChoiceCard(
+            colorScheme: colorScheme,
+            icon: Icons.local_shipping_rounded,
+            label: 'Need a driver',
+            selected: !hasOwnTransport,
+            onTap: () => onChanged(false),
           ),
-          _StepperButton(icon: Icons.add_rounded, colorScheme: colorScheme, onTap: onIncrement),
-        ],
-      ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _ChoiceCard(
+            colorScheme: colorScheme,
+            icon: Icons.directions_walk_rounded,
+            label: 'I\'ll collect it',
+            selected: hasOwnTransport,
+            onTap: () => onChanged(true),
+          ),
+        ),
+      ],
     );
   }
 }
 
-class _StepperButton extends StatelessWidget {
-  const _StepperButton({required this.icon, required this.colorScheme, required this.onTap});
+class _ChoiceCard extends StatelessWidget {
+  const _ChoiceCard({
+    required this.colorScheme,
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
 
-  final IconData icon;
   final ColorScheme colorScheme;
+  final IconData icon;
+  final String label;
+  final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(width: 30, height: 30, child: Icon(icon, size: 16, color: colorScheme.primary)),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: selected ? colorScheme.primary.withValues(alpha: 0.15) : colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: selected ? colorScheme.primary : colorScheme.outline.withValues(alpha: 0.25)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: selected ? colorScheme.primary : colorScheme.onSurfaceVariant, size: 22),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: selected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+                fontSize: 12.5,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -503,10 +647,16 @@ class _PaymentMethodCard extends StatelessWidget {
 }
 
 class _CheckoutFooter extends StatelessWidget {
-  const _CheckoutFooter({required this.colorScheme, required this.total, required this.onPay});
+  const _CheckoutFooter({
+    required this.colorScheme,
+    required this.total,
+    required this.submitting,
+    required this.onPay,
+  });
 
   final ColorScheme colorScheme;
   final double total;
+  final bool submitting;
   final VoidCallback onPay;
 
   @override
@@ -532,14 +682,23 @@ class _CheckoutFooter extends StatelessWidget {
             width: double.infinity,
             height: 54,
             child: FilledButton.icon(
-              onPressed: onPay,
+              onPressed: submitting ? null : onPay,
               style: FilledButton.styleFrom(
                 backgroundColor: colorScheme.primary,
                 foregroundColor: colorScheme.onPrimary,
                 shape: const StadiumBorder(),
               ),
-              icon: const Icon(Icons.lock_rounded, size: 18),
-              label: const Text('Pay & Confirm Escrow', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              icon: submitting
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.onPrimary),
+                    )
+                  : const Icon(Icons.lock_rounded, size: 18),
+              label: Text(
+                submitting ? 'Processing...' : 'Pay & Confirm Escrow',
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+              ),
             ),
           ),
         ],

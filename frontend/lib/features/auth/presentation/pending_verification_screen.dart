@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,9 +5,9 @@ import '../../../core/widgets/agri_button.dart';
 import '../application/auth_controller.dart';
 
 /// Checklist 1.4: no access to core features until an Admin approves the
-/// account. Real verification is push/poll-driven (Phase 10/9, not yet
-/// built) — the debug approve action stands in for that so the flow can be
-/// demonstrated end to end.
+/// account via the real admin panel. There is no push notification for
+/// approval yet, so the user finds out by logging back in — logging out and
+/// back in re-checks status against the server.
 class PendingVerificationScreen extends ConsumerWidget {
   const PendingVerificationScreen({super.key});
 
@@ -49,13 +48,6 @@ class PendingVerificationScreen extends ConsumerWidget {
                   variant: AgriButtonVariant.secondary,
                   onPressed: () => ref.read(authControllerProvider.notifier).logout(),
                 ),
-                if (kDebugMode) ...[
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: () => ref.read(authControllerProvider.notifier).debugApprove(),
-                    child: const Text('(Debug) Simulate approval'),
-                  ),
-                ],
               ],
             ),
           ),

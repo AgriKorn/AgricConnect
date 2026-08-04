@@ -131,9 +131,11 @@ final darkColorScheme = ColorScheme.fromSeed(
 );
 
 TextTheme _interTextTheme(TextTheme base) {
-  return GoogleFonts.interTextTheme(base).copyWith(
-    bodyLarge: GoogleFonts.inter(textStyle: base.bodyLarge, fontSize: 16),
-  );
+  try {
+    return GoogleFonts.interTextTheme(base);
+  } catch (_) {
+    return base;
+  }
 }
 
 final lightTheme = ThemeData(

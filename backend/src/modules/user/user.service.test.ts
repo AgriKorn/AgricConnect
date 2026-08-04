@@ -11,6 +11,7 @@ describe('UserService', () => {
     id: 'user-1',
     name: 'Kwame Mensah',
     phone: '+233541234567',
+    email: null,
     passwordHash: 'hashed-secret',
     role: 'farmer',
     status: 'ACTIVE',
@@ -29,8 +30,10 @@ describe('UserService', () => {
     mockUsers = {
       create: jest.fn(),
       findByPhone: jest.fn(),
+      findByEmail: jest.fn(),
       findById: jest.fn(),
       findManyByStatus: jest.fn(),
+      findManyByRole: jest.fn(),
       findFarmerIdsByRegion: jest.fn(),
       findAvailableDrivers: jest.fn(),
       update: jest.fn(),

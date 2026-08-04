@@ -11,6 +11,7 @@ import '../../../core/utils/currency.dart';
 import '../../../core/utils/freshness.dart';
 import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../application/scan_controller.dart';
 import '../data/scan_record.dart';
 
@@ -25,7 +26,7 @@ class ScanResultScreen extends ConsumerWidget {
 
     if (result == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('AI Analysis')),
+        appBar: AppBar(title: const Text('AI Analysis (Preview)')),
         body: SafeArea(
           child: Center(
             child: Padding(
@@ -50,7 +51,8 @@ class ScanResultScreen extends ConsumerWidget {
         children: [
           _ResultBackground(tint: tint),
           SafeArea(
-            child: Column(
+            child: ResponsiveContent(
+              child: Column(
               children: [
                 _ResultAppBar(colorScheme: colorScheme, result: result),
                 Expanded(
@@ -73,6 +75,7 @@ class ScanResultScreen extends ConsumerWidget {
                   ),
                 ),
               ],
+              ),
             ),
           ),
           Positioned(
@@ -150,10 +153,20 @@ class _ResultAppBar extends StatelessWidget {
             onPressed: () => context.canPop() ? context.pop() : context.go('/farmer/home'),
           ),
           Expanded(
-            child: Text(
-              'AI Analysis',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: colorScheme.onSurface, fontSize: 19, fontWeight: FontWeight.w800),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'AI Analysis',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: colorScheme.onSurface, fontSize: 19, fontWeight: FontWeight.w800),
+                ),
+                Text(
+                  'Preview — sample result, not a real scan',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600),
+                ),
+              ],
             ),
           ),
           _CircleIconButton(

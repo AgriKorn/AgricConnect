@@ -5,22 +5,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/auth/application/auth_controller.dart';
 import 'edit_profile_screen.dart';
+import 'user_avatar.dart';
 
 void _openEditProfile(
   BuildContext context, {
-  required Widget Function(double size) avatarBuilder,
   required String locationLabel,
   required String locationHint,
-  required String bioHint,
   required String verifiedSubtitle,
 }) {
   Navigator.of(context).push(
     MaterialPageRoute(
       builder: (context) => EditProfileScreen(
-        avatarBuilder: avatarBuilder,
         locationLabel: locationLabel,
         locationHint: locationHint,
-        bioHint: bioHint,
         verifiedSubtitle: verifiedSubtitle,
       ),
     ),
@@ -34,21 +31,17 @@ void _openEditProfile(
 class AccountSettingsScreen extends ConsumerWidget {
   const AccountSettingsScreen({
     super.key,
-    required this.avatarBuilder,
     required this.roleBadgeLabel,
     required this.onHelpTap,
     required this.locationLabel,
     required this.locationHint,
-    required this.bioHint,
     required this.verifiedSubtitle,
   });
 
-  final Widget Function(double size) avatarBuilder;
   final String roleBadgeLabel;
   final VoidCallback onHelpTap;
   final String locationLabel;
   final String locationHint;
-  final String bioHint;
   final String verifiedSubtitle;
 
   @override
@@ -100,7 +93,7 @@ class AccountSettingsScreen extends ConsumerWidget {
                     ),
                     child: Row(
                       children: [
-                        SizedBox(width: 64, height: 64, child: avatarBuilder(64)),
+                        const SizedBox(width: 64, height: 64, child: UserAvatar(size: 64)),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(
@@ -133,10 +126,8 @@ class AccountSettingsScreen extends ConsumerWidget {
                         GestureDetector(
                           onTap: () => _openEditProfile(
                             context,
-                            avatarBuilder: avatarBuilder,
                             locationLabel: locationLabel,
                             locationHint: locationHint,
-                            bioHint: bioHint,
                             verifiedSubtitle: verifiedSubtitle,
                           ),
                           child: Container(

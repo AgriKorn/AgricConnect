@@ -1,5 +1,5 @@
 import { prisma } from '../../config/db';
-import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../utils/errors';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError, PayoutNotConfiguredError } from '../../utils/errors';
 import { auditService } from '../audit/audit.service';
 import { dispatchService } from '../dispatch/dispatch.service';
 import { DriverJob } from '../dispatch/dispatch.types';
@@ -14,6 +14,7 @@ import { outboxService } from '../outbox/outbox.service';
 export interface PurchaseResult {
   transaction: Transaction;
   dispatch: DriverJob | null;
+  authorizationUrl: string;
 }
 
 export class TransactionService {
@@ -28,12 +29,14 @@ export class TransactionService {
     const recent = await this.repo.findRecentOrderByBuyerAndListing(buyerId, listingId, 60);
     if (recent) {
       const activeDispatch = await dispatchService.findActiveForTransaction(recent.id);
-      return { transaction: recent, dispatch: activeDispatch };
+      // Duplicate request within the idempotency window reuses the original order;
+      // the original authorizationUrl was only returned once and isn't persisted.
+      return { transaction: recent, dispatch: activeDispatch, authorizationUrl: '' };
     }
 
     const amountGhs = listing.pricePerKg * listing.quantityKg;
     const buyer = await userRepository.findById(buyerId);
-    const { reference } = await paymentService.initializeTransaction(amountGhs, buyer?.phone ?? 'unknown', { listingId });
+    const { reference, authorizationUrl } = await paymentService.initializeTransaction(amountGhs, buyer?.phone ?? 'unknown', { listingId });
 
     return await prisma.$transaction(
       async (tx) => {
@@ -76,6 +79,18 @@ export class TransactionService {
           orderId: transaction.id,
         });
 
+        // The buyer otherwise gets no confirmation their payment went
+        // through at all until delivery is confirmed, which can be days
+        // later — confirmDelivery() already notifies both sides, this makes
+        // purchase() do the same instead of leaving the buyer half of it out.
+        await notificationService.sendNotification({
+          userId: buyerId,
+          type: 'PURCHASE_CONFIRMED',
+          message: `Your order for ${listing.quantityKg}kg of ${listing.cropType} is confirmed. GHS ${amountGhs} is held in escrow until delivery.`,
+          listingId,
+          orderId: transaction.id,
+        });
+
         let dispatch: DriverJob | null = null;
         if (!hasOwnTransport) {
           dispatch = await dispatchService.assignDriver({
@@ -86,7 +101,7 @@ export class TransactionService {
           });
         }
 
-        return { transaction, dispatch };
+        return { transaction, dispatch, authorizationUrl };
       },
       { timeout: 15000 },
     );
@@ -130,6 +145,18 @@ export class TransactionService {
       throw new BadRequestError('QR hash does not match this listing — cannot verify delivery');
     }
 
+    const farmer = await userRepository.findById(transaction.farmerId);
+    if (!farmer?.profile?.momoNumber || !farmer.profile.momoNetwork) {
+      throw new PayoutNotConfiguredError('Cannot release payment — the farmer has not set up Mobile Money payout details');
+    }
+
+    const { transferCode } = await paymentService.initiateTransfer(
+      farmer.profile.momoNumber,
+      transaction.amountGhs,
+      `Escrow release for order ${transaction.id}`,
+      farmer.profile.momoNetwork,
+    );
+
     return await prisma.$transaction(
       async (tx) => {
         await tx.qr_scans.create({
@@ -141,7 +168,7 @@ export class TransactionService {
           },
         });
 
-        const updated = await this.repo.update(transaction.id, { status: 'RELEASED' });
+        const updated = await this.repo.update(transaction.id, { status: 'RELEASED', transferCode });
 
         await auditService.log('DELIVERY_CONFIRMED', transaction.id, { qrHash, confirmedBy }, confirmedBy);
         await auditService.log('PAYMENT_RELEASED', transaction.id, { amountGhs: transaction.amountGhs }, confirmedBy);

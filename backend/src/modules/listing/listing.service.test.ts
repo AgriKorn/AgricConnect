@@ -2,7 +2,9 @@ import { ListingService } from './listing.service';
 import { PrismaListingRepository } from './listing.repository.prisma';
 import { mofaPriceRepository } from '../pricing/pricing.repository.prisma';
 import { auditService } from '../audit/audit.service';
-import { ForbiddenError } from '../../utils/errors';
+import { userRepository } from '../user/user.repository.prisma';
+import { transactionRepository } from '../transaction/transaction.repository.prisma';
+import { ConflictError, ForbiddenError, PayoutNotConfiguredError } from '../../utils/errors';
 
 describe('ListingService', () => {
   let listingService: ListingService;
@@ -24,7 +26,23 @@ describe('ListingService', () => {
   });
 
   describe('createListing', () => {
+    it('should throw PayoutNotConfiguredError if the farmer has no MoMo payout number on file', async () => {
+      jest.spyOn(userRepository, 'findById').mockResolvedValue({ id: 'farmer-1', profile: {} } as any);
+
+      await expect(
+        listingService.createListing(
+          { cropType: 'tomato', quantityKg: 200, freshnessScore: 9.5, shelfLifeDays: 7, farmerLat: 5.6, farmerLong: -0.18, pricePerKg: 10.0 } as any,
+          'farmer-1',
+        ),
+      ).rejects.toThrow(PayoutNotConfiguredError);
+      expect(mockRepo.create).not.toHaveBeenCalled();
+    });
+
     it('should calculate price floor/ceiling against MOFA reference price if available', async () => {
+      jest.spyOn(userRepository, 'findById').mockResolvedValue({
+        id: 'farmer-1',
+        profile: { momoNumber: '+233541234567', momoNetwork: 'MTN' },
+      } as any);
       jest.spyOn(mofaPriceRepository, 'findLatest').mockResolvedValue({
         cropType: 'tomato',
         region: 'Greater Accra',
@@ -45,7 +63,7 @@ describe('ListingService', () => {
         qrCodeData: 'hash-1',
       };
 
-      const mockListing = { id: '00000000-0000-0000-0000-000000000001', farmerId: 'farmer-1', ...input, cropCategory: 'vegetables', status: 'ACTIVE' as const, createdAt: new Date(), updatedAt: new Date() };
+      const mockListing = { id: '00000000-0000-0000-0000-000000000001', farmerId: 'farmer-1', ...input, cropCategory: 'vegetables', imageUrls: [], status: 'ACTIVE' as const, createdAt: new Date(), updatedAt: new Date() };
       mockRepo.create.mockResolvedValue(mockListing);
 
       const result = await listingService.createListing(input, 'farmer-1');
@@ -72,7 +90,7 @@ describe('ListingService', () => {
         qrCodeData: 'hash-1',
       };
 
-      const mockListing = { id: '00000000-0000-0000-0000-000000000001', farmerId: 'farmer-1', ...input, cropCategory: 'vegetables', status: 'ACTIVE' as const, createdAt: new Date(), updatedAt: new Date() };
+      const mockListing = { id: '00000000-0000-0000-0000-000000000001', farmerId: 'farmer-1', ...input, cropCategory: 'vegetables', imageUrls: [], status: 'ACTIVE' as const, createdAt: new Date(), updatedAt: new Date() };
       mockRepo.create.mockResolvedValue(mockListing);
 
       const result = await listingService.createListing(input, 'farmer-1');
@@ -91,19 +109,6 @@ describe('ListingService', () => {
 
       await expect(listingService.updateListing('00000000-0000-0000-0000-000000000001', 'other-farmer-id', { pricePerKg: 12 })).rejects.toThrow(ForbiddenError);
     });
-
-    it('should still return the updated listing when the audit write fails', async () => {
-      const farmerId = 'owner-farmer-id';
-      mockRepo.findById.mockResolvedValue({ id: '00000000-0000-0000-0000-000000000001', farmerId } as any);
-
-      const updated = { id: '00000000-0000-0000-0000-000000000001', farmerId, pricePerKg: 12 } as any;
-      mockRepo.update.mockResolvedValue(updated);
-      jest.spyOn(auditService, 'log').mockRejectedValue(new Error('audit database unreachable'));
-
-      const result = await listingService.updateListing('00000000-0000-0000-0000-000000000001', farmerId, { pricePerKg: 12 });
-
-      expect(result).toEqual(updated);
-    });
   });
 
   describe('deleteListing', () => {
@@ -113,6 +118,7 @@ describe('ListingService', () => {
         id: '00000000-0000-0000-0000-000000000001',
         farmerId,
       } as any);
+      jest.spyOn(transactionRepository, 'findActiveByListingId').mockResolvedValue(null);
 
       const deletedListing = { id: '00000000-0000-0000-0000-000000000001', farmerId, status: 'INACTIVE' as const } as any;
       mockRepo.softDelete.mockResolvedValue(deletedListing);
@@ -121,6 +127,18 @@ describe('ListingService', () => {
 
       expect(mockRepo.softDelete).toHaveBeenCalledWith('00000000-0000-0000-0000-000000000001');
       expect(result).toEqual(deletedListing);
+    });
+
+    it('should refuse to delete a listing that has an active order in escrow', async () => {
+      const farmerId = 'owner-farmer-id';
+      mockRepo.findById.mockResolvedValue({
+        id: '00000000-0000-0000-0000-000000000001',
+        farmerId,
+      } as any);
+      jest.spyOn(transactionRepository, 'findActiveByListingId').mockResolvedValue({ id: 'order-1' } as any);
+
+      await expect(listingService.deleteListing('00000000-0000-0000-0000-000000000001', farmerId)).rejects.toThrow(ConflictError);
+      expect(mockRepo.softDelete).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,19 +1,24 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/motion.dart';
 import '../../../core/widgets/agri_toast.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../../core/widgets/theme_toggle_button.dart';
 import '../application/auth_controller.dart';
 import 'widgets/auth_visuals.dart';
 
 const _markAsset = 'assets/images/agri_mark.png';
 
-/// Checklist 1.3: email / password. Styled fully off [ColorScheme] tokens
-/// (not fixed hex, unlike the splash/onboarding screens) so it renders
-/// correctly in both light and dark mode. Shares its visual language
-/// (widgets/auth_visuals.dart) with role selection and registration.
+/// Email / password login — phone is still collected at registration (it's
+/// the driver/dispatch contact + WhatsApp-style identifier for the field),
+/// but the account is signed into by email, same as the admin side. Styled
+/// fully off [ColorScheme] tokens (not fixed hex, unlike the splash/onboarding
+/// screens) so it renders correctly in both light and dark mode. Shares its
+/// visual language (widgets/auth_visuals.dart) with role selection and
+/// registration.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -44,10 +49,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
   }
 
-  void _continueWithGoogle() {
-    showAgriToast(context, 'Sign in with Google is coming soon', icon: Icons.info_outline_rounded);
-  }
-
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(authControllerProvider);
@@ -67,7 +68,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: SingleChildScrollView(
+            child: ResponsiveContent(
+              child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
               child: Form(
                 key: _formKey,
@@ -143,10 +145,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             onPressed: _submit,
                             colorScheme: colorScheme,
                           ),
-                          const SizedBox(height: 20),
-                          _OrDivider(colorScheme: colorScheme),
-                          const SizedBox(height: 20),
-                          _GoogleSignInButton(colorScheme: colorScheme, onPressed: _continueWithGoogle),
+                          const SizedBox(height: 18),
+                          AuthOrDivider(colorScheme: colorScheme),
+                          const SizedBox(height: 18),
+                          AuthGoogleButton(
+                            loading: isSubmitting,
+                            colorScheme: colorScheme,
+                            onPressed: () => ref.read(authControllerProvider.notifier).loginWithGoogle(),
+                          ),
                         ],
                       ),
                     ),
@@ -167,8 +173,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ],
                     ),
+                    if (kDebugMode) ...[
+                      const SizedBox(height: 20),
+                      Center(
+                        child: TextButton(
+                          onPressed: () => context.push('/debug/components'),
+                          child: const Text('Component gallery (debug)'),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
+              ),
               ),
             ),
           ),
@@ -291,84 +307,6 @@ class _AuthTab extends StatelessWidget {
             fontSize: 14,
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _OrDivider extends StatelessWidget {
-  const _OrDivider({required this.colorScheme});
-
-  final ColorScheme colorScheme;
-
-  @override
-  Widget build(BuildContext context) {
-    final line = Divider(color: colorScheme.outline.withValues(alpha: 0.4), height: 1);
-    return Row(
-      children: [
-        Expanded(child: line),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(
-            'OR',
-            style: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w700, fontSize: 12),
-          ),
-        ),
-        Expanded(child: line),
-      ],
-    );
-  }
-}
-
-/// Google isn't wired up yet (no `google_sign_in` package or backend OAuth
-/// exchange) — tapping this surfaces a "coming soon" toast, same mock-first
-/// pattern as the rest of the app's not-yet-implemented actions.
-class _GoogleSignInButton extends StatelessWidget {
-  const _GoogleSignInButton({required this.colorScheme, required this.onPressed});
-
-  final ColorScheme colorScheme;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 54,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: colorScheme.onSurface,
-          side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.5)),
-          shape: const StadiumBorder(),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const _GoogleMark(),
-            const SizedBox(width: 10),
-            Text(
-              'Continue with Google',
-              style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 15),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _GoogleMark extends StatelessWidget {
-  const _GoogleMark();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 20,
-      height: 20,
-      decoration: const BoxDecoration(color: Color(0xFF4285F4), shape: BoxShape.circle),
-      alignment: Alignment.center,
-      child: const Text(
-        'G',
-        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13, height: 1),
       ),
     );
   }

@@ -44,5 +44,18 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Without this, url_launcher can't resolve a browser for the
+             Paystack checkout link on Android 11+ (API 30+): package-visibility
+             sandboxing hides even an installed browser from an implicit VIEW
+             intent unless the scheme is declared here, so launchUrl silently
+             fails to open. See https://pub.dev/packages/url_launcher#android -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="http"/>
+        </intent>
     </queries>
 </manifest>

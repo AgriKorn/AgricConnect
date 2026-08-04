@@ -1,17 +1,60 @@
 import { z } from 'zod';
 
+/** Preprocesses Ghana phone numbers (05X... or 233... to +233...) and role strings (FARMER to farmer) */
+
+export const normalizePhone = (val: unknown): unknown => {
+  if (typeof val !== 'string') return val;
+  const p = val.trim().replace(/\s+/g, '');
+  if (/^0\d{9}$/.test(p)) {
+    return `+233${p.slice(1)}`;
+  }
+  if (/^233\d{9}$/.test(p)) {
+    return `+${p}`;
+  }
+  return p;
+};
+
+const normalizeRole = (val: unknown): unknown => {
+  if (typeof val !== 'string') return val;
+  return val.trim().toLowerCase();
+};
+
+export const phoneSchema = z.preprocess(
+  normalizePhone,
+  z.string().trim().regex(/^\+233\d{9}$/, 'Phone must be a valid Ghana number (+233XXXXXXXXX)'),
+);
+
+const roleSchema = z.preprocess(
+  normalizeRole,
+  z.enum(['farmer', 'buyer', 'driver']),
+);
+
+export const emailSchema = z.string().trim().toLowerCase().email('Enter a valid email address');
+
 export const registerSchema = z.object({
   body: z.object({
     name: z.string().trim().min(2, 'Name must be at least 2 characters'),
-    phone: z.string().trim().regex(/^\+233\d{9}$/, 'Phone must be a valid Ghana number (+233XXXXXXXXX)'),
+    phone: phoneSchema,
+    // Required, not just collected: login is by email, so an account
+    // created without one could never be signed back into.
+    email: emailSchema,
     password: z.string().min(8, 'Password must be at least 8 characters'),
-    role: z.enum(['farmer', 'buyer', 'driver']),
+    role: roleSchema,
+    // Role-specific, all optional here (buyers don't send region; farmers
+    // don't send business info) — previously accepted by nothing in this
+    // schema and silently stripped, so every registration defaulted to a
+    // hardcoded region regardless of what was actually picked.
+    region: z.string().trim().min(1).optional(), // Farmer
+    businessName: z.string().trim().min(1).optional(), // Buyer
+    businessType: z.string().trim().min(1).optional(), // Buyer
+    operatingRegion: z.string().trim().min(1).optional(), // Driver
+    vehicleCapacity: z.string().trim().min(1).optional(), // Driver — free text, parsed in AuthService
   }),
 });
 
 export const forgotPasswordSchema = z.object({
   body: z.object({
-    phone: z.string().trim().regex(/^\+233\d{9}$/, 'Phone must be a valid Ghana number (+233XXXXXXXXX)'),
+    email: emailSchema,
   }),
 });
 
@@ -24,7 +67,7 @@ export const resetPasswordSchema = z.object({
 
 export const loginSchema = z.object({
   body: z.object({
-    phone: z.string().trim().regex(/^\+233\d{9}$/, 'Phone must be a valid Ghana number (+233XXXXXXXXX)'),
+    email: emailSchema,
     password: z.string().min(1, 'Password is required'),
   }),
 });
@@ -38,7 +81,7 @@ export const refreshSchema = z.object({
 export const googleAuthSchema = z.object({
   body: z.object({
     token: z.string().trim().min(1, 'Google ID token or Supabase session token is required'),
-    role: z.enum(['farmer', 'buyer', 'driver']).optional(),
+    role: z.preprocess(normalizeRole, z.enum(['farmer', 'buyer', 'driver']).optional()),
   }),
 });
 

@@ -21,6 +21,23 @@ const ACCESS_TOKEN_TTL = '15m';
 const REFRESH_TOKEN_TTL = '7d';
 const RESET_TOKEN_TTL = '15m';
 
+/**
+ * The registration form's vehicle-capacity field is free text (hint: "e.g. 2
+ * tonnes"), but the column it lands in is kg. Taking the leading number
+ * as-is would silently store 2 for a driver who typed "2 tonnes" — 1000x too
+ * small — and break dispatch's minimum-capacity matching. Unparseable input
+ * falls back to undefined so the caller's existing 1000kg default applies,
+ * rather than storing a wrong number with false confidence.
+ */
+const parseVehicleCapacityKg = (raw?: string): number | undefined => {
+  if (!raw) return undefined;
+  const match = raw.match(/[\d.]+/);
+  if (!match) return undefined;
+  const value = parseFloat(match[0]);
+  if (!Number.isFinite(value) || value <= 0) return undefined;
+  return /tonne|ton\b|tons\b/i.test(raw) ? value * 1000 : value;
+};
+
 export class AuthService {
   constructor(private readonly users: IUserRepository) {}
 
@@ -28,15 +45,24 @@ export class AuthService {
     const existing = await this.users.findByPhone(data.phone);
     if (existing) throw new ConflictError('Phone number already registered', 'PHONE_ALREADY_REGISTERED');
 
+    const existingEmail = await this.users.findByEmail(data.email);
+    if (existingEmail) throw new ConflictError('Email already registered', 'EMAIL_ALREADY_REGISTERED');
+
     const passwordHash = await bcrypt.hash(data.password, 10);
 
     const user = await this.users.create({
       name: data.name,
       phone: data.phone,
+      email: data.email,
       passwordHash,
       role: data.role,
       otp: '',
       otpExpiry: new Date(),
+      region: data.region,
+      businessName: data.businessName,
+      businessType: data.businessType,
+      operatingRegion: data.operatingRegion,
+      vehicleCapacityKg: parseVehicleCapacityKg(data.vehicleCapacity),
     });
 
     const isBuyer = data.role.toLowerCase() === 'buyer';
@@ -51,8 +77,8 @@ export class AuthService {
   }
 
   async forgotPassword(data: ForgotPasswordInput): Promise<{ message: string; resetToken?: string }> {
-    const user = await this.users.findByPhone(data.phone);
-    const genericMessage = 'If an account with that phone number exists, password reset instructions have been generated.';
+    const user = await this.users.findByEmail(data.email);
+    const genericMessage = 'If an account with that email exists, password reset instructions have been generated.';
 
     if (!user) {
       return { message: genericMessage };
@@ -60,7 +86,13 @@ export class AuthService {
 
     const resetToken = jwt.sign({ userId: user.id, purpose: 'password_reset' }, env.JWT_SECRET, { expiresIn: RESET_TOKEN_TTL });
 
-    logger.info(`[password-reset] Password reset token generated for ${user.phone}: ${resetToken}`);
+    // No real email/SMS delivery is wired up yet, so logging the token is
+    // how this gets to a developer/tester — but a production log is not a
+    // secure delivery channel, and this token alone is enough to take over
+    // the account. Only ever surface it (log or API response) outside prod.
+    if (env.NODE_ENV !== 'production') {
+      logger.info(`[password-reset] Password reset token generated for ${user.email}: ${resetToken}`);
+    }
 
     return {
       message: genericMessage,
@@ -90,7 +122,7 @@ export class AuthService {
   }
 
   async login(data: LoginInput): Promise<{ accessToken: string; refreshToken: string; user: SafeUser }> {
-    const user = await this.users.findByPhone(data.phone);
+    const user = await this.users.findByEmail(data.email);
     if (!user) throw new UnauthorizedError('Invalid credentials');
 
     const passwordMatches = await bcrypt.compare(data.password, user.passwordHash);
@@ -169,33 +201,47 @@ export class AuthService {
     }
 
     const email = userData.email;
-    const phone = userData.phone || userData.user_metadata?.phone || `+233${Math.floor(100000000 + Math.random() * 900000000)}`;
+    // Google almost never shares a phone number, so a fresh one is minted for
+    // brand-new sign-ups only. Returning users MUST be found by email — phone
+    // can't be the lookup key here since there is no stable phone to look up.
+    const googlePhone = userData.phone || userData.user_metadata?.phone;
     const name = userData.user_metadata?.full_name || userData.user_metadata?.name || email?.split('@')[0] || 'Google User';
 
-    let user = await this.users.findByPhone(phone);
+    let user = email ? await this.users.findByEmail(email) : null;
+    if (!user && googlePhone) {
+      user = await this.users.findByPhone(googlePhone);
+    }
 
     if (!user) {
-      // Create new user account via OAuth — auto-activated for OAuth providers
+      // Create new user account via OAuth. Same approval rule as phone
+      // registration: buyers auto-activate, farmers/drivers need an admin.
+      const phone = googlePhone || `+233${Math.floor(100000000 + Math.random() * 900000000)}`;
       const passwordHash = await bcrypt.hash(`oauth_google_${userData.id}`, 10);
+      const role = data.role || 'buyer';
       user = await this.users.create({
         name,
         phone,
+        email,
         passwordHash,
-        role: data.role || 'buyer',
+        role,
         otp: '',
         otpExpiry: new Date(),
       });
-      user = await this.users.update(user.id, { status: 'ACTIVE' });
+      user = await this.users.update(user.id, { status: role === 'buyer' ? 'ACTIVE' : 'PENDING_APPROVAL' });
       logger.info(`[auth-oauth] Created new user ${user.id} via Google OAuth`);
     } else {
       // Account linking / merging: existing user logging in via OAuth
-      if (!user.name || user.name === 'Google User') {
-        user = await this.users.update(user.id, { name });
+      const updates: Partial<SafeUser> = {};
+      if (!user.email && email) updates.email = email;
+      if (!user.name || user.name === 'Google User') updates.name = name;
+      if (Object.keys(updates).length > 0) {
+        user = await this.users.update(user.id, updates);
       }
       logger.info(`[auth-oauth] Linked Google OAuth sign-in for existing user ${user.id}`);
     }
 
     if (user.status === 'REJECTED') throw new AccountRejectedError();
+    if (user.status === 'PENDING_APPROVAL') throw new AccountPendingApprovalError();
 
     const accessToken = jwt.sign({ userId: user.id, role: user.role }, env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL });
     const refreshToken = jwt.sign({ userId: user.id }, env.JWT_REFRESH_SECRET, { expiresIn: REFRESH_TOKEN_TTL });

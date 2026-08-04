@@ -72,6 +72,12 @@ export class AccountPendingApprovalError extends AppError {
   }
 }
 
+export class PayoutNotConfiguredError extends AppError {
+  constructor(message = 'Add your Mobile Money payout number in your profile before creating listings') {
+    super(message, 400, 'PAYOUT_NOT_CONFIGURED');
+  }
+}
+
 export class InternalServerError extends AppError {
   constructor(message = 'Internal server error') {
     super(message, 500, 'INTERNAL_SERVER_ERROR', false);

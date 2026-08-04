@@ -10,6 +10,7 @@ datasource db {
 model User {
   id                                   String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   phone_number                         String                  @unique @db.VarChar(20)
+  email                                String?                 @unique @db.VarChar(255)
   full_name                            String                  @db.VarChar(150)
   role                                 user_role
   region                               String                  @db.VarChar(100)
@@ -20,11 +21,17 @@ model User {
   fcm_token                            String?                 @db.VarChar(255)
   momo_number                          String?                 @db.VarChar(20)
   momo_network                         String?                 @db.VarChar(20)
+  business_name                        String?                 @db.VarChar(150)
+  business_type                        String?                 @db.VarChar(100)
+  photo_url                            String?                 @db.VarChar(500)
+  notification_prefs                   Json?
   password_hash                        String?                 @db.VarChar(255)
   /// Persisted so refresh tokens can be revoked: logout clears it and refresh
   /// rejects any token that does not match the stored one. Without this column
   /// AuthService.refresh always fails and logout cannot revoke anything.
-  refresh_token                        String?                 @db.VarChar(512)
+  /// Text rather than a capped VarChar — a JWT's length varies with its claims
+  /// and a fixed cap risks silently truncating a longer token.
+  refresh_token                        String?                 @db.Text
   created_at                           DateTime                @default(now()) @db.Timestamptz(6)
   updated_at                           DateTime                @default(now()) @db.Timestamptz(6)
   audit_trail                          AuditTrail[]
@@ -38,12 +45,27 @@ model User {
   produce_listings                     produce_listings[]
   qr_scans                             qr_scans[]
   user_device_tokens                   user_device_tokens[]
+  delivery_addresses                   delivery_addresses[]
   users                                User?                   @relation("usersTousers", fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
   other_users                          User[]                  @relation("usersTousers")
 
   @@index([region], map: "idx_users_region")
   @@index([role, account_status], map: "idx_users_role_status")
   @@map("users")
+}
+
+model delivery_addresses {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String   @db.Uuid
+  label        String   @db.VarChar(50)
+  address_line String   @db.VarChar(255)
+  region       String?  @db.VarChar(100)
+  is_default   Boolean  @default(false)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime @default(now()) @db.Timestamptz(6)
+  users        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id], map: "idx_delivery_addresses_user_id")
 }
 
 model Dispute {
@@ -162,7 +184,13 @@ model notifications {
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model orders {
   id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  listing_id         String               @unique @db.Uuid
+  // Not @unique: double-sale protection is the atomic active->sold status
+  // flip on produce_listings in TransactionService.purchase(), not this. A
+  // hard unique constraint here meant a listing could never be re-listed
+  // after its one and only order was cancelled/refunded/failed — the
+  // listing correctly reopens to 'active' but every re-purchase attempt
+  // hit a database unique-constraint violation forever after.
+  listing_id         String               @db.Uuid
   buyer_id           String               @db.Uuid
   transport_mode     transport_mode
   order_status       order_status         @default(pending_payment)
@@ -181,6 +209,7 @@ model orders {
 
   @@index([buyer_id], map: "idx_orders_buyer")
   @@index([order_status], map: "idx_orders_status")
+  @@index([listing_id], map: "idx_orders_listing")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -192,6 +221,7 @@ model payments {
   status             payment_status @default(held)
   provider           String         @default("paystack") @db.VarChar(50)
   provider_reference String?        @db.VarChar(150)
+  payout_reference   String?        @db.VarChar(150)
   held_at            DateTime       @default(now()) @db.Timestamptz(6)
   released_at        DateTime?      @db.Timestamptz(6)
   refunded_at        DateTime?      @db.Timestamptz(6)
@@ -217,12 +247,21 @@ model produce_listings {
   below_floor_acknowledged Boolean         @default(false)
   listing_hash             String          @unique @db.Char(64)
   qr_code_data             String?
+  // photo_url is the cover image, kept for backward compatibility. image_urls
+  // is the full gallery (SRS "Produce Upload": farmers may upload multiple
+  // images); photo_url mirrors image_urls[0] when a gallery is present.
+  photo_url                String?         @db.VarChar(500)
+  image_urls               String[]        @default([])
+  description              String?         @db.Text
   status                   listing_status  @default(active)
   created_at               DateTime        @default(now()) @db.Timestamptz(6)
   updated_at               DateTime        @default(now()) @db.Timestamptz(6)
   sold_at                  DateTime?       @db.Timestamptz(6)
   notifications            notifications[]
-  orders                   orders?
+  // One-to-many, not one-to-one: a listing can accumulate more than one
+  // order over its lifetime if earlier ones were cancelled/refunded/failed
+  // and it was reopened for sale. See the note on orders.listing_id.
+  orders                   orders[]
   crop_types               crop_types      @relation(fields: [crop_type_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   users                    User            @relation(fields: [farmer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 

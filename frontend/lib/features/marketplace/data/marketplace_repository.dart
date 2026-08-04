@@ -1,0 +1,311 @@
+import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/network/api_endpoints.dart';
+import '../../../core/network/api_exception.dart';
+import '../../../core/network/dio_client.dart';
+import '../../home/data/farmer_dashboard_mock.dart';
+import 'marketplace_mock.dart';
+
+/// Approximate regional-capital coordinates, used as the listing's location
+/// until real GPS capture is wired up — tied to the farmer's own registered
+/// region (from their profile), not arbitrary.
+const _regionCoordinates = {
+  'Greater Accra': (5.6037, -0.1870),
+  'Ashanti': (6.6885, -1.6244),
+  'Northern': (9.4008, -0.8393),
+  'Eastern': (6.0940, -0.2591),
+  'Western': (4.9346, -1.7137),
+  'Brong-Ahafo': (7.7398, -2.3237),
+};
+
+(double, double) coordinatesForRegion(String? region) {
+  return _regionCoordinates[region] ?? _regionCoordinates['Greater Accra']!;
+}
+
+abstract class MarketplaceRepository {
+  /// GET /marketplace. With [farmerId], returns just that farmer's active
+  /// listings (their store page). Without it, returns every active listing
+  /// in the marketplace, paging through the backend's real 50-per-page
+  /// limit transparently — the server never returns everything in one call,
+  /// so a single unpaginated request here would silently cap the buyer's
+  /// view at whatever the first page happened to contain.
+  Future<List<MarketplaceListing>> fetchListings({String? farmerId});
+
+  /// GET /marketplace/:id — full detail (farmer name/region, quantity,
+  /// shelf life) for the product detail screen.
+  Future<MarketplaceListingDetail> fetchListingDetail(String id);
+
+  Future<List<FarmerListingSummary>> fetchMyListings();
+  Future<FarmerListingSummary> createListing({
+    required String cropType,
+    required double quantityKg,
+    required int freshnessScore,
+    required int shelfLifeDays,
+    required double farmerLat,
+    required double farmerLong,
+    required double pricePerKg,
+    String? imageUrl,
+    String? description,
+  });
+
+  /// Uploads [bytes] to S3 via a presigned URL and returns the resulting
+  /// public photo URL — caller still has to pass it to [createListing].
+  Future<String> uploadListingPhoto({
+    required List<int> bytes,
+    required String fileName,
+    required String contentType,
+  });
+
+  /// Soft-deletes the listing — DELETE /listings/:id.
+  Future<void> deleteListing(String id);
+
+  /// PATCH /listings/:id — only price and quantity are editable after a
+  /// listing is created; pass only the field(s) actually changing.
+  Future<FarmerListingSummary> updateListing(String id, {double? pricePerKg, double? quantityKg});
+}
+
+/// Our own API always errors with an {"error":{"message":...}} JSON body, but
+/// a request that never reached it (a presigned S3 PUT, a proxy/gateway
+/// error page) can come back as XML or plain text instead — indexing into
+/// that with ['error'] throws rather than returning null, so the `is Map`
+/// check has to come first.
+String? _extractDioErrorMessage(DioException e) {
+  final data = e.response?.data;
+  if (data is Map) {
+    return data['error']?['message']?.toString();
+  }
+  return null;
+}
+
+class HttpMarketplaceRepository implements MarketplaceRepository {
+  HttpMarketplaceRepository(this._dio);
+
+  final Dio _dio;
+
+  @override
+  Future<List<MarketplaceListing>> fetchListings({String? farmerId}) async {
+    try {
+      final all = <MarketplaceListing>[];
+      var page = 1;
+      // A generous ceiling, not a real limit: stops a malformed backend
+      // response (e.g. totalPages stuck above the current page) from looping
+      // forever, while comfortably covering any realistic marketplace size
+      // for a demo. One farmer's store page never needs more than one round.
+      const maxPages = 10;
+      while (page <= maxPages) {
+        final response = await _dio.get(
+          ApiEndpoints.marketplace,
+          queryParameters: {
+            'page': page,
+            'limit': 50,
+            if (farmerId != null) 'farmerId': farmerId,
+          },
+        );
+        final data = response.data['data'];
+        final rawList = data?['listings'] as List? ?? [];
+        all.addAll(rawList.map((item) => _parseListing(item)));
+
+        final totalPages = (data?['pagination']?['totalPages'] as num?)?.toInt() ?? 1;
+        if (rawList.isEmpty || page >= totalPages) break;
+        page++;
+      }
+      return all;
+    } on DioException catch (e) {
+      throw ApiException(_extractDioErrorMessage(e) ?? 'Failed to load the marketplace.');
+    }
+  }
+
+  @override
+  Future<MarketplaceListingDetail> fetchListingDetail(String id) async {
+    try {
+      final response = await _dio.get('${ApiEndpoints.marketplace}/$id');
+      final item = response.data['data'] ?? response.data;
+      return _parseListingDetail(item);
+    } on DioException catch (e) {
+      throw ApiException(_extractDioErrorMessage(e) ?? 'Failed to load this listing.');
+    }
+  }
+
+  @override
+  Future<List<FarmerListingSummary>> fetchMyListings() async {
+    try {
+      final response = await _dio.get(ApiEndpoints.listings);
+      final rawList = response.data['data']?['listings'] as List? ?? [];
+      return rawList.map((item) => _parseFarmerListing(item)).toList();
+    } on DioException catch (e) {
+      throw ApiException(e.message ?? 'Failed to load your listings.');
+    }
+  }
+
+  @override
+  Future<FarmerListingSummary> createListing({
+    required String cropType,
+    required double quantityKg,
+    required int freshnessScore,
+    required int shelfLifeDays,
+    required double farmerLat,
+    required double farmerLong,
+    required double pricePerKg,
+    String? imageUrl,
+    String? description,
+  }) async {
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.listings,
+        data: {
+          'cropType': cropType,
+          'quantityKg': quantityKg,
+          'freshnessScore': freshnessScore,
+          'shelfLifeDays': shelfLifeDays,
+          'farmerLat': farmerLat,
+          'farmerLong': farmerLong,
+          'pricePerKg': pricePerKg,
+          if (imageUrl != null) 'imageUrl': imageUrl,
+          if (description != null && description.trim().isNotEmpty) 'description': description.trim(),
+        },
+      );
+      final item = response.data['data'] ?? response.data;
+      return _parseFarmerListing(item);
+    } on DioException catch (e) {
+      throw ApiException(_extractDioErrorMessage(e) ?? 'Failed to create listing.');
+    }
+  }
+
+  @override
+  Future<String> uploadListingPhoto({
+    required List<int> bytes,
+    required String fileName,
+    required String contentType,
+  }) async {
+    try {
+      final urlResponse = await _dio.post(
+        '/listings/photo-upload-url',
+        data: {'fileName': fileName, 'contentType': contentType},
+      );
+      final urlData = urlResponse.data['data'] ?? urlResponse.data;
+      final uploadUrl = urlData['uploadUrl']?.toString() ?? '';
+      final publicUrl = urlData['publicUrl']?.toString() ?? '';
+      if (uploadUrl.isEmpty || publicUrl.isEmpty) {
+        throw const ApiException('Could not get a photo upload URL.');
+      }
+
+      await Dio().put<void>(
+        uploadUrl,
+        data: Stream.fromIterable([bytes]),
+        options: Options(headers: {'Content-Type': contentType, 'content-length': bytes.length}),
+      );
+
+      return publicUrl;
+    } on DioException catch (e) {
+      // The upload PUT goes straight to S3, not our own API — a failure there
+      // (e.g. AccessDenied) comes back as XML, not our {error:{message}} JSON
+      // shape, which is exactly what _extractDioErrorMessage guards against.
+      throw ApiException(_extractDioErrorMessage(e) ?? e.message ?? 'Failed to upload photo.');
+    }
+  }
+
+  @override
+  Future<void> deleteListing(String id) async {
+    try {
+      await _dio.delete('${ApiEndpoints.listings}/$id');
+    } on DioException catch (e) {
+      throw ApiException(_extractDioErrorMessage(e) ?? 'Failed to delete listing.');
+    }
+  }
+
+  @override
+  Future<FarmerListingSummary> updateListing(String id, {double? pricePerKg, double? quantityKg}) async {
+    try {
+      final response = await _dio.patch(
+        '${ApiEndpoints.listings}/$id',
+        data: {
+          if (pricePerKg != null) 'pricePerKg': pricePerKg,
+          if (quantityKg != null) 'quantityKg': quantityKg,
+        },
+      );
+      final item = response.data['data'] ?? response.data;
+      return _parseFarmerListing(item);
+    } on DioException catch (e) {
+      throw ApiException(_extractDioErrorMessage(e) ?? 'Failed to update listing.');
+    }
+  }
+
+  FarmerListingSummary _parseFarmerListing(dynamic json) {
+    final cropType = json['cropType']?.toString() ?? 'crop';
+    final statusStr = json['status']?.toString().toUpperCase() ?? 'ACTIVE';
+    return FarmerListingSummary(
+      id: json['id']?.toString() ?? '',
+      cropType: cropType.isEmpty ? cropType : cropType[0].toUpperCase() + cropType.substring(1),
+      freshnessScore: double.tryParse(json['freshnessScore']?.toString() ?? '')?.round() ?? 0,
+      price: double.tryParse(json['pricePerKg']?.toString() ?? '') ?? 0,
+      unit: 'kg',
+      quantityKg: double.tryParse(json['quantityKg']?.toString() ?? '') ?? 0,
+      status: switch (statusStr) {
+        'SOLD' => 'Sold',
+        'INACTIVE' => 'Pending',
+        _ => 'Active',
+      },
+      qrCodeData: json['qrCodeData']?.toString(),
+      imageUrl: json['imageUrl']?.toString(),
+    );
+  }
+
+  MarketplaceListing _parseListing(dynamic json) {
+    final cropType = json['cropType']?.toString() ?? 'crop';
+
+    return MarketplaceListing(
+      id: json['id']?.toString() ?? 'id-${json.hashCode}',
+      name: cropType[0].toUpperCase() + cropType.substring(1),
+      category: _stringToCategory(cropType.toUpperCase()),
+      freshnessScore: double.tryParse(json['freshnessScore']?.toString() ?? '')?.round() ?? 90,
+      pricePerUnit: double.tryParse(json['pricePerKg']?.toString() ?? '') ?? 15.0,
+      unit: 'kg',
+      farmerName: json['farmerName']?.toString() ?? 'Local Farmer',
+      farmerId: json['farmerId']?.toString(),
+      farmerRegion: json['farmerRegion']?.toString(),
+      quantityAvailable: double.tryParse(json['quantityKg']?.toString() ?? ''),
+      imageUrl: json['imageUrl']?.toString(),
+    );
+  }
+
+  MarketplaceListingDetail _parseListingDetail(dynamic json) {
+    final cropType = json['cropType']?.toString() ?? 'crop';
+
+    return MarketplaceListingDetail(
+      id: json['id']?.toString() ?? '',
+      name: cropType.isEmpty ? cropType : cropType[0].toUpperCase() + cropType.substring(1),
+      category: _stringToCategory((json['cropCategory'] ?? cropType).toString().toUpperCase()),
+      freshnessScore: double.tryParse(json['freshnessScore']?.toString() ?? '')?.round() ?? 0,
+      pricePerUnit: double.tryParse(json['pricePerKg']?.toString() ?? '') ?? 0,
+      unit: 'kg',
+      quantityAvailable: double.tryParse(json['quantityKg']?.toString() ?? ''),
+      shelfLifeDays: int.tryParse(json['shelfLifeDays']?.toString() ?? ''),
+      imageUrl: json['imageUrl']?.toString(),
+      farmerName: json['farmerName']?.toString() ?? 'Local Farmer',
+      farmerId: json['farmerId']?.toString(),
+      farmerRegion: json['farmerRegion']?.toString(),
+      description: json['description']?.toString(),
+    );
+  }
+
+  ProduceCategory _stringToCategory(String str) {
+    switch (str) {
+      case 'FRUITS':
+      case 'FRUIT':
+        return ProduceCategory.fruits;
+      case 'GRAINS':
+      case 'GRAIN':
+        return ProduceCategory.grains;
+      case 'VEGETABLES':
+      case 'VEGETABLE':
+      default:
+        return ProduceCategory.vegetables;
+    }
+  }
+}
+
+final marketplaceRepositoryProvider = Provider<MarketplaceRepository>((ref) {
+  final dio = ref.watch(dioProvider);
+  return HttpMarketplaceRepository(dio);
+});

@@ -1,5 +1,5 @@
 import { prisma } from '../../config/db';
-import { ForbiddenError, NotFoundError } from '../../utils/errors';
+import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/errors';
 import { auditService } from '../audit/audit.service';
 import { notificationService } from '../notification/notification.service';
 import { userRepository } from '../user/user.repository.prisma';
@@ -47,6 +47,44 @@ export class DispatchService {
 
   getDriverJobs(driverId: string, status?: DriverJob['status']): Promise<DriverJob[]> {
     return this.jobs.findJobsForDriver(driverId, status);
+  }
+
+  /**
+   * Admin override for the driver-exhaustion terminal case in declineJob —
+   * picks a specific driver rather than the automatic capacity-based match,
+   * since exhaustion means no candidate was available/willing.
+   */
+  async manualAssignDriver(transactionId: string, driverId: string, assignedBy: string): Promise<DriverJob> {
+    const order = await prisma.orders.findUnique({
+      where: { id: transactionId },
+      include: { produce_listings: { include: { crop_types: true } } },
+    });
+    if (!order) throw new NotFoundError('Order not found');
+
+    const driver = await this.users.findById(driverId);
+    if (!driver || driver.role !== 'driver') throw new BadRequestError('Driver not found or not a driver account');
+
+    const cropType = order.produce_listings?.crop_types?.name || 'crop';
+    const quantityKg = order.produce_listings ? Number(order.produce_listings.quantity_kg) : 0;
+
+    const job = await this.jobs.create({
+      transactionId: order.id,
+      listingId: order.listing_id,
+      driverId: driver.id,
+      cropType,
+      quantityKg,
+    });
+
+    await auditService.log('DRIVER_MANUALLY_ASSIGNED' as any, transactionId, { driverId, jobId: job.id }, assignedBy);
+
+    await notificationService.sendNotification({
+      userId: driver.id,
+      type: 'DRIVER_JOB_OFFERED',
+      message: `New delivery job offer: Pickup ${quantityKg}kg of ${cropType}. Open app to accept or decline.`,
+      orderId: transactionId,
+    });
+
+    return job;
   }
 
   async findActiveForTransaction(transactionId: string): Promise<DriverJob | null> {
@@ -121,7 +159,7 @@ export class DispatchService {
           await notificationService.sendNotification({
             userId: admin.id,
             type: 'MANUAL_DISPATCH_REQUIRED',
-            message: `Order #${order.id} has no remaining available drivers in the operating region. Manual driver assignment required via POST /api/dispatch/assign.`,
+            message: `Order #${order.id} has no remaining available drivers in the operating region. Manual driver assignment required via POST /api/admin/dispatch/assign.`,
             orderId: order.id,
           });
         }

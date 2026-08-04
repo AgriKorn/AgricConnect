@@ -6,6 +6,8 @@ export const browseMarketplaceSchema = z.object({
   query: z.object({
     crop: z.string().optional(),
     region: z.string().optional(),
+    /** Powers a farmer's store page — every active listing from one farmer. */
+    farmerId: z.string().uuid('farmerId must be a valid UUID').optional(),
     minFreshness: numeric().min(0).max(100).optional(),
     maxFreshness: numeric().min(0).max(100).optional(),
     minQuantity: numeric().positive().optional(),

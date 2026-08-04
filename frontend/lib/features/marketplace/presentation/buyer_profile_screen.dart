@@ -6,12 +6,17 @@ import '../../../core/widgets/account_settings_screen.dart';
 import '../../../core/widgets/agri_dialog.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/edit_profile_screen.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/help_support_screen.dart';
+import '../../../core/widgets/privacy_policy_screen.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/models/account_status.dart';
 import '../application/buyer_profile_providers.dart';
+import '../data/address_repository.dart';
 import '../data/buyer_profile_mock.dart';
+import 'edit_address_screen.dart';
 
 void _openComingSoon(BuildContext context, String title, IconData icon) {
   Navigator.of(context).push(
@@ -25,24 +30,14 @@ void _openComingSoon(BuildContext context, String title, IconData icon) {
   );
 }
 
-Widget Function(double size) _buyerAvatarBuilder(BuyerProfileDetails profile) {
-  return (size) => UserAvatar(
-        size: size,
-        fallback: (context) =>
-            GreenInitialsAvatar(name: profile.name, size: size, colorScheme: Theme.of(context).colorScheme),
-      );
-}
-
 void _openBuyerAccountSettings(BuildContext context, BuyerProfileDetails profile, bool verified) {
   Navigator.of(context).push(
     MaterialPageRoute(
       builder: (context) => AccountSettingsScreen(
-        avatarBuilder: _buyerAvatarBuilder(profile),
-        roleBadgeLabel: verified ? 'Verified ${profile.tier}' : profile.tier,
+        roleBadgeLabel: verified ? 'Verified Buyer' : 'Buyer',
         onHelpTap: () => _openBuyerHelp(context),
         locationLabel: 'Location',
         locationHint: 'e.g. Accra, Ghana',
-        bioHint: 'Tell farmers about your business...',
         verifiedSubtitle: 'Your profile badge is visible to all farmers.',
       ),
     ),
@@ -53,10 +48,8 @@ void _openBuyerEditProfile(BuildContext context, BuyerProfileDetails profile) {
   Navigator.of(context).push(
     MaterialPageRoute(
       builder: (context) => EditProfileScreen(
-        avatarBuilder: _buyerAvatarBuilder(profile),
         locationLabel: 'Location',
         locationHint: 'e.g. Accra, Ghana',
-        bioHint: 'Tell farmers about your business...',
         verifiedSubtitle: 'Your profile badge is visible to all farmers.',
       ),
     ),
@@ -102,9 +95,14 @@ class BuyerProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final profile = ref.watch(buyerProfileProvider);
-    final addresses = ref.watch(deliveryAddressesProvider);
-    final paymentMethods = ref.watch(savedPaymentMethodsProvider);
-    final preferences = ref.watch(buyerPreferencesProvider);
+    final addressesAsync = ref.watch(deliveryAddressesProvider);
+    final preferences = ref.watch(buyerPreferencesProvider).valueOrNull ??
+        const BuyerPreferences(
+          orderStatusUpdates: true,
+          priceAlerts: true,
+          freshnessNotifications: false,
+          marketingOffers: false,
+        );
     final verified = ref.watch(authControllerProvider).user?.status == AccountStatus.verified;
     final themeMode = ref.watch(themeModeControllerProvider);
 
@@ -112,7 +110,8 @@ class BuyerProfileScreen extends ConsumerWidget {
       body: ColoredBox(
         color: Theme.of(context).scaffoldBackgroundColor,
         child: SafeArea(
-          child: ListView(
+          child: ResponsiveContent(
+            child: ListView(
             padding: EdgeInsets.zero,
             children: [
               _ProfileHero(colorScheme: colorScheme, profile: profile),
@@ -132,7 +131,9 @@ class BuyerProfileScreen extends ConsumerWidget {
                           ),
                         ),
                         GestureDetector(
-                          onTap: () => _openComingSoon(context, 'Add Address', Icons.add_location_alt_outlined),
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (context) => const EditAddressScreen()),
+                          ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -148,35 +149,42 @@ class BuyerProfileScreen extends ConsumerWidget {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    _InfoCard(
-                      colorScheme: colorScheme,
-                      children: [
-                        for (var i = 0; i < addresses.length; i++)
-                          _AddressRow(
-                            colorScheme: colorScheme,
-                            address: addresses[i],
-                            isLast: i == addresses.length - 1,
-                            onTap: () => _openComingSoon(context, addresses[i].label, addresses[i].type.icon),
+                    addressesAsync.when(
+                      loading: () => const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                      error: (error, _) => _InfoCard(
+                        colorScheme: colorScheme,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Text(
+                              'Could not load your addresses.',
+                              style: TextStyle(color: colorScheme.error, fontSize: 13.5, fontWeight: FontWeight.w600),
+                            ),
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 28),
-                    Text(
-                      'Payment Methods',
-                      style: TextStyle(color: colorScheme.onSurface, fontSize: 19, fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 12),
-                    _InfoCard(
-                      colorScheme: colorScheme,
-                      children: [
-                        for (var i = 0; i < paymentMethods.length; i++)
-                          _PaymentMethodRow(
-                            colorScheme: colorScheme,
-                            method: paymentMethods[i],
-                            isLast: i == paymentMethods.length - 1,
-                            onTap: () => _openComingSoon(context, paymentMethods[i].label, Icons.credit_card_rounded),
-                          ),
-                      ],
+                        ],
+                      ),
+                      data: (addresses) => addresses.isEmpty
+                          ? EmptyState(
+                              icon: Icons.location_on_outlined,
+                              message: 'No delivery addresses yet. Add one for faster checkout.',
+                            )
+                          : _InfoCard(
+                              colorScheme: colorScheme,
+                              children: [
+                                for (var i = 0; i < addresses.length; i++)
+                                  _AddressRow(
+                                    colorScheme: colorScheme,
+                                    address: addresses[i],
+                                    isLast: i == addresses.length - 1,
+                                    onTap: () => Navigator.of(context).push(
+                                      MaterialPageRoute(builder: (context) => EditAddressScreen(address: addresses[i])),
+                                    ),
+                                  ),
+                              ],
+                            ),
                     ),
                     const SizedBox(height: 28),
                     Text(
@@ -258,7 +266,9 @@ class BuyerProfileScreen extends ConsumerWidget {
                           colorScheme: colorScheme,
                           icon: Icons.verified_user_outlined,
                           label: 'Privacy Policy',
-                          onTap: () => _openComingSoon(context, 'Privacy Policy', Icons.verified_user_outlined),
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (context) => const PrivacyPolicyScreen()),
+                          ),
                           isLast: true,
                         ),
                       ],
@@ -269,6 +279,7 @@ class BuyerProfileScreen extends ConsumerWidget {
                 ),
               ),
             ],
+            ),
           ),
         ),
       ),
@@ -311,14 +322,7 @@ class _ProfileHero extends StatelessWidget {
             offset: const Offset(0, -8),
             child: Column(
               children: [
-                SizedBox(
-                  width: 104,
-                  height: 104,
-                  child: UserAvatar(
-                    size: 104,
-                    fallback: (context) => GreenInitialsAvatar(name: profile.name, size: 104, colorScheme: colorScheme),
-                  ),
-                ),
+                const SizedBox(width: 104, height: 104, child: UserAvatar(size: 104)),
                 const SizedBox(height: 16),
                 Text(
                   profile.name,
@@ -326,7 +330,7 @@ class _ProfileHero extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${profile.tier} • ${profile.location}',
+                  'Buyer • ${profile.location}',
                   style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
                 ),
               ],
@@ -386,20 +390,38 @@ class _AddressRow extends StatelessWidget {
               width: 40,
               height: 40,
               decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest, shape: BoxShape.circle),
-              child: Icon(address.type.icon, color: colorScheme.onSurface, size: 18),
+              child: Icon(Icons.location_on_outlined, color: colorScheme.onSurface, size: 18),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    address.label,
-                    style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 15),
+                  Row(
+                    children: [
+                      Text(
+                        address.label,
+                        style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 15),
+                      ),
+                      if (address.isDefault) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            'Default',
+                            style: TextStyle(color: colorScheme.primary, fontSize: 10.5, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    address.detail,
+                    address.addressLine,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12.5),
@@ -408,71 +430,6 @@ class _AddressRow extends StatelessWidget {
               ),
             ),
             Icon(Icons.chevron_right_rounded, color: colorScheme.onSurfaceVariant),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PaymentMethodRow extends StatelessWidget {
-  const _PaymentMethodRow({
-    required this.colorScheme,
-    required this.method,
-    required this.onTap,
-    this.isLast = false,
-  });
-
-  final ColorScheme colorScheme;
-  final SavedPaymentMethod method;
-  final VoidCallback onTap;
-  final bool isLast;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          border: isLast ? null : Border(bottom: BorderSide(color: colorScheme.outline.withValues(alpha: 0.15))),
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 40,
-              child: method.type == SavedPaymentType.visaCard
-                  ? const Text('VISA', style: TextStyle(color: Color(0xFF1A1F71), fontWeight: FontWeight.w900, fontSize: 12))
-                  : Icon(Icons.phone_android_rounded, color: colorScheme.onSurfaceVariant, size: 20),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    method.label,
-                    style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 15),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(method.maskedNumber, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12.5)),
-                ],
-              ),
-            ),
-            if (method.isDefault)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  'Default',
-                  style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600),
-                ),
-              )
-            else
-              Icon(Icons.chevron_right_rounded, color: colorScheme.onSurfaceVariant),
           ],
         ),
       ),

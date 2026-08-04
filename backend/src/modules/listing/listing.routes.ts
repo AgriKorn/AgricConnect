@@ -8,9 +8,10 @@ import {
   deleteListingHandler,
   getFarmerListingsHandler,
   getListingByIdHandler,
+  getListingPhotoUploadUrlHandler,
   updateListingHandler,
 } from './listing.controller';
-import { createListingSchema, listingIdParamSchema, updateListingSchema } from './listing.schema';
+import { createListingSchema, listingIdParamSchema, listingPhotoUploadUrlSchema, updateListingSchema } from './listing.schema';
 
 const router = Router();
 
@@ -48,6 +49,13 @@ const router = Router();
  */
 router.post('/', authenticate, authorize('farmer'), requireApproved, validate(createListingSchema), createListingHandler);
 router.get('/', authenticate, authorize('farmer'), getFarmerListingsHandler);
+router.post(
+  '/photo-upload-url',
+  authenticate,
+  authorize('farmer'),
+  validate(listingPhotoUploadUrlSchema),
+  getListingPhotoUploadUrlHandler,
+);
 
 /**
  * @swagger

@@ -7,31 +7,24 @@ import '../../../core/utils/currency.dart';
 import '../../../core/widgets/account_settings_screen.dart';
 import '../../../core/widgets/agri_dialog.dart';
 import '../../../core/widgets/help_support_screen.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/models/account_status.dart';
 import '../../auth/data/models/user_model.dart';
+import '../../orders/presentation/farmer_sales_screen.dart';
 import '../application/farmer_dashboard_providers.dart';
-import '../data/farmer_dashboard_mock.dart';
+import '../data/farmer_dashboard_repository.dart';
+import 'momo_payout_screen.dart';
 
-Widget Function(double size) _farmerAvatarBuilder(String? name) {
-  return (size) => UserAvatar(
-        size: size,
-        fallback: (context) =>
-            GreenInitialsAvatar(name: name, size: size, colorScheme: Theme.of(context).colorScheme),
-      );
-}
-
-void _openFarmerAccountSettings(BuildContext context, String? name, bool verified) {
+void _openFarmerAccountSettings(BuildContext context, bool verified) {
   Navigator.of(context).push(
     MaterialPageRoute(
       builder: (context) => AccountSettingsScreen(
-        avatarBuilder: _farmerAvatarBuilder(name),
         roleBadgeLabel: verified ? 'Verified Farmer' : 'Farmer',
         onHelpTap: () => _openFarmerHelp(context),
         locationLabel: 'Farm Location',
         locationHint: 'e.g. Ashanti Region, Ghana',
-        bioHint: 'Tell buyers about your farm...',
         verifiedSubtitle: 'Your profile badge is visible to all buyers.',
       ),
     ),
@@ -77,14 +70,15 @@ class FarmerProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final user = ref.watch(authControllerProvider).user;
-    final details = ref.watch(farmerProfileDetailsProvider);
+    final details = ref.watch(farmerDashboardSummaryProvider).valueOrNull;
     final themeMode = ref.watch(themeModeControllerProvider);
 
     return Scaffold(
       body: ColoredBox(
         color: Theme.of(context).scaffoldBackgroundColor,
         child: SafeArea(
-          child: ListView(
+          child: ResponsiveContent(
+            child: ListView(
             padding: EdgeInsets.zero,
             children: [
               _ProfileHero(colorScheme: colorScheme, user: user, details: details),
@@ -105,20 +99,22 @@ class FarmerProfileScreen extends ConsumerWidget {
                         _InfoRow(
                           colorScheme: colorScheme,
                           icon: Icons.location_on_rounded,
-                          title: details.location,
+                          title: details?.location ?? user?.region ?? 'Not set',
                           subtitle: 'Location',
                         ),
                         _InfoRow(
                           colorScheme: colorScheme,
                           icon: Icons.agriculture_rounded,
-                          title: details.primaryCrops.join(', '),
+                          title: (details == null || details.primaryCrops.isEmpty)
+                              ? 'No listings yet'
+                              : details.primaryCrops.join(', '),
                           subtitle: 'Primary Crops',
                         ),
                         _InfoRow(
                           colorScheme: colorScheme,
                           icon: Icons.account_balance_wallet_rounded,
-                          title: formatGhs(details.walletBalance),
-                          subtitle: 'Wallet Balance',
+                          title: formatGhs(details?.totalEarningsGhs ?? 0),
+                          subtitle: 'Total Earnings',
                           isLast: true,
                         ),
                       ],
@@ -135,8 +131,21 @@ class FarmerProfileScreen extends ConsumerWidget {
                         _ActionRow(
                           colorScheme: colorScheme,
                           label: 'Account Settings',
-                          onTap: () =>
-                              _openFarmerAccountSettings(context, user?.name, user?.status == AccountStatus.verified),
+                          onTap: () => _openFarmerAccountSettings(context, user?.status == AccountStatus.verified),
+                        ),
+                        _ActionRow(
+                          colorScheme: colorScheme,
+                          label: 'My Sales',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (context) => const FarmerSalesScreen()),
+                          ),
+                        ),
+                        _ActionRow(
+                          colorScheme: colorScheme,
+                          label: 'Payment Methods',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (context) => const MomoPayoutScreen()),
+                          ),
                         ),
                         _ActionRow(
                           colorScheme: colorScheme,
@@ -177,6 +186,7 @@ class FarmerProfileScreen extends ConsumerWidget {
                 ),
               ),
             ],
+            ),
           ),
         ),
       ),
@@ -189,7 +199,7 @@ class _ProfileHero extends StatelessWidget {
 
   final ColorScheme colorScheme;
   final UserModel? user;
-  final FarmerProfileDetails details;
+  final FarmerDashboardSummary? details;
 
   @override
   Widget build(BuildContext context) {
@@ -243,14 +253,14 @@ class _ProfileHero extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _HeroStat(value: details.rating.toStringAsFixed(1), label: 'Rating'),
+                    _HeroStat(value: '${details?.salesCount ?? 0}', label: 'Sales'),
                     Container(
                       width: 1,
                       height: 34,
                       color: Colors.white.withValues(alpha: 0.2),
                       margin: const EdgeInsets.symmetric(horizontal: 28),
                     ),
-                    _HeroStat(value: '${details.salesCount}', label: 'Sales'),
+                    _HeroStat(value: '${details?.activeOrders ?? 0}', label: 'Active Orders'),
                   ],
                 ),
               ],
@@ -268,10 +278,7 @@ class _ProfileHero extends StatelessWidget {
               color: Theme.of(context).scaffoldBackgroundColor,
               border: Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
             ),
-            child: UserAvatar(
-              size: 90,
-              fallback: (context) => GreenInitialsAvatar(name: user?.name, size: 90, colorScheme: colorScheme),
-            ),
+            child: const UserAvatar(size: 90),
           ),
         ),
       ],
@@ -394,7 +401,7 @@ class _ActionRow extends StatelessWidget {
             Expanded(
               child: Text(label, style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 15)),
             ),
-            Icon(Icons.add_rounded, color: colorScheme.onSurfaceVariant, size: 20),
+            Icon(Icons.chevron_right_rounded, color: colorScheme.onSurfaceVariant, size: 20),
           ],
         ),
       ),

@@ -1,18 +1,26 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/network/api_endpoints.dart';
+import '../../../core/network/api_exception.dart';
+import '../../../core/network/dio_client.dart';
 import '../../../core/utils/freshness.dart';
 import '../../../core/widgets/agri_bottom_sheet.dart';
 import '../../../core/widgets/agri_toast.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../auth/presentation/widgets/auth_visuals.dart';
 import '../../home/application/farmer_dashboard_providers.dart';
-import '../../home/data/farmer_dashboard_mock.dart';
+import '../../marketplace/data/marketplace_repository.dart';
 import '../../scan/data/scan_record.dart';
+
+/// Pulls the leading integer out of a display label like "12 Days" — best
+/// effort; falls back to null if the scan didn't produce a parseable value.
+int? _parseLeadingInt(String label) {
+  final match = RegExp(r'\d+').firstMatch(label);
+  return match == null ? null : int.tryParse(match.group(0)!);
+}
 
 /// Manual (or scan-assisted, via [prefill]) listing creation — the scan
 /// flow is one way into this form, not the only way. Reuses the auth flow's
@@ -28,14 +36,17 @@ class AddListingScreen extends ConsumerStatefulWidget {
 
 class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _imagePicker = ImagePicker();
   late final TextEditingController _nameController;
   late final TextEditingController _priceController;
-  late final TextEditingController _unitController;
   late final TextEditingController _quantityController;
+  late final TextEditingController _shelfLifeController;
   late final TextEditingController _descriptionController;
   late double _freshnessScore;
-  String? _imagePath;
+  String? _imageUrl;
+  bool _uploadingPhoto = false;
   bool _submitting = false;
+  String? _error;
 
   @override
   void initState() {
@@ -43,71 +54,108 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
     final scan = widget.prefill;
     _nameController = TextEditingController(text: scan?.cropType ?? '');
     _priceController = TextEditingController(text: scan == null ? '' : scan.recommendedPrice.toStringAsFixed(0));
-    _unitController = TextEditingController(text: scan?.priceUnit ?? 'kg');
     _quantityController = TextEditingController();
+    _shelfLifeController = TextEditingController(
+      text: scan == null ? '' : (_parseLeadingInt(scan.shelfLifeLabel)?.toString() ?? ''),
+    );
     _descriptionController = TextEditingController();
     _freshnessScore = (scan?.score ?? 100).toDouble();
-    _imagePath = scan?.imagePath;
-  }
-
-  Future<void> _pickImage() async {
-    final source = await showAgriBottomSheet<ImageSource>(
-      context,
-      builder: (context) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt_outlined),
-              title: const Text('Take a photo'),
-              onTap: () => Navigator.of(context).pop(ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Choose from gallery'),
-              onTap: () => Navigator.of(context).pop(ImageSource.gallery),
-            ),
-          ],
-        );
-      },
-    );
-    if (source == null || !mounted) return;
-    final file = await ImagePicker().pickImage(source: source, maxWidth: 1600, imageQuality: 85);
-    if (file == null || !mounted) return;
-    setState(() => _imagePath = file.path);
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _priceController.dispose();
-    _unitController.dispose();
     _quantityController.dispose();
+    _shelfLifeController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
 
+  Future<void> _pickPhoto() async {
+    final source = await showAgriBottomSheet<ImageSource>(
+      context,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.photo_camera_outlined),
+            title: const Text('Take a photo'),
+            onTap: () => Navigator.of(context).pop(ImageSource.camera),
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library_outlined),
+            title: const Text('Choose from gallery'),
+            onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+          ),
+        ],
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    final picked = await _imagePicker.pickImage(source: source, maxWidth: 1600, imageQuality: 85);
+    if (picked == null || !mounted) return;
+
+    setState(() => _uploadingPhoto = true);
+    try {
+      final bytes = await picked.readAsBytes();
+      final ext = picked.name.contains('.') ? picked.name.split('.').last.toLowerCase() : 'jpg';
+      final contentType = ext == 'png' ? 'image/png' : 'image/jpeg';
+
+      final publicUrl = await ref.read(marketplaceRepositoryProvider).uploadListingPhoto(
+            bytes: bytes,
+            fileName: picked.name,
+            contentType: contentType,
+          );
+
+      if (!mounted) return;
+      setState(() => _imageUrl = publicUrl);
+    } on ApiException catch (e) {
+      if (mounted) showAgriToast(context, e.message);
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _submitting = true);
-    await Future<void>.delayed(const Duration(milliseconds: 600));
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
 
     final cropType = _nameController.text.trim();
-    ref.read(farmerListingsProvider.notifier).addListing(
-          FarmerListingSummary(
-            id: 'l-${DateTime.now().millisecondsSinceEpoch}',
-            cropType: cropType,
-            freshnessScore: _freshnessScore.round(),
-            price: double.tryParse(_priceController.text.trim()) ?? 0,
-            unit: _unitController.text.trim(),
-            status: 'Active',
-            imagePath: _imagePath,
-          ),
-        );
+    try {
+      String? region;
+      try {
+        final response = await ref.read(dioProvider).get(ApiEndpoints.userProfile);
+        final data = response.data['data'] ?? response.data;
+        region = data['profile']?['farmRegion']?.toString();
+      } catch (_) {
+        // Fall back to the default region coordinate below.
+      }
+      final (lat, long) = coordinatesForRegion(region);
 
-    if (!mounted) return;
-    showAgriToast(context, '$cropType listed successfully');
-    context.go('/farmer/listings');
+      await ref.read(farmerListingsProvider.notifier).addListing(
+            cropType: cropType,
+            quantityKg: double.parse(_quantityController.text.trim()),
+            freshnessScore: _freshnessScore.round(),
+            shelfLifeDays: int.parse(_shelfLifeController.text.trim()),
+            farmerLat: lat,
+            farmerLong: long,
+            pricePerKg: double.parse(_priceController.text.trim()),
+            imageUrl: _imageUrl,
+            description: _descriptionController.text.trim(),
+          );
+
+      if (!mounted) return;
+      showAgriToast(context, '$cropType listed successfully');
+      context.go('/farmer/listings');
+    } on ApiException catch (e) {
+      setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -121,7 +169,8 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: SingleChildScrollView(
+            child: ResponsiveContent(
+              child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               child: Form(
                 key: _formKey,
@@ -164,6 +213,15 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
+                          AuthFieldLabel('Photo', colorScheme),
+                          const SizedBox(height: 8),
+                          _PhotoPicker(
+                            colorScheme: colorScheme,
+                            imageUrl: _imageUrl,
+                            uploading: _uploadingPhoto,
+                            onTap: _uploadingPhoto ? null : _pickPhoto,
+                          ),
+                          const SizedBox(height: 16),
                           AuthFieldLabel('Crop / Produce Name', colorScheme),
                           const SizedBox(height: 8),
                           AuthTextField(
@@ -182,7 +240,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    AuthFieldLabel('Price (GH₵)', colorScheme),
+                                    AuthFieldLabel('Price per kg (GH₵)', colorScheme),
                                     const SizedBox(height: 8),
                                     AuthTextField(
                                       controller: _priceController,
@@ -202,14 +260,18 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    AuthFieldLabel('Unit', colorScheme),
+                                    AuthFieldLabel('Quantity (kg)', colorScheme),
                                     const SizedBox(height: 8),
                                     AuthTextField(
-                                      controller: _unitController,
-                                      hint: 'kg, box, bag...',
+                                      controller: _quantityController,
+                                      hint: 'e.g. 40',
+                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      icon: Icons.inventory_2_outlined,
                                       colorScheme: colorScheme,
-                                      validator: (value) =>
-                                          (value == null || value.trim().isEmpty) ? 'Required' : null,
+                                      validator: (value) {
+                                        final qty = double.tryParse(value?.trim() ?? '');
+                                        return (qty == null || qty <= 0) ? 'Enter a valid quantity' : null;
+                                      },
                                     ),
                                   ],
                                 ),
@@ -217,23 +279,18 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                             ],
                           ),
                           const SizedBox(height: 16),
-                          AuthFieldLabel('Quantity Available (optional)', colorScheme),
+                          AuthFieldLabel('Shelf life (days)', colorScheme),
                           const SizedBox(height: 8),
                           AuthTextField(
-                            controller: _quantityController,
-                            hint: 'e.g. 40',
+                            controller: _shelfLifeController,
+                            hint: 'e.g. 7',
                             keyboardType: TextInputType.number,
-                            icon: Icons.inventory_2_outlined,
+                            icon: Icons.hourglass_bottom_rounded,
                             colorScheme: colorScheme,
-                          ),
-                          const SizedBox(height: 20),
-                          AuthFieldLabel('Photo', colorScheme),
-                          const SizedBox(height: 8),
-                          _ListingPhotoPicker(
-                            colorScheme: colorScheme,
-                            imagePath: _imagePath,
-                            fromScan: widget.prefill != null && _imagePath == widget.prefill?.imagePath,
-                            onTap: _pickImage,
+                            validator: (value) {
+                              final days = int.tryParse(value?.trim() ?? '');
+                              return (days == null || days <= 0) ? 'Enter a valid number of days' : null;
+                            },
                           ),
                           const SizedBox(height: 16),
                           AuthFieldLabel('Description (optional)', colorScheme),
@@ -243,6 +300,13 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                             hint: 'Add any extra details for buyers...',
                             colorScheme: colorScheme,
                           ),
+                          if (_error != null) ...[
+                            const SizedBox(height: 14),
+                            Text(
+                              _error!,
+                              style: TextStyle(color: colorScheme.error, fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                          ],
                           const SizedBox(height: 22),
                           AuthPillButton(
                             label: _submitting ? 'Publishing...' : 'Publish Listing',
@@ -256,9 +320,78 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                   ],
                 ),
               ),
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PhotoPicker extends StatelessWidget {
+  const _PhotoPicker({
+    required this.colorScheme,
+    required this.imageUrl,
+    required this.uploading,
+    required this.onTap,
+  });
+
+  final ColorScheme colorScheme;
+  final String? imageUrl;
+  final bool uploading;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 160,
+        width: double.infinity,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
+        ),
+        child: uploading
+            ? const Center(child: CircularProgressIndicator())
+            : imageUrl != null
+            ? Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(imageUrl!, fit: BoxFit.cover),
+                  Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.55),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Text(
+                        'Change photo',
+                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add_a_photo_outlined, color: colorScheme.onSurfaceVariant, size: 26),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Add a photo of your produce',
+                      style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12.5, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
       ),
     );
   }
@@ -289,91 +422,6 @@ class _PrefillBanner extends StatelessWidget {
               'Pre-filled from your AI scan (${prefill.score}% freshness, ${prefill.qualityGrade}).',
               style: TextStyle(color: colorScheme.onSurface, fontSize: 12.5, fontWeight: FontWeight.w600, height: 1.3),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ListingPhotoPicker extends StatelessWidget {
-  const _ListingPhotoPicker({
-    required this.colorScheme,
-    required this.imagePath,
-    required this.fromScan,
-    required this.onTap,
-  });
-
-  final ColorScheme colorScheme;
-  final String? imagePath;
-  final bool fromScan;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          height: 160,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              if (imagePath != null && !kIsWeb)
-                Image.file(
-                  File(imagePath!),
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => _placeholder(),
-                )
-              else
-                _placeholder(),
-              if (imagePath != null)
-                Positioned(
-                  right: 10,
-                  bottom: 10,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.55),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.edit_rounded, size: 14, color: Colors.white),
-                        const SizedBox(width: 4),
-                        Text(
-                          fromScan ? 'From scan · Change' : 'Change',
-                          style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w600),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _placeholder() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.add_a_photo_outlined, size: 30, color: colorScheme.onSurfaceVariant),
-          const SizedBox(height: 8),
-          Text(
-            'Add a photo',
-            style: TextStyle(color: colorScheme.onSurfaceVariant, fontWeight: FontWeight.w600, fontSize: 12.5),
           ),
         ],
       ),

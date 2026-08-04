@@ -1,16 +1,21 @@
-import 'dart:io';
+import 'dart:convert';
+import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/theme/motion.dart';
 import '../../../core/utils/currency.dart';
 import '../../../core/utils/freshness.dart';
 import '../../../core/widgets/agri_bottom_sheet.dart';
+import '../../../core/widgets/agri_dialog.dart';
+import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/responsive_content.dart';
+import '../../auth/presentation/widgets/auth_visuals.dart';
 import '../../home/application/farmer_dashboard_providers.dart';
 import '../../home/data/farmer_dashboard_mock.dart';
 
@@ -36,6 +41,25 @@ class MyListingsScreen extends ConsumerStatefulWidget {
 class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
   String _selectedTab = 'Active';
   _ListingSort _sort = _ListingSort.freshnessDesc;
+
+  Future<void> _deleteListing(FarmerListingSummary listing) async {
+    final confirmed = await showAgriDialog(
+      context,
+      title: 'Delete this listing?',
+      message: '"${listing.cropType}" will no longer be visible to buyers. This can\'t be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await ref.read(farmerListingsProvider.notifier).deleteListing(listing.id);
+      if (!mounted) return;
+      showAgriToast(context, '${listing.cropType} deleted');
+    } on ApiException catch (e) {
+      if (mounted) showAgriToast(context, e.message);
+    }
+  }
 
   void _showSortSheet(BuildContext context) {
     showAgriBottomSheet(
@@ -70,8 +94,8 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final listings = ref
-        .watch(farmerListingsProvider)
+    final listingsAsync = ref.watch(farmerListingsProvider);
+    final listings = (listingsAsync.valueOrNull ?? const [])
         .where((listing) => listing.status == _selectedTab)
         .toList()
       ..sort((a, b) => switch (_sort) {
@@ -86,7 +110,8 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: Column(
+            child: ResponsiveContent(
+              child: Column(
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -126,19 +151,38 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
                   ),
                 ),
                 Expanded(
-                  child: listings.isEmpty
-                      ? EmptyState(
-                          icon: Icons.inventory_2_outlined,
-                          message: 'No ${_selectedTab.toLowerCase()} listings yet.',
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
-                          itemCount: listings.length,
-                          separatorBuilder: (context, index) => const SizedBox(height: 16),
-                          itemBuilder: (context, index) => _ListingRow(listing: listings[index], colorScheme: colorScheme),
-                        ),
+                  child: RefreshIndicator(
+                    onRefresh: () => ref.refresh(farmerListingsProvider.future),
+                    child: listingsAsync.isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : listingsAsync.hasError
+                        ? EmptyState(
+                            icon: Icons.error_outline_rounded,
+                            message: 'Could not load your listings. Pull down to retry.',
+                          )
+                        : listings.isEmpty
+                        ? ListView(
+                            children: [
+                              EmptyState(
+                                icon: Icons.grass_outlined,
+                                message: 'No ${_selectedTab.toLowerCase()} listings yet.',
+                              ),
+                            ],
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
+                            itemCount: listings.length,
+                            separatorBuilder: (context, index) => const SizedBox(height: 16),
+                            itemBuilder: (context, index) => _ListingRow(
+                              listing: listings[index],
+                              colorScheme: colorScheme,
+                              onDelete: () => _deleteListing(listings[index]),
+                            ),
+                          ),
+                  ),
                 ),
               ],
+              ),
             ),
           ),
         ],
@@ -243,14 +287,138 @@ class _StatusTab extends StatelessWidget {
   }
 }
 
-class _ListingRow extends StatelessWidget {
-  const _ListingRow({required this.listing, required this.colorScheme});
+class _ListingRow extends ConsumerWidget {
+  const _ListingRow({required this.listing, required this.colorScheme, required this.onDelete});
 
   final FarmerListingSummary listing;
   final ColorScheme colorScheme;
+  final VoidCallback onDelete;
+
+  void _showManageSheet(BuildContext context, WidgetRef ref) {
+    showAgriBottomSheet(
+      context,
+      builder: (sheetContext) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Editing price/quantity only makes sense while a listing is still
+          // for sale — a sold order already recorded its own frozen amount,
+          // so changing the listing afterward wouldn't affect anything real.
+          if (listing.status == 'Active')
+            ListTile(
+              leading: Icon(Icons.edit_outlined, color: Theme.of(context).colorScheme.onSurface),
+              title: Text(
+                'Edit Listing',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w700),
+              ),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _showEditSheet(context, ref);
+              },
+            ),
+          ListTile(
+            leading: Icon(Icons.delete_outline_rounded, color: Theme.of(context).colorScheme.error),
+            title: Text(
+              'Delete Listing',
+              style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.w700),
+            ),
+            onTap: () {
+              Navigator.of(sheetContext).pop();
+              onDelete();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditSheet(BuildContext context, WidgetRef ref) {
+    final priceController = TextEditingController(text: listing.price.toStringAsFixed(2));
+    final quantityController = TextEditingController(text: listing.quantityKg.toStringAsFixed(0));
+    final formKey = GlobalKey<FormState>();
+    bool saving = false;
+
+    showAgriBottomSheet(
+      context,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setState) {
+          final colorScheme = Theme.of(sheetContext).colorScheme;
+          Future<void> save() async {
+            if (!formKey.currentState!.validate()) return;
+            setState(() => saving = true);
+            try {
+              await ref.read(farmerListingsProvider.notifier).updateListing(
+                    listing.id,
+                    pricePerKg: double.parse(priceController.text),
+                    quantityKg: double.parse(quantityController.text),
+                  );
+              if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+              if (context.mounted) showAgriToast(context, '${listing.cropType} updated');
+            } on ApiException catch (e) {
+              setState(() => saving = false);
+              if (sheetContext.mounted) showAgriToast(sheetContext, e.message);
+            }
+          }
+
+          return Form(
+            key: formKey,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Edit ${listing.cropType}',
+                    style: TextStyle(color: colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 20),
+                  AuthFieldLabel('Price per kg (GHS)', colorScheme),
+                  const SizedBox(height: 8),
+                  AuthTextField(
+                    controller: priceController,
+                    hint: 'e.g. 8.50',
+                    icon: Icons.sell_outlined,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    colorScheme: colorScheme,
+                    validator: (value) {
+                      final parsed = double.tryParse(value ?? '');
+                      return (parsed == null || parsed <= 0) ? 'Enter a valid price' : null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  AuthFieldLabel('Quantity (kg)', colorScheme),
+                  const SizedBox(height: 8),
+                  AuthTextField(
+                    controller: quantityController,
+                    hint: 'e.g. 100',
+                    icon: Icons.scale_outlined,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    colorScheme: colorScheme,
+                    validator: (value) {
+                      final parsed = double.tryParse(value ?? '');
+                      return (parsed == null || parsed <= 0) ? 'Enter a valid quantity' : null;
+                    },
+                  ),
+                  const SizedBox(height: 22),
+                  AuthPillButton(
+                    label: 'Save Changes',
+                    loading: saving,
+                    onPressed: save,
+                    colorScheme: colorScheme,
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final freshness = freshnessColorFor(listing.freshnessScore, Theme.of(context).brightness);
     final accent = colorScheme.primary;
     return Container(
@@ -271,7 +439,22 @@ class _ListingRow extends StatelessWidget {
                   child: SizedBox(
                     height: 190,
                     width: double.infinity,
-                    child: _ListingImage(listing: listing, accent: accent),
+                    child: listing.imageUrl != null
+                        ? Image.network(listing.imageUrl!, fit: BoxFit.cover)
+                        : listing.imageAsset != null
+                        ? Image.asset(listing.imageAsset!, fit: BoxFit.cover)
+                        : DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.12)],
+                              ),
+                            ),
+                            child: Center(
+                              child: Icon(Icons.eco_rounded, size: 48, color: accent.withValues(alpha: 0.8)),
+                            ),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -281,9 +464,21 @@ class _ListingRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${formatGhs(listing.price)} / ${listing.unit}',
+                  '${formatGhs(listing.price)} / ${listing.unit} · ${listing.quantityKg.toStringAsFixed(0)}${listing.unit} available',
                   style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w700, fontSize: 14),
                 ),
+                if (listing.status == 'Active' && listing.qrCodeData != null) ...[
+                  const SizedBox(height: 10),
+                  TextButton.icon(
+                    onPressed: () => _showQrDialog(context, listing),
+                    style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 0)),
+                    icon: Icon(Icons.qr_code_2_rounded, size: 16, color: colorScheme.primary),
+                    label: Text(
+                      'Show delivery QR',
+                      style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w700, fontSize: 12.5),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -299,45 +494,53 @@ class _ListingRow extends StatelessWidget {
               ),
             ),
           ),
+          Positioned(
+            top: 10,
+            left: 10,
+            child: Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.45), shape: BoxShape.circle),
+              child: IconButton(
+                padding: EdgeInsets.zero,
+                tooltip: 'Manage listing',
+                icon: const Icon(Icons.more_vert_rounded, color: Colors.white, size: 18),
+                onPressed: () => _showManageSheet(context, ref),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _ListingImage extends StatelessWidget {
-  const _ListingImage({required this.listing, required this.accent});
-
-  final FarmerListingSummary listing;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!kIsWeb && listing.imagePath != null) {
-      return Image.file(
-        File(listing.imagePath!),
-        fit: BoxFit.cover,
-        errorBuilder: (context, error, stackTrace) => _fallback(),
-      );
+void _showQrDialog(BuildContext context, FarmerListingSummary listing) {
+  final data = listing.qrCodeData ?? '';
+  final isImage = data.startsWith('data:image');
+  Uint8List? imageBytes;
+  if (isImage) {
+    final base64Part = data.split(',').last;
+    try {
+      imageBytes = base64Decode(base64Part);
+    } catch (_) {
+      imageBytes = null;
     }
-    if (listing.imageAsset != null) {
-      return Image.asset(listing.imageAsset!, fit: BoxFit.cover);
-    }
-    return _fallback();
   }
 
-  Widget _fallback() {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [accent.withValues(alpha: 0.35), accent.withValues(alpha: 0.12)],
-        ),
+  showDialog<void>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Show this at delivery'),
+      content: SizedBox(
+        width: 240,
+        child: imageBytes != null
+            ? Image.memory(imageBytes)
+            : SelectableText(data, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
       ),
-      child: Center(
-        child: Icon(Icons.eco_rounded, size: 48, color: accent.withValues(alpha: 0.8)),
-      ),
-    );
-  }
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close')),
+      ],
+    ),
+  );
 }

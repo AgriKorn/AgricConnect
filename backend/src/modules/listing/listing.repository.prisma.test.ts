@@ -203,5 +203,57 @@ describe('PrismaListingRepository.findActive', () => {
 
       expect(listings[0].cropCategory).toBeNull();
     });
+
+    it('should expose the full image gallery, falling back to the single photo for legacy rows', async () => {
+      mockPrisma.produce_listings.findMany.mockResolvedValue([
+        // A gallery row.
+        { id: 'a', farmer_id: 'f', crop_types: { name: 'tomato', category: 'vegetables' }, quantity_kg: 1, freshness_score: 90, estimated_viable_days: 6, gps_lat: 5, gps_lng: 0, listed_price: 3, listing_hash: 'h', qr_code_data: 'q', photo_url: 'https://s3/cover.jpg', image_urls: ['https://s3/cover.jpg', 'https://s3/2.jpg'], status: 'active', created_at: new Date(), updated_at: new Date() },
+        // A legacy single-photo row with no gallery array.
+        { id: 'b', farmer_id: 'f', crop_types: { name: 'maize', category: 'grains' }, quantity_kg: 1, freshness_score: 90, estimated_viable_days: 6, gps_lat: 5, gps_lng: 0, listed_price: 3, listing_hash: 'h2', qr_code_data: 'q', photo_url: 'https://s3/legacy.jpg', image_urls: [], status: 'active', created_at: new Date(), updated_at: new Date() },
+      ] as any);
+      mockPrisma.produce_listings.count.mockResolvedValue(2 as any);
+
+      const { listings } = await repo.findActive(filters());
+
+      expect(listings[0].imageUrls).toEqual(['https://s3/cover.jpg', 'https://s3/2.jpg']);
+      expect(listings[0].imageUrl).toBe('https://s3/cover.jpg'); // cover is the first
+      expect(listings[1].imageUrls).toEqual(['https://s3/legacy.jpg']); // legacy single photo becomes a one-image gallery
+    });
+  });
+
+  describe('create — image gallery (SRS "Produce Upload")', () => {
+    beforeEach(() => {
+      mockPrisma.crop_types.findFirst.mockResolvedValue({ id: 'crop-1', name: 'tomato', category: 'vegetables' } as any);
+      mockPrisma.produce_listings.create.mockResolvedValue({
+        id: 'new', farmer_id: 'f', crop_types: { name: 'tomato', category: 'vegetables' }, quantity_kg: 1,
+        freshness_score: 90, estimated_viable_days: 6, gps_lat: 5, gps_lng: 0, listed_price: 3,
+        listing_hash: 'h', qr_code_data: 'q', status: 'active', created_at: new Date(), updated_at: new Date(),
+      } as any);
+    });
+
+    const baseCreate = { farmerId: 'f', cropType: 'tomato', quantityKg: 1, freshnessScore: 90, shelfLifeDays: 6, farmerLat: 5, farmerLong: 0, pricePerKg: 3, listingHash: 'h', qrCodeData: 'q', status: 'ACTIVE' as const };
+
+    const dataWritten = () => (mockPrisma.produce_listings.create.mock.calls[0][0] as any).data;
+
+    it('should store the whole gallery and set the cover to the first image', async () => {
+      await repo.create({ ...baseCreate, imageUrls: ['https://s3/1.jpg', 'https://s3/2.jpg', 'https://s3/3.jpg'] });
+
+      expect(dataWritten().image_urls).toEqual(['https://s3/1.jpg', 'https://s3/2.jpg', 'https://s3/3.jpg']);
+      expect(dataWritten().photo_url).toBe('https://s3/1.jpg');
+    });
+
+    it('should promote a single imageUrl into a one-image gallery', async () => {
+      await repo.create({ ...baseCreate, imageUrl: 'https://s3/only.jpg' });
+
+      expect(dataWritten().image_urls).toEqual(['https://s3/only.jpg']);
+      expect(dataWritten().photo_url).toBe('https://s3/only.jpg');
+    });
+
+    it('should store an empty gallery and no cover when no images are supplied', async () => {
+      await repo.create(baseCreate);
+
+      expect(dataWritten().image_urls).toEqual([]);
+      expect(dataWritten().photo_url).toBeUndefined();
+    });
   });
 });

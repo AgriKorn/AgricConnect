@@ -64,7 +64,6 @@ bool _isPreAuthRoute(String location) {
       location == '/forgot-password' ||
       location == '/role-selection' ||
       location.startsWith('/register/') ||
-      location == '/pending-verification' ||
       location == '/splash' ||
       location == '/onboarding' ||
       location == '/debug/components';
@@ -231,7 +230,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         ],
       ),
 
-      // Buyer: Marketplace · Orders · Profile (checklist 2.2)
+      // Buyer: Marketplace · Orders · Alerts · Profile (checklist 2.2)
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => RoleNavShell(
           navigationShell: navigationShell,
@@ -245,6 +244,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               icon: Icon(Icons.receipt_long_outlined),
               selectedIcon: Icon(Icons.receipt_long_rounded),
               label: 'Orders',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.notifications_outlined),
+              selectedIcon: Icon(Icons.notifications_rounded),
+              label: 'Alerts',
             ),
             _profileDestination,
           ],
@@ -269,6 +273,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(
             routes: [
               GoRoute(
+                path: '/buyer/alerts',
+                builder: (context, state) => const AlertsScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
                 path: '/buyer/profile',
                 builder: (context, state) => const BuyerProfileScreen(),
               ),
@@ -277,7 +289,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         ],
       ),
 
-      // Driver: Home (Availability toggle) · Jobs (Dispatch) · Job History · Profile (checklist 2.2)
+      // Driver: Home (Availability toggle) · Jobs (Dispatch) · Job History · Alerts · Profile (checklist 2.2)
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => RoleNavShell(
           navigationShell: navigationShell,
@@ -296,6 +308,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               icon: Icon(Icons.history_outlined),
               selectedIcon: Icon(Icons.history_rounded),
               label: 'History',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.notifications_outlined),
+              selectedIcon: Icon(Icons.notifications_rounded),
+              label: 'Alerts',
             ),
             _profileDestination,
           ],
@@ -322,6 +339,14 @@ final goRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/driver/history',
                 builder: (context, state) => const JobHistoryScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/driver/alerts',
+                builder: (context, state) => const AlertsScreen(),
               ),
             ],
           ),

@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { NotFoundError } from '../../utils/errors';
-import { User, UserStatus } from './user.types';
+import { User, UserRole, UserStatus } from './user.types';
 import { CreateUserRecord, IUserRepository } from './user.repository';
 
 /**
@@ -11,6 +11,7 @@ import { CreateUserRecord, IUserRepository } from './user.repository';
 export class InMemoryUserRepository implements IUserRepository {
   private readonly usersById = new Map<string, User>();
   private readonly idByPhone = new Map<string, string>();
+  private readonly idByEmail = new Map<string, string>();
 
   async create(data: CreateUserRecord): Promise<User> {
     const now = new Date();
@@ -18,23 +19,36 @@ export class InMemoryUserRepository implements IUserRepository {
       id: randomUUID(),
       name: data.name,
       phone: data.phone,
+      email: data.email ?? null,
       passwordHash: data.passwordHash,
       role: data.role,
       status: 'PENDING_OTP',
       otp: data.otp,
       otpExpiry: data.otpExpiry,
       refreshToken: null,
-      profile: {},
+      profile: {
+        farmRegion: data.region,
+        operatingRegion: data.operatingRegion || data.region,
+        truckCapacity: data.vehicleCapacityKg,
+        businessName: data.businessName,
+        businessType: data.businessType,
+      },
       createdAt: now,
       updatedAt: now,
     };
     this.usersById.set(user.id, user);
     this.idByPhone.set(user.phone, user.id);
+    if (user.email) this.idByEmail.set(user.email, user.id);
     return user;
   }
 
   async findByPhone(phone: string): Promise<User | null> {
     const id = this.idByPhone.get(phone);
+    return id ? this.usersById.get(id) ?? null : null;
+  }
+
+  async findByEmail(email: string): Promise<User | null> {
+    const id = this.idByEmail.get(email);
     return id ? this.usersById.get(id) ?? null : null;
   }
 
@@ -45,7 +59,13 @@ export class InMemoryUserRepository implements IUserRepository {
   async findManyByStatus(status: UserStatus): Promise<User[]> {
     return [...this.usersById.values()]
       .filter((user) => user.status === status)
-      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async findManyByRole(role: UserRole): Promise<User[]> {
+    return [...this.usersById.values()]
+      .filter((user) => user.role === role)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
   async findFarmerIdsByRegion(region: string): Promise<string[]> {
@@ -73,6 +93,7 @@ export class InMemoryUserRepository implements IUserRepository {
     if (!existing) throw new NotFoundError('User not found');
     const updated: User = { ...existing, ...data, updatedAt: new Date() };
     this.usersById.set(id, updated);
+    if (updated.email) this.idByEmail.set(updated.email, id);
     return updated;
   }
 

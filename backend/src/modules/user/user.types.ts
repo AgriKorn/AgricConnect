@@ -5,10 +5,24 @@ export interface FarmerProfile {
   farmRegion?: string;
   gpsLatitude?: number;
   gpsLongitude?: number;
+  /** Mobile Money payout number — must be set before a farmer can create listings. */
+  momoNumber?: string;
+  /** Paystack Ghana mobile-money bank code: 'MTN' | 'VOD' | 'ATL'. */
+  momoNetwork?: string;
+  /** Public S3 URL of the user's uploaded profile photo — shared across all roles. */
+  photoUrl?: string;
+  /** Notification toggle state — shared across all roles, currently only surfaced in the Buyer profile UI. */
+  notificationPreferences?: {
+    orderStatusUpdates?: boolean;
+    priceAlerts?: boolean;
+    freshnessNotifications?: boolean;
+    marketingOffers?: boolean;
+  };
 }
 
 export interface BuyerProfile {
   businessName?: string;
+  businessType?: string;
   deliveryAddress?: string;
 }
 
@@ -22,6 +36,7 @@ export interface User {
   id: string;
   name: string;
   phone: string;
+  email: string | null;
   passwordHash: string;
   role: UserRole;
   status: UserStatus;
@@ -29,6 +44,9 @@ export interface User {
   otpExpiry: Date | null;
   refreshToken: string | null;
   profile: FarmerProfile & BuyerProfile & DriverProfile;
+  /** Which admin approved/rejected this account, and when — set by AdminService.approveUser/rejectUser. */
+  approvedBy?: string | null;
+  approvedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }

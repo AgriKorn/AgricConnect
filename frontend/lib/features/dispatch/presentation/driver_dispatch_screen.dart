@@ -6,6 +6,8 @@ import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/responsive_content.dart';
+import '../../orders/presentation/confirm_delivery_screen.dart';
 import '../application/dispatch_providers.dart';
 import '../data/dispatch_mock.dart';
 import 'widgets/job_request_card.dart';
@@ -23,10 +25,11 @@ class DriverDispatchScreen extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final status = ref.watch(driverStatusProvider);
     final online = ref.watch(driverOnlineProvider);
-    final activeTrip = ref.watch(activeTripProvider);
+    final activeTripAsync = ref.watch(activeTripProvider);
     final filter = ref.watch(jobFilterProvider);
+    final jobsAsync = ref.watch(availableJobsProvider);
     final jobs = ref.watch(filteredJobsProvider);
-    final history = ref.watch(dispatchHistoryProvider);
+    final history = ref.watch(dispatchHistoryProvider).valueOrNull ?? const [];
 
     return Scaffold(
       body: Stack(
@@ -34,7 +37,14 @@ class DriverDispatchScreen extends ConsumerWidget {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: ListView(
+            child: ResponsiveContent(
+              child: RefreshIndicator(
+              onRefresh: () => Future.wait([
+                ref.read(availableJobsProvider.notifier).refresh(),
+                ref.read(activeTripProvider.notifier).refresh(),
+                ref.refresh(dispatchHistoryProvider.future),
+              ]),
+              child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               children: [
                 _DriverHeader(
@@ -46,16 +56,32 @@ class DriverDispatchScreen extends ConsumerWidget {
                 const SizedBox(height: 24),
                 Text('Active Trip', style: _sectionTitleStyle(colorScheme)),
                 const SizedBox(height: 12),
-                activeTrip == null
-                    ? _NoActiveTripCard(colorScheme: colorScheme)
-                    : _ActiveTripCard(
-                        trip: activeTrip,
-                        colorScheme: colorScheme,
-                        onComplete: () {
-                          ref.read(activeTripProvider.notifier).complete();
-                          showAgriToast(context, 'Delivery marked complete');
-                        },
-                      ),
+                activeTripAsync.when(
+                  loading: () => const Center(child: CircularProgressIndicator()),
+                  error: (error, _) => EmptyState(
+                    icon: Icons.wifi_off_rounded,
+                    message: 'Could not check your active trip. Pull to refresh.',
+                  ),
+                  data: (activeTrip) => activeTrip == null
+                      ? _NoActiveTripCard(colorScheme: colorScheme)
+                      : _ActiveTripCard(
+                          trip: activeTrip,
+                          colorScheme: colorScheme,
+                          onConfirmDelivery: () async {
+                            final result = await Navigator.of(context).push<bool>(
+                              MaterialPageRoute(
+                                builder: (_) => ConfirmDeliveryScreen(transactionId: activeTrip.job.transactionId),
+                              ),
+                            );
+                            if (result == true) {
+                              await ref.read(activeTripProvider.notifier).refresh();
+                              if (context.mounted) {
+                                showAgriToast(context, 'Delivery confirmed — payment released to the farmer.');
+                              }
+                            }
+                          },
+                        ),
+                ),
                 const SizedBox(height: 28),
                 Row(
                   children: [
@@ -91,26 +117,43 @@ class DriverDispatchScreen extends ConsumerWidget {
                   onSelect: (value) => ref.read(jobFilterProvider.notifier).select(value),
                 ),
                 const SizedBox(height: 14),
-                if (jobs.isEmpty)
+                if (jobsAsync.isLoading)
+                  const Center(child: CircularProgressIndicator())
+                else if (jobsAsync.hasError)
+                  EmptyState(icon: Icons.wifi_off_rounded, message: 'Could not load job requests. Pull to refresh.')
+                else if (jobs.isEmpty)
                   EmptyState(icon: Icons.local_shipping_outlined, message: 'No jobs match this filter right now.')
                 else
                   for (final job in jobs) ...[
                     JobRequestCard(
                       job: job,
                       colorScheme: colorScheme,
-                      onDecline: () {
-                        ref.read(availableJobsProvider.notifier).remove(job.id);
-                        showAgriToast(
-                          context,
-                          'Declined ${job.cropSummary}',
-                          icon: Icons.cancel_rounded,
-                          isError: true,
-                        );
+                      onDecline: () async {
+                        try {
+                          await ref.read(availableJobsProvider.notifier).decline(job.id);
+                          if (context.mounted) {
+                            showAgriToast(
+                              context,
+                              'Declined ${job.cropSummary}',
+                              icon: Icons.cancel_rounded,
+                              isError: true,
+                            );
+                          }
+                        } catch (_) {
+                          if (context.mounted) {
+                            showAgriToast(context, 'Could not decline this job. Try again.', isError: true);
+                          }
+                        }
                       },
-                      onAccept: () {
-                        ref.read(availableJobsProvider.notifier).remove(job.id);
-                        ref.read(activeTripProvider.notifier).start(job);
-                        showAgriToast(context, 'Accepted ${job.cropSummary}');
+                      onAccept: () async {
+                        try {
+                          await ref.read(availableJobsProvider.notifier).accept(job.id);
+                          if (context.mounted) showAgriToast(context, 'Accepted ${job.cropSummary}');
+                        } catch (_) {
+                          if (context.mounted) {
+                            showAgriToast(context, 'Could not accept this job. Try again.', isError: true);
+                          }
+                        }
                       },
                     ),
                     const SizedBox(height: 16),
@@ -126,6 +169,8 @@ class DriverDispatchScreen extends ConsumerWidget {
                     const SizedBox(height: 12),
                   ],
               ],
+              ),
+              ),
             ),
           ),
         ],
@@ -219,11 +264,11 @@ class _NoActiveTripCard extends StatelessWidget {
 }
 
 class _ActiveTripCard extends StatelessWidget {
-  const _ActiveTripCard({required this.trip, required this.colorScheme, required this.onComplete});
+  const _ActiveTripCard({required this.trip, required this.colorScheme, required this.onConfirmDelivery});
 
   final ActiveTrip trip;
   final ColorScheme colorScheme;
-  final VoidCallback onComplete;
+  final VoidCallback onConfirmDelivery;
 
   @override
   Widget build(BuildContext context) {
@@ -247,15 +292,6 @@ class _ActiveTripCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 13),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: colorScheme.primary, borderRadius: BorderRadius.circular(999)),
-                child: Text(
-                  'ETA ${trip.etaMinutes}m',
-                  style: TextStyle(color: colorScheme.onPrimary, fontSize: 11.5, fontWeight: FontWeight.w700),
                 ),
               ),
             ],
@@ -282,11 +318,6 @@ class _ActiveTripCard extends StatelessWidget {
                       trip.destination,
                       style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w800, fontSize: 15.5),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${trip.distanceRemainingKm.toStringAsFixed(1)} km remaining',
-                      style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12.5),
-                    ),
                   ],
                 ),
               ),
@@ -297,14 +328,14 @@ class _ActiveTripCard extends StatelessWidget {
             width: double.infinity,
             height: 50,
             child: FilledButton.icon(
-              onPressed: onComplete,
+              onPressed: onConfirmDelivery,
               style: FilledButton.styleFrom(
                 backgroundColor: colorScheme.primary,
                 foregroundColor: colorScheme.onPrimary,
                 shape: const StadiumBorder(),
               ),
-              icon: const Icon(Icons.check_circle_rounded, size: 18),
-              label: const Text('Complete Delivery', style: TextStyle(fontWeight: FontWeight.w700)),
+              icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+              label: const Text('Confirm Delivery', style: TextStyle(fontWeight: FontWeight.w700)),
             ),
           ),
         ],
