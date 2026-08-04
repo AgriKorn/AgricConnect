@@ -21,6 +21,7 @@ describe('MarketplaceService', () => {
     pricePerKg: 15,
     listingHash: 'hash-1',
     qrCodeData: 'qr-1',
+    imageUrls: [],
     status: 'ACTIVE' as const,
     createdAt: new Date(),
     updatedAt: new Date(),

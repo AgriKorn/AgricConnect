@@ -69,6 +69,10 @@ dependencies:
   camera: ^0.12.0+2
   # Real profile photo upload (Edit Profile "Change Profile Photo")
   image_picker: ^1.1.2
+  # On-device crop freshness scan (ai/model/agriconnect.tflite) — see core/ai
+  tflite_flutter: ^0.12.1
+  # Decodes/resizes captured photos into the model's input tensor
+  image: ^4.9.1
 
 dev_dependencies:
   flutter_test:
@@ -99,6 +103,12 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/images/
+    - assets/models/
+    # Bundled so google_fonts never needs a network fetch (PRD 7.1: must
+    # work on patchy rural networks) — see lib/main.dart's
+    # allowRuntimeFetching = false. google_fonts finds these automatically
+    # by filename (Inter-<Weight>.ttf); no `fonts:` section needed.
+    - assets/fonts/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

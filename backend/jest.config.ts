@@ -14,6 +14,7 @@ const config: Config = {
     'src/modules/dispatch/dispatch.service.ts',
     'src/modules/dispute/dispute.service.ts',
     'src/modules/listing/listing.service.ts',
+    'src/modules/listing/freshnessMonitor.ts',
     'src/modules/marketplace/marketplace.service.ts',
     'src/modules/notification/notification.service.ts',
     'src/modules/pricing/freshnessDecay.ts',
@@ -23,6 +24,7 @@ const config: Config = {
     'src/modules/user/user.service.ts',
     'src/services/payment.service.ts',
     'src/workers/outbox.worker.ts',
+    'src/workers/freshness-monitor.worker.ts',
   ],
   coverageThreshold: {
     global: {

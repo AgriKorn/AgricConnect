@@ -52,6 +52,19 @@ export class NotificationRepository {
     }));
   }
 
+  /**
+   * Whether a notification of this type already exists for a listing. The
+   * freshness monitor uses it to alert a farmer only once per listing, rather
+   * than on every poll once the crossing condition holds.
+   */
+  async existsForListingAndType(listingId: string, type: string): Promise<boolean> {
+    const found = await prisma.notifications.findFirst({
+      where: { listing_id: listingId, type },
+      select: { id: true },
+    });
+    return found !== null;
+  }
+
   async markAsRead(id: string, userId: string): Promise<boolean> {
     const result = await prisma.notifications.updateMany({
       where: { id, user_id: userId },

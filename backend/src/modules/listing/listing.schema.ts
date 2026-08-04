@@ -38,6 +38,10 @@ export const createListingSchema = z.object({
     }).positive('Price per kg must be greater than 0'),
 
     imageUrl: z.string().url().optional(),
+    // SRS "Produce Upload": farmers may upload multiple images. Each is a
+    // presigned-uploaded S3 URL (obtained via POST /listings/photo-upload-url,
+    // one call per file). Capped at 6 to bound payload and storage.
+    imageUrls: z.array(z.string().url('Each image must be a valid URL')).max(6, 'A listing can have at most 6 images').optional(),
     description: z.string().max(2000, 'Description cannot exceed 2000 characters').optional(),
   }),
 });

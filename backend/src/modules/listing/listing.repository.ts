@@ -4,10 +4,12 @@ import { Listing } from './listing.types';
 // resolves to, never supplied by the caller. region is added (not part of the
 // public Listing shape) so the service layer can pass the farmer's real
 // region through for storage — the repository has no user lookup of its own.
-export type CreateListingRecord = Omit<Listing, 'id' | 'createdAt' | 'updatedAt' | 'cropCategory'> & {
+export type CreateListingRecord = Omit<Listing, 'id' | 'createdAt' | 'updatedAt' | 'cropCategory' | 'imageUrls'> & {
   region?: string;
   /** Real MOFA reference price for this crop/region, when one is on file — undefined when there isn't one yet. */
   mofaReferencePrice?: number;
+  /** Optional gallery. The repository derives the stored array and the cover from this and imageUrl. */
+  imageUrls?: string[];
 };
 export type UpdateListingRecord = Partial<Pick<Listing, 'pricePerKg' | 'quantityKg'>>;
 
@@ -27,6 +29,8 @@ export interface IListingRepository {
   create(data: CreateListingRecord): Promise<Listing>;
   findManyByFarmer(farmerId: string): Promise<Listing[]>;
   findActive(filters: ListingFilters): Promise<{ listings: Listing[]; total: number }>;
+  /** Every active listing, unpaginated — for the freshness monitor to sweep. */
+  findAllActive(): Promise<Listing[]>;
   findById(id: string): Promise<Listing | null>;
   update(id: string, data: UpdateListingRecord): Promise<Listing>;
   softDelete(id: string): Promise<Listing>;

@@ -11,10 +11,11 @@ import '../application/scan_controller.dart';
 /// Full-bleed live camera surface with a centered viewfinder (a plain black
 /// screen with a loading spinner on platforms/devices with no camera —
 /// desktop, simulators, or web without permission — never a stand-in photo).
-/// Tapping the shutter takes a real photo and simultaneously simulates
-/// detection + analysis: a loading-ellipsis skeleton pulses in the frame
-/// while [ScanController.captureAndAnalyze] runs (still mocked — no AI
-/// backend exists yet), then the app moves to the results screen.
+/// Tapping the shutter takes a real photo and runs it through the on-device
+/// `agriconnect.tflite` model: a loading-ellipsis skeleton pulses in the
+/// frame while [ScanController.captureAndAnalyze] runs inference, then the
+/// app moves to the results screen. Platforms with no camera fall back to
+/// cycling fixed sample results instead (see [ScanController]).
 class ScanCaptureScreen extends ConsumerStatefulWidget {
   const ScanCaptureScreen({super.key});
 
@@ -171,7 +172,7 @@ class _ScanCaptureScreenState extends ConsumerState<ScanCaptureScreen>
                         icon: Icons.close_rounded,
                         onPressed: () => context.canPop() ? context.pop() : context.go('/farmer/home'),
                       ),
-                      if (isScanning) _DetectedPill(label: detectedLabel),
+                      if (isScanning && !cameraReady) _DetectedPill(label: detectedLabel),
                       _GlassIconButton(
                         icon: scanState.isFlashOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
                         active: scanState.isFlashOn,
