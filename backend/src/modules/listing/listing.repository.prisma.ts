@@ -14,7 +14,12 @@ const mapPrismaToListing = (p: any): Listing => ({
   shelfLifeDays: p.estimated_viable_days,
   farmerLat: Number(p.gps_lat),
   farmerLong: Number(p.gps_lng),
+  region: p.region,
   pricePerKg: Number(p.listed_price),
+  mofaReferencePrice: Number(p.mofa_reference_price),
+  priceCeiling: Number(p.price_ceiling),
+  priceFloor: Number(p.price_floor),
+  belowFloorAcknowledged: p.below_floor_acknowledged,
   listingHash: p.listing_hash ? p.listing_hash.trim() : '',
   qrCodeData: p.qr_code_data || '',
   status: p.status === 'sold' ? 'SOLD' : p.status === 'active' ? 'ACTIVE' : 'INACTIVE',
@@ -39,14 +44,20 @@ export class PrismaListingRepository implements IListingRepository {
         farmer_id: data.farmerId,
         crop_type_id: crop.id,
         quantity_kg: new Prisma.Decimal(data.quantityKg),
-        region: 'Greater Accra',
+        region: data.region,
         gps_lat: new Prisma.Decimal(data.farmerLat),
         gps_lng: new Prisma.Decimal(data.farmerLong),
         freshness_score: new Prisma.Decimal(data.freshnessScore),
         estimated_viable_days: data.shelfLifeDays,
-        mofa_reference_price: new Prisma.Decimal(data.pricePerKg),
-        price_ceiling: new Prisma.Decimal(data.pricePerKg * 1.2),
-        price_floor: new Prisma.Decimal(data.pricePerKg * 0.8),
+        // mofa_reference_price/price_ceiling/price_floor come from
+        // ListingService.createListing's real PricingService lookup — do not
+        // re-derive these from listed_price here, that was the original bug
+        // (a listing's own price validating itself against a range built
+        // from that same price).
+        mofa_reference_price: new Prisma.Decimal(data.mofaReferencePrice),
+        price_ceiling: new Prisma.Decimal(data.priceCeiling),
+        price_floor: new Prisma.Decimal(data.priceFloor),
+        below_floor_acknowledged: data.belowFloorAcknowledged,
         listed_price: new Prisma.Decimal(data.pricePerKg),
         listing_hash: data.listingHash,
         qr_code_data: data.qrCodeData,

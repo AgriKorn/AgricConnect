@@ -1,12 +1,17 @@
 import crypto from 'crypto';
 import QRCode from 'qrcode';
-import { ForbiddenError, NotFoundError } from '../../utils/errors';
+import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/errors';
 import { auditService } from '../audit/audit.service';
 import logger from '../../utils/logger';
 import { CreateListingInput, UpdateListingInput } from './listing.schema';
 import { IListingRepository } from './listing.repository';
 import { listingRepository } from './listing.repository.prisma';
 import { Listing } from './listing.types';
+import { pricingService, PricingService } from '../pricing/pricing.service';
+import { userRepository } from '../user/user.repository.prisma';
+import { IUserRepository } from '../user/user.repository';
+
+const DEFAULT_REGION = 'Greater Accra';
 
 /**
  * Generates the listing's SHA-256 fingerprint and its QR code representation.
@@ -58,21 +63,72 @@ const auditNonFatal = async (operation: string, entityId: string, run: () => Pro
 };
 
 export class ListingService {
-  constructor(private readonly repo: IListingRepository) {}
+  constructor(
+    private readonly repo: IListingRepository,
+    private readonly users: Pick<IUserRepository, 'findById'> = userRepository,
+    private readonly pricing: Pick<PricingService, 'recommend'> = pricingService,
+  ) {}
 
+  /**
+   * Creates a listing after checking the farmer's chosen pricePerKg against a
+   * MOFA-anchored range for their crop, region, and freshness score.
+   *
+   * Enforcement is asymmetric by design:
+   *  - Above the ceiling: hard-rejected (BadRequestError) — protects buyers
+   *    from price-gouging, matching the SRS's "AI-generated price
+   *    recommendations" intent.
+   *  - Below the floor: allowed — a farmer may have a legitimate reason to
+   *    undercut (urgent sale, local glut) — but belowFloorAcknowledged is
+   *    set so this is visible downstream (admin dashboards, disputes)
+   *    rather than silently indistinguishable from a normal listing.
+   *
+   * Previously this method never consulted MOFA prices at all: the farmer's
+   * own pricePerKg was echoed back as a fake "mofaReferencePrice", and
+   * ceiling/floor were derived as +-20% of that same number — meaning the
+   * "range" had no relationship to real market data. This also always used
+   * a hardcoded 'Greater Accra' region regardless of where the farmer
+   * actually farms; that is now read from their profile.
+   */
   async createListing(data: CreateListingInput, farmerId: string): Promise<Listing> {
+    const farmer = await this.users.findById(farmerId);
+    const region = farmer?.profile.farmRegion || DEFAULT_REGION;
+
+    const recommendation = await this.pricing.recommend({
+      crop: data.cropType,
+      region,
+      freshness: data.freshnessScore,
+      shelfLifeDays: data.shelfLifeDays,
+    });
+
+    if (data.pricePerKg > recommendation.ceiling) {
+      throw new BadRequestError(
+        `Price per kg (GHS ${data.pricePerKg.toFixed(2)}) exceeds the recommended ceiling of GHS ${recommendation.ceiling.toFixed(2)} for ${data.cropType} in ${region}`,
+      );
+    }
+    const belowFloorAcknowledged = data.pricePerKg < recommendation.softFloor;
+
     const { listingHash, qrCodeData } = await generateListingProof(farmerId, data);
 
     const listing = await this.repo.create({
       farmerId,
       ...data,
+      region,
+      mofaReferencePrice: recommendation.mofaPrice,
+      priceCeiling: recommendation.ceiling,
+      priceFloor: recommendation.softFloor,
+      belowFloorAcknowledged,
       listingHash,
       qrCodeData,
       status: 'ACTIVE',
     });
 
     await auditNonFatal('LISTING_CREATED', listing.id, () =>
-      auditService.log('LISTING_CREATED', listing.id, { cropType: data.cropType, quantityKg: data.quantityKg, pricePerKg: data.pricePerKg }, farmerId),
+      auditService.log(
+        'LISTING_CREATED',
+        listing.id,
+        { cropType: data.cropType, quantityKg: data.quantityKg, pricePerKg: data.pricePerKg, belowFloorAcknowledged },
+        farmerId,
+      ),
     );
 
     return listing;
