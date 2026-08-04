@@ -29,6 +29,13 @@ class HelpResourceLink {
   final String label;
 }
 
+class HelpFaqItem {
+  const HelpFaqItem({required this.question, required this.answer});
+
+  final String question;
+  final String answer;
+}
+
 /// Shared Help & Support screen: one implementation reused by every role's
 /// Profile tab, parameterized with role-specific copy so a farmer, driver,
 /// and buyer each see help content relevant to what they actually do in the
@@ -48,7 +55,7 @@ class HelpSupportScreen extends StatefulWidget {
   final String roleLabel;
   final String heroSubtitle;
   final List<HelpContactMethod> contactMethods;
-  final List<String> faqItems;
+  final List<HelpFaqItem> faqItems;
   final List<HelpResourceLink> resourceLinks;
   final VoidCallback? onNotificationsTap;
 
@@ -71,7 +78,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
     final query = _searchController.text.trim().toLowerCase();
     final faqItems = query.isEmpty
         ? widget.faqItems
-        : widget.faqItems.where((q) => q.toLowerCase().contains(query)).toList();
+        : widget.faqItems.where((f) => f.question.toLowerCase().contains(query) || f.answer.toLowerCase().contains(query)).toList();
 
     return Scaffold(
       body: ColoredBox(
@@ -181,9 +188,8 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                     for (var i = 0; i < faqItems.length; i++)
                       _FaqRow(
                         colorScheme: colorScheme,
-                        question: faqItems[i],
+                        item: faqItems[i],
                         isLast: i == faqItems.length - 1,
-                        onTap: () => _openComingSoon(context, faqItems[i], Icons.quiz_outlined),
                       ),
                   ],
                 ),
@@ -353,33 +359,70 @@ class _ContactRow extends StatelessWidget {
   }
 }
 
-class _FaqRow extends StatelessWidget {
-  const _FaqRow({required this.colorScheme, required this.question, required this.onTap, this.isLast = false});
+/// Expands in place to reveal [HelpFaqItem.answer] instead of navigating to
+/// a separate screen — most farmers/drivers/buyers just want the answer,
+/// not another page to back out of.
+class _FaqRow extends StatefulWidget {
+  const _FaqRow({required this.colorScheme, required this.item, this.isLast = false});
 
   final ColorScheme colorScheme;
-  final String question;
-  final VoidCallback onTap;
+  final HelpFaqItem item;
   final bool isLast;
 
   @override
+  State<_FaqRow> createState() => _FaqRowState();
+}
+
+class _FaqRowState extends State<_FaqRow> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        decoration: BoxDecoration(
-          border: isLast ? null : Border(bottom: BorderSide(color: colorScheme.outline.withValues(alpha: 0.15))),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.help_outline_rounded, color: colorScheme.onSurfaceVariant, size: 19),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(question, style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w600, fontSize: 14.5)),
+    final colorScheme = widget.colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        border: widget.isLast ? null : Border(bottom: BorderSide(color: colorScheme.outline.withValues(alpha: 0.15))),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Row(
+                children: [
+                  Icon(Icons.help_outline_rounded, color: colorScheme.onSurfaceVariant, size: 19),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Text(
+                      widget.item.question,
+                      style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w600, fontSize: 14.5),
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: _expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: Icon(Icons.keyboard_arrow_down_rounded, color: colorScheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
             ),
-            Icon(Icons.chevron_right_rounded, color: colorScheme.onSurfaceVariant),
-          ],
-        ),
+          ),
+          AnimatedCrossFade(
+            firstChild: const SizedBox(width: double.infinity),
+            secondChild: Padding(
+              padding: const EdgeInsets.fromLTRB(49, 0, 16, 16),
+              child: Text(
+                widget.item.answer,
+                style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13.5, height: 1.45),
+              ),
+            ),
+            crossFadeState: _expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 200),
+            sizeCurve: Curves.easeInOut,
+          ),
+        ],
       ),
     );
   }

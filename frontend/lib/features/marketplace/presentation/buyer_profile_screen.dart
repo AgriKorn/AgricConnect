@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/theme_mode_controller.dart';
 import '../../../core/widgets/account_settings_screen.dart';
+import '../../../core/widgets/agri_bottom_sheet.dart';
 import '../../../core/widgets/agri_dialog.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/edit_profile_screen.dart';
+import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/help_support_screen.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../auth/application/auth_controller.dart';
@@ -22,6 +24,17 @@ void _openComingSoon(BuildContext context, String title, IconData icon) {
         message: '$title will be available in a future update.',
       ),
     ),
+  );
+}
+
+/// Same "coming soon" placeholder content as [_openComingSoon], but as an
+/// in-place bottom sheet instead of a full screen — used for the Delivery
+/// Addresses card, which shouldn't navigate away from Profile just to view
+/// or add an address.
+void _openComingSoonSheet(BuildContext context, String title, IconData icon) {
+  showAgriBottomSheet(
+    context,
+    builder: (context) => EmptyState(icon: icon, message: '$title will be available in a future update.'),
   );
 }
 
@@ -76,10 +89,24 @@ void _openBuyerHelp(BuildContext context) {
           HelpContactMethod(icon: Icons.email_outlined, label: 'Email Us', detail: 'support@agriconnect.com'),
         ],
         faqItems: const [
-          'How does escrow protect my payment?',
-          'How do I track my order?',
-          'What if my produce arrives damaged?',
-          'How do I add a new delivery address?',
+          HelpFaqItem(
+            question: 'How does escrow protect my payment?',
+            answer:
+                'Your payment is held securely until you confirm the order has arrived as described. Funds are only released to the seller after your confirmation, protecting you from non-delivery or damaged goods.',
+          ),
+          HelpFaqItem(
+            question: 'How do I track my order?',
+            answer: 'Open Orders from your profile and tap any active order to see its live status, from confirmation through dispatch to delivery.',
+          ),
+          HelpFaqItem(
+            question: 'What if my produce arrives damaged?',
+            answer:
+                "Report it within 24 hours of delivery from the order details screen. Our support team will review your claim and issue a refund or replacement per our Refund Policy.",
+          ),
+          HelpFaqItem(
+            question: 'How do I add a new delivery address?',
+            answer: 'Go to your Profile, select Delivery Addresses, and tap Add New Address. You can save multiple addresses and choose one at checkout.',
+          ),
         ],
         resourceLinks: const [
           HelpResourceLink(icon: Icons.description_outlined, label: 'Terms of Service'),
@@ -132,7 +159,7 @@ class BuyerProfileScreen extends ConsumerWidget {
                           ),
                         ),
                         GestureDetector(
-                          onTap: () => _openComingSoon(context, 'Add Address', Icons.add_location_alt_outlined),
+                          onTap: () => _openComingSoonSheet(context, 'Add Address', Icons.add_location_alt_outlined),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -156,7 +183,7 @@ class BuyerProfileScreen extends ConsumerWidget {
                             colorScheme: colorScheme,
                             address: addresses[i],
                             isLast: i == addresses.length - 1,
-                            onTap: () => _openComingSoon(context, addresses[i].label, addresses[i].type.icon),
+                            onTap: () => _openComingSoonSheet(context, addresses[i].label, addresses[i].type.icon),
                           ),
                       ],
                     ),

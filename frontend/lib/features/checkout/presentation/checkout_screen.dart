@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/utils/currency.dart';
 import '../../../core/utils/freshness.dart';
+import '../../../core/widgets/agri_dialog.dart';
 import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/ambient_background.dart';
+import '../../marketplace/application/marketplace_providers.dart';
 import '../../marketplace/data/marketplace_mock.dart';
 import '../application/checkout_providers.dart';
 import '../data/checkout_mock.dart';
@@ -38,6 +40,19 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       final next = (_quantities[listingId] ?? widget.quantity) + delta;
       _quantities[listingId] = next.clamp(1, 999);
     });
+  }
+
+  Future<void> _clearCart() async {
+    final confirmed = await showAgriDialog(
+      context,
+      title: 'Clear Cart?',
+      message: 'This will remove all items from your cart.',
+      confirmLabel: 'Clear Cart',
+      destructive: true,
+    );
+    if (confirmed != true || !mounted) return;
+    ref.read(selectedMarketplaceListingsProvider.notifier).state = {};
+    Navigator.of(context).pop();
   }
 
   @override
@@ -96,6 +111,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                         listings: listings,
                         quantities: _quantities,
                         onAdjustQuantity: _adjustQuantity,
+                        onClearCart: _clearCart,
                         subtotal: subtotal,
                         total: total,
                       ),
@@ -151,6 +167,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   colorScheme: colorScheme,
                   total: total,
                   onPay: () {
+                    ref.read(selectedMarketplaceListingsProvider.notifier).state = {};
                     showAgriToast(context, 'Payment confirmed — funds are held in escrow until delivery.');
                     Navigator.of(context).pop();
                   },
@@ -211,6 +228,7 @@ class _OrderSummaryCard extends StatelessWidget {
     required this.listings,
     required this.quantities,
     required this.onAdjustQuantity,
+    required this.onClearCart,
     required this.subtotal,
     required this.total,
   });
@@ -219,6 +237,7 @@ class _OrderSummaryCard extends StatelessWidget {
   final List<MarketplaceListing> listings;
   final Map<String, double> quantities;
   final void Function(String listingId, double delta) onAdjustQuantity;
+  final VoidCallback onClearCart;
   final double subtotal;
   final double total;
 
@@ -234,9 +253,29 @@ class _OrderSummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Order Summary',
-            style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w800, fontSize: 17),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Order Summary',
+                  style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w800, fontSize: 17),
+                ),
+              ),
+              GestureDetector(
+                onTap: onClearCart,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.delete_outline_rounded, size: 15, color: colorScheme.error),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Clear Cart',
+                      style: TextStyle(color: colorScheme.error, fontWeight: FontWeight.w700, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 14),
           Divider(color: colorScheme.outline.withValues(alpha: 0.2), height: 1),

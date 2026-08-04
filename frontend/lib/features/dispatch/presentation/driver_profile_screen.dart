@@ -34,10 +34,24 @@ void _openDriverHelp(BuildContext context) {
           HelpContactMethod(icon: Icons.email_outlined, label: 'Email Us', detail: 'support@agriconnect.com'),
         ],
         faqItems: const [
-          'How do I accept or decline a job?',
-          "What happens if I'm delayed on a delivery?",
-          'How is my payout calculated?',
-          'How do I update my vehicle details?',
+          HelpFaqItem(
+            question: 'How do I accept or decline a job?',
+            answer:
+                'New job requests appear as a pop-up with pickup and drop-off details. Tap Accept to claim it or Decline to pass it to the next available driver — you have a short window to respond before it\'s reassigned.',
+          ),
+          HelpFaqItem(
+            question: "What happens if I'm delayed on a delivery?",
+            answer:
+                'Update your status in the app as soon as you know you\'ll be late so the buyer and dispatch are notified automatically. Significant delays should also be reported to Dispatch Support.',
+          ),
+          HelpFaqItem(
+            question: 'How is my payout calculated?',
+            answer: 'Payouts are based on distance, delivery time, and any applicable bonuses, calculated automatically per completed job and added to your weekly settlement.',
+          ),
+          HelpFaqItem(
+            question: 'How do I update my vehicle details?',
+            answer: 'Go to your Profile, select Vehicle Information, and edit your vehicle type, plate number, or capacity. Changes are reviewed before they take effect.',
+          ),
         ],
         resourceLinks: const [
           HelpResourceLink(icon: Icons.description_outlined, label: 'Terms of Service'),

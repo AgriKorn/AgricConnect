@@ -119,7 +119,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Sign up as Farmer'), findsOneWidget);
-    expect(find.text('Region / District'), findsOneWidget);
+    expect(find.text('Region'), findsOneWidget);
+    expect(find.text('Town / City'), findsOneWidget);
   });
 
   testWidgets('Persisted session restores the farmer home shell', (
