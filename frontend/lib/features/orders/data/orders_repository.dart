@@ -48,6 +48,19 @@ class PurchaseResult {
   final String authorizationUrl;
 }
 
+/// A real backend error response is always `{"error": {"message": "..."}}`,
+/// but a Dio error can also surface a gateway/proxy failure (a 502/504 HTML
+/// error page, or a plain-text body) instead — indexing into that with
+/// `['error']` throws rather than returning null, so the `is Map` check has
+/// to come first.
+String? _extractDioErrorMessage(DioException e) {
+  final data = e.response?.data;
+  if (data is Map) {
+    return data['error']?['message']?.toString();
+  }
+  return null;
+}
+
 abstract class OrdersRepository {
   Future<PurchaseResult> purchaseListing({
     required String listingId,
@@ -93,8 +106,7 @@ class HttpOrdersRepository implements OrdersRepository {
         authorizationUrl: data['authorizationUrl']?.toString() ?? '',
       );
     } on DioException catch (e) {
-      final serverMessage = e.response?.data?['error']?['message']?.toString();
-      throw ApiException(serverMessage ?? e.message ?? 'Failed to complete purchase.');
+      throw ApiException(_extractDioErrorMessage(e) ?? e.message ?? 'Failed to complete purchase.');
     }
   }
 
@@ -122,12 +134,7 @@ class HttpOrdersRepository implements OrdersRepository {
       // from "genuinely no orders yet" — both the buyer's Orders screen and
       // the farmer's My Sales screen already have a real error state built
       // for ordersAsync, it just never fired.
-      String? serverMessage;
-      final responseData = e.response?.data;
-      if (responseData is Map) {
-        serverMessage = responseData['error']?['message']?.toString();
-      }
-      throw ApiException(serverMessage ?? e.message ?? 'Failed to load orders.');
+      throw ApiException(_extractDioErrorMessage(e) ?? e.message ?? 'Failed to load orders.');
     }
   }
 
@@ -136,8 +143,7 @@ class HttpOrdersRepository implements OrdersRepository {
     try {
       await _dio.post('${ApiEndpoints.transactions}/$transactionId/confirm-delivery', data: {'qrHash': qrHash});
     } on DioException catch (e) {
-      final serverMessage = e.response?.data?['error']?['message']?.toString();
-      throw ApiException(serverMessage ?? e.message ?? 'Failed to confirm delivery.');
+      throw ApiException(_extractDioErrorMessage(e) ?? e.message ?? 'Failed to confirm delivery.');
     }
   }
 
@@ -154,8 +160,7 @@ class HttpOrdersRepository implements OrdersRepository {
         'description': description,
       });
     } on DioException catch (e) {
-      final serverMessage = e.response?.data?['error']?['message']?.toString();
-      throw ApiException(serverMessage ?? e.message ?? 'Failed to submit dispute.');
+      throw ApiException(_extractDioErrorMessage(e) ?? e.message ?? 'Failed to submit dispute.');
     }
   }
 }
