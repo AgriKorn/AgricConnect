@@ -30,8 +30,8 @@ void _openDriverHelp(BuildContext context) {
             'Our AI assistant and support team are ready to assist you with your delivery and logistics needs.',
         contactMethods: const [
           HelpContactMethod(icon: Icons.chat_bubble_outline_rounded, label: 'Live Chat', detail: 'Chat with our support team'),
-          HelpContactMethod(icon: Icons.call_rounded, label: 'Call Dispatch Support', detail: '+233 30 123 4567'),
-          HelpContactMethod(icon: Icons.email_outlined, label: 'Email Us', detail: 'support@agriconnect.com'),
+          HelpContactMethod(icon: Icons.call_rounded, label: 'Call Dispatch Support', detail: '0597741107'),
+          HelpContactMethod(icon: Icons.email_outlined, label: 'Email Us', detail: 'addosakah@gmail.com'),
         ],
         faqItems: const [
           HelpFaqItem(

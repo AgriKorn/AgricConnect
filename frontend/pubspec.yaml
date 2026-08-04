@@ -59,6 +59,8 @@ dependencies:
   tflite_flutter: ^0.12.1
   # Decodes/resizes captured photos into the model's input tensor
   image: ^4.9.1
+  # Launches tel:/mailto: from Help & Support contact rows
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'coming_soon_screen.dart';
 
@@ -12,6 +13,34 @@ void _openComingSoon(BuildContext context, String title, IconData icon) {
       ),
     ),
   );
+}
+
+/// Call and email rows open the device dialer/mail app directly; every
+/// other contact method (e.g. Live Chat) still falls back to Coming Soon.
+Future<void> _handleContactTap(BuildContext context, HelpContactMethod method) async {
+  final Uri? uri = switch (method.icon) {
+    Icons.call_rounded => Uri(scheme: 'tel', path: method.detail.replaceAll(RegExp(r'\s+'), '')),
+    Icons.email_outlined => Uri(scheme: 'mailto', path: method.detail),
+    _ => null,
+  };
+
+  if (uri == null) {
+    _openComingSoon(context, method.label, method.icon);
+    return;
+  }
+
+  var launched = false;
+  try {
+    launched = await launchUrl(uri);
+  } catch (_) {
+    launched = false;
+  }
+
+  if (!launched && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Could not open ${method.label.toLowerCase()}.')),
+    );
+  }
 }
 
 class HelpContactMethod {
@@ -148,7 +177,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
                       colorScheme: colorScheme,
                       method: widget.contactMethods[i],
                       isLast: i == widget.contactMethods.length - 1,
-                      onTap: () => _openComingSoon(context, widget.contactMethods[i].label, widget.contactMethods[i].icon),
+                      onTap: () => _handleContactTap(context, widget.contactMethods[i]),
                     ),
                 ],
               ),
