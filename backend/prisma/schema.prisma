@@ -19,7 +19,9 @@ model User {
   approved_by                          String?                 @db.Uuid
   approved_at                          DateTime?               @db.Timestamptz(6)
   fcm_token                            String?                 @db.VarChar(255)
-  momo_number                          String?                 @db.VarChar(20)
+  // Widened from VarChar(20): stores the AES-256-GCM envelope (enc:v1:iv:tag:
+  // ciphertext, ~90 chars), not the raw ~13-digit number. See utils/encryption.
+  momo_number                          String?                 @db.VarChar(255)
   momo_network                         String?                 @db.VarChar(20)
   business_name                        String?                 @db.VarChar(150)
   business_type                        String?                 @db.VarChar(100)
