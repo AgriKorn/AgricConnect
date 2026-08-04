@@ -33,6 +33,10 @@ export class InMemoryListingRepository implements IListingRepository {
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
+  async findAllActive(): Promise<Listing[]> {
+    return [...this.listings.values()].filter((listing) => listing.status === 'ACTIVE');
+  }
+
   async findActive(filters: ListingFilters): Promise<{ listings: Listing[]; total: number }> {
     let results = [...this.listings.values()].filter((listing) => listing.status === 'ACTIVE');
 

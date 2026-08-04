@@ -27,6 +27,8 @@ export interface IListingRepository {
   create(data: CreateListingRecord): Promise<Listing>;
   findManyByFarmer(farmerId: string): Promise<Listing[]>;
   findActive(filters: ListingFilters): Promise<{ listings: Listing[]; total: number }>;
+  /** Every active listing, unpaginated — for the freshness monitor to sweep. */
+  findAllActive(): Promise<Listing[]>;
   findById(id: string): Promise<Listing | null>;
   update(id: string, data: UpdateListingRecord): Promise<Listing>;
   softDelete(id: string): Promise<Listing>;

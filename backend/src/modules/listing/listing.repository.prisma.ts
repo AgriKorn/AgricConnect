@@ -131,6 +131,14 @@ export class PrismaListingRepository implements IListingRepository {
     return { listings: list.map(mapPrismaToListing), total };
   }
 
+  async findAllActive(): Promise<Listing[]> {
+    const list = await prisma.produce_listings.findMany({
+      where: { status: 'active' },
+      include: { crop_types: true },
+    });
+    return list.map(mapPrismaToListing);
+  }
+
   async findById(id: string): Promise<Listing | null> {
     const found = await prisma.produce_listings.findUnique({
       where: { id },
