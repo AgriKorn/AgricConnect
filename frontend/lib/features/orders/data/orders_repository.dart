@@ -119,8 +119,11 @@ class HttpOrdersRepository implements OrdersRepository {
       // from "genuinely no orders yet" — both the buyer's Orders screen and
       // the farmer's My Sales screen already have a real error state built
       // for ordersAsync, it just never fired.
+      String? serverMessage;
       final responseData = e.response?.data;
-      final serverMessage = responseData is Map ? responseData['error']?['message']?.toString() : null;
+      if (responseData is Map) {
+        serverMessage = responseData['error']?['message']?.toString();
+      }
       throw ApiException(serverMessage ?? e.message ?? 'Failed to load orders.');
     }
   }
