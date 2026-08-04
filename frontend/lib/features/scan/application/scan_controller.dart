@@ -132,7 +132,7 @@ class ScanController extends Notifier<ScanState> {
     try {
       final model = await _model();
       final bytes = await File(imagePath).readAsBytes();
-      final prediction = model.predict(bytes);
+      final prediction = await model.predict(bytes);
       return buildScanRecord(
         prediction,
         id: 'scan-${DateTime.now().millisecondsSinceEpoch}',
