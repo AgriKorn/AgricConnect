@@ -401,7 +401,7 @@ class _ActionRow extends StatelessWidget {
             Expanded(
               child: Text(label, style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 15)),
             ),
-            Icon(Icons.add_rounded, color: colorScheme.onSurfaceVariant, size: 20),
+            Icon(Icons.chevron_right_rounded, color: colorScheme.onSurfaceVariant, size: 20),
           ],
         ),
       ),

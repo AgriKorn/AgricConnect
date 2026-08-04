@@ -114,8 +114,14 @@ class HttpOrdersRepository implements OrdersRepository {
         driverName: item['driverName']?.toString(),
         driverPhone: item['driverPhone']?.toString(),
       )).toList();
-    } on DioException {
-      return const [];
+    } on DioException catch (e) {
+      // Swallowing this to `[]` used to make a failed fetch indistinguishable
+      // from "genuinely no orders yet" — both the buyer's Orders screen and
+      // the farmer's My Sales screen already have a real error state built
+      // for ordersAsync, it just never fired.
+      final responseData = e.response?.data;
+      final serverMessage = responseData is Map ? responseData['error']?['message']?.toString() : null;
+      throw ApiException(serverMessage ?? e.message ?? 'Failed to load orders.');
     }
   }
 

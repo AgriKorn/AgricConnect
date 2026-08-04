@@ -8,6 +8,7 @@ class FarmerListingSummary {
     required this.freshnessScore,
     required this.price,
     required this.unit,
+    required this.quantityKg,
     required this.status,
     this.qrCodeData,
     this.imageAsset,
@@ -19,6 +20,7 @@ class FarmerListingSummary {
   final int freshnessScore;
   final double price;
   final String unit;
+  final double quantityKg;
   final String status; // Active | Pending | Sold
   final String? qrCodeData; // data:image/png;base64,... shown to buyers/drivers at delivery
   final String? imageAsset; // bundled asset — unused by real listings, kept for any future seed/demo data

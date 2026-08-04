@@ -41,6 +41,12 @@ export class PrismaListingRepository implements IListingRepository {
       });
     }
 
+    // Anchor the ceiling/floor to a real government reference price when one
+    // exists for this crop and region — without it there's no real market
+    // data to compare against, so fall back to a plain band around the
+    // farmer's own price rather than mislabeling that as a MOFA reference.
+    const referencePrice = data.mofaReferencePrice ?? data.pricePerKg;
+
     const created = await prisma.produce_listings.create({
       data: {
         farmer_id: data.farmerId,
@@ -51,9 +57,9 @@ export class PrismaListingRepository implements IListingRepository {
         gps_lng: new Prisma.Decimal(data.farmerLong),
         freshness_score: new Prisma.Decimal(data.freshnessScore),
         estimated_viable_days: data.shelfLifeDays,
-        mofa_reference_price: new Prisma.Decimal(data.pricePerKg),
-        price_ceiling: new Prisma.Decimal(data.pricePerKg * 1.2),
-        price_floor: new Prisma.Decimal(data.pricePerKg * 0.8),
+        mofa_reference_price: new Prisma.Decimal(referencePrice),
+        price_ceiling: new Prisma.Decimal(referencePrice * 1.2),
+        price_floor: new Prisma.Decimal(referencePrice * 0.8),
         listed_price: new Prisma.Decimal(data.pricePerKg),
         listing_hash: data.listingHash,
         qr_code_data: data.qrCodeData,

@@ -3,7 +3,8 @@ import { PrismaListingRepository } from './listing.repository.prisma';
 import { mofaPriceRepository } from '../pricing/pricing.repository.prisma';
 import { auditService } from '../audit/audit.service';
 import { userRepository } from '../user/user.repository.prisma';
-import { ForbiddenError, PayoutNotConfiguredError } from '../../utils/errors';
+import { transactionRepository } from '../transaction/transaction.repository.prisma';
+import { ConflictError, ForbiddenError, PayoutNotConfiguredError } from '../../utils/errors';
 
 describe('ListingService', () => {
   let listingService: ListingService;
@@ -117,6 +118,7 @@ describe('ListingService', () => {
         id: '00000000-0000-0000-0000-000000000001',
         farmerId,
       } as any);
+      jest.spyOn(transactionRepository, 'findActiveByListingId').mockResolvedValue(null);
 
       const deletedListing = { id: '00000000-0000-0000-0000-000000000001', farmerId, status: 'INACTIVE' as const } as any;
       mockRepo.softDelete.mockResolvedValue(deletedListing);
@@ -125,6 +127,18 @@ describe('ListingService', () => {
 
       expect(mockRepo.softDelete).toHaveBeenCalledWith('00000000-0000-0000-0000-000000000001');
       expect(result).toEqual(deletedListing);
+    });
+
+    it('should refuse to delete a listing that has an active order in escrow', async () => {
+      const farmerId = 'owner-farmer-id';
+      mockRepo.findById.mockResolvedValue({
+        id: '00000000-0000-0000-0000-000000000001',
+        farmerId,
+      } as any);
+      jest.spyOn(transactionRepository, 'findActiveByListingId').mockResolvedValue({ id: 'order-1' } as any);
+
+      await expect(listingService.deleteListing('00000000-0000-0000-0000-000000000001', farmerId)).rejects.toThrow(ConflictError);
+      expect(mockRepo.softDelete).not.toHaveBeenCalled();
     });
   });
 });

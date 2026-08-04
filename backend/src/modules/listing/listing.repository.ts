@@ -6,6 +6,8 @@ import { Listing } from './listing.types';
 // region through for storage — the repository has no user lookup of its own.
 export type CreateListingRecord = Omit<Listing, 'id' | 'createdAt' | 'updatedAt' | 'cropCategory'> & {
   region?: string;
+  /** Real MOFA reference price for this crop/region, when one is on file — undefined when there isn't one yet. */
+  mofaReferencePrice?: number;
 };
 export type UpdateListingRecord = Partial<Pick<Listing, 'pricePerKg' | 'quantityKg'>>;
 

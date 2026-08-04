@@ -53,6 +53,23 @@ abstract class MarketplaceRepository {
 
   /// Soft-deletes the listing — DELETE /listings/:id.
   Future<void> deleteListing(String id);
+
+  /// PATCH /listings/:id — only price and quantity are editable after a
+  /// listing is created; pass only the field(s) actually changing.
+  Future<FarmerListingSummary> updateListing(String id, {double? pricePerKg, double? quantityKg});
+}
+
+/// Our own API always errors with an {"error":{"message":...}} JSON body, but
+/// a request that never reached it (a presigned S3 PUT, a proxy/gateway
+/// error page) can come back as XML or plain text instead — indexing into
+/// that with ['error'] throws rather than returning null, so the `is Map`
+/// check has to come first.
+String? _extractDioErrorMessage(DioException e) {
+  final data = e.response?.data;
+  if (data is Map) {
+    return data['error']?['message']?.toString();
+  }
+  return null;
 }
 
 class HttpMarketplaceRepository implements MarketplaceRepository {
@@ -68,8 +85,7 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
       final rawList = data?['listings'] as List? ?? [];
       return rawList.map((item) => _parseListing(item)).toList();
     } on DioException catch (e) {
-      final serverMessage = e.response?.data?['error']?['message']?.toString();
-      throw ApiException(serverMessage ?? e.message ?? 'Failed to load the marketplace.');
+      throw ApiException(_extractDioErrorMessage(e) ?? 'Failed to load the marketplace.');
     }
   }
 
@@ -80,8 +96,7 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
       final item = response.data['data'] ?? response.data;
       return _parseListingDetail(item);
     } on DioException catch (e) {
-      final serverMessage = e.response?.data?['error']?['message']?.toString();
-      throw ApiException(serverMessage ?? e.message ?? 'Failed to load this listing.');
+      throw ApiException(_extractDioErrorMessage(e) ?? 'Failed to load this listing.');
     }
   }
 
@@ -126,8 +141,7 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
       final item = response.data['data'] ?? response.data;
       return _parseFarmerListing(item);
     } on DioException catch (e) {
-      final serverMessage = e.response?.data?['error']?['message']?.toString();
-      throw ApiException(serverMessage ?? e.message ?? 'Failed to create listing.');
+      throw ApiException(_extractDioErrorMessage(e) ?? 'Failed to create listing.');
     }
   }
 
@@ -157,8 +171,10 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
 
       return publicUrl;
     } on DioException catch (e) {
-      final serverMessage = e.response?.data?['error']?['message']?.toString();
-      throw ApiException(serverMessage ?? e.message ?? 'Failed to upload photo.');
+      // The upload PUT goes straight to S3, not our own API — a failure there
+      // (e.g. AccessDenied) comes back as XML, not our {error:{message}} JSON
+      // shape, which is exactly what _extractDioErrorMessage guards against.
+      throw ApiException(_extractDioErrorMessage(e) ?? e.message ?? 'Failed to upload photo.');
     }
   }
 
@@ -167,8 +183,24 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
     try {
       await _dio.delete('${ApiEndpoints.listings}/$id');
     } on DioException catch (e) {
-      final serverMessage = e.response?.data?['error']?['message']?.toString();
-      throw ApiException(serverMessage ?? e.message ?? 'Failed to delete listing.');
+      throw ApiException(_extractDioErrorMessage(e) ?? 'Failed to delete listing.');
+    }
+  }
+
+  @override
+  Future<FarmerListingSummary> updateListing(String id, {double? pricePerKg, double? quantityKg}) async {
+    try {
+      final response = await _dio.patch(
+        '${ApiEndpoints.listings}/$id',
+        data: {
+          if (pricePerKg != null) 'pricePerKg': pricePerKg,
+          if (quantityKg != null) 'quantityKg': quantityKg,
+        },
+      );
+      final item = response.data['data'] ?? response.data;
+      return _parseFarmerListing(item);
+    } on DioException catch (e) {
+      throw ApiException(_extractDioErrorMessage(e) ?? 'Failed to update listing.');
     }
   }
 
@@ -181,6 +213,7 @@ class HttpMarketplaceRepository implements MarketplaceRepository {
       freshnessScore: double.tryParse(json['freshnessScore']?.toString() ?? '')?.round() ?? 0,
       price: double.tryParse(json['pricePerKg']?.toString() ?? '') ?? 0,
       unit: 'kg',
+      quantityKg: double.tryParse(json['quantityKg']?.toString() ?? '') ?? 0,
       status: switch (statusStr) {
         'SOLD' => 'Sold',
         'INACTIVE' => 'Pending',

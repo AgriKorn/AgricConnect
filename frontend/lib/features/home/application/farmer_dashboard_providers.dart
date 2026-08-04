@@ -62,6 +62,15 @@ class FarmerListingsController extends AsyncNotifier<List<FarmerListingSummary>>
     ref.invalidateSelf();
     await future;
   }
+
+  /// Price and quantity are the only fields the backend allows editing after
+  /// a listing is created (PATCH /listings/:id) — crop, freshness, and shelf
+  /// life are fixed at creation time.
+  Future<void> updateListing(String id, {double? pricePerKg, double? quantityKg}) async {
+    await ref.read(marketplaceRepositoryProvider).updateListing(id, pricePerKg: pricePerKg, quantityKg: quantityKg);
+    ref.invalidateSelf();
+    await future;
+  }
 }
 
 final farmerListingsProvider = AsyncNotifierProvider<FarmerListingsController, List<FarmerListingSummary>>(
