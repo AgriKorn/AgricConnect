@@ -57,6 +57,8 @@ class ScanResultScreen extends ConsumerWidget {
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
                     children: [
+                      _CropHeader(colorScheme: colorScheme, result: result),
+                      const SizedBox(height: 14),
                       _FreshnessCard(colorScheme: colorScheme, result: result, tint: tint),
                       const SizedBox(height: 18),
                       _PriceCard(colorScheme: colorScheme, result: result),
@@ -204,6 +206,68 @@ class _CircleIconButton extends StatelessWidget {
         padding: EdgeInsets.zero,
         icon: Icon(icon, size: iconSize, color: colorScheme.onSurface),
         onPressed: onPressed,
+      ),
+    );
+  }
+}
+
+/// Surfaces exactly what the model identified — the app never showed this
+/// anywhere before (only buried in the share-to-clipboard text), and since
+/// the model can be confidently wrong (see noCropConfidenceThreshold's
+/// doc comment for real measured cases), this is also the farmer's actual
+/// safety net: seeing "Potato" when they scanned a mango is the cue to
+/// hit Retake instead of listing the wrong crop.
+class _CropHeader extends StatelessWidget {
+  const _CropHeader({required this.colorScheme, required this.result});
+
+  final ColorScheme colorScheme;
+  final ScanRecord result;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: colorScheme.primary.withValues(alpha: 0.18), shape: BoxShape.circle),
+            child: Icon(Icons.eco_rounded, size: 20, color: colorScheme.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Crop Identified',
+                  style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11.5, fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  result.cropType,
+                  style: TextStyle(color: colorScheme.onSurface, fontSize: 19, fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: colorScheme.surface.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              '${(result.confidence * 100).round()}% sure',
+              style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11.5, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
       ),
     );
   }

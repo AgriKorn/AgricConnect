@@ -56,7 +56,13 @@ class CropScanModel {
       throw const FormatException('Could not decode captured image for scanning.');
     }
 
-    final input = [_resizeWithPadToInputTensor(decoded)];
+    // runForMultipleInputs takes one entry per input TENSOR, and this
+    // model has exactly one, whose own shape already includes the batch
+    // dimension ([1,224,224,3]) — so the list here has length 1, and that
+    // one element must itself be 4D, not the raw [224,224,3] frame.
+    final input = [
+      [_resizeWithPadToInputTensor(decoded)],
+    ];
 
     // Output shapes/order per ai/README.md: crop_output [1,9],
     // fresh_output [1,3], shelf_life_days [1] (batch-only, no class dim).
@@ -78,6 +84,7 @@ class CropScanModel {
     return CropScanResult(
       cropType: cropNames[cropIdx],
       cropConfidence: cropProbs[cropIdx],
+      cropProbs: cropProbs,
       freshnessStage: freshNames[freshIdx],
       freshnessConfidence: freshProbs[freshIdx],
       freshnessProbs: freshProbs,

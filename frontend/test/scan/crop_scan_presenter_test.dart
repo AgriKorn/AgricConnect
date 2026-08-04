@@ -12,9 +12,13 @@ CropScanResult _result({
   required double shelfLifeDays,
 }) {
   final freshIdx = CropScanModel.freshNames.indexOf(freshnessStage);
+  final cropIdx = CropScanModel.cropNames.indexOf(cropType);
+  final cropProbs = List<double>.filled(CropScanModel.cropNames.length, (1 - cropConfidence) / 8);
+  if (cropIdx >= 0) cropProbs[cropIdx] = cropConfidence;
   return CropScanResult(
     cropType: cropType,
     cropConfidence: cropConfidence,
+    cropProbs: cropProbs,
     freshnessStage: freshnessStage,
     freshnessConfidence: freshnessProbs[freshIdx],
     freshnessProbs: freshnessProbs,
@@ -102,6 +106,14 @@ void main() {
         record.attributes.any((a) => a.label == 'Aging Estimate Extrapolated'),
         isTrue,
       );
+    });
+
+    test('the no-crop threshold sits below the low-confidence warning threshold', () {
+      // Sanity check on the two-tier design: a confidence between these
+      // gets a "Low Confidence" tag on a real result; below the lower one,
+      // ScanController throws NoCropDetectedException instead of building
+      // a result at all.
+      expect(noCropConfidenceThreshold, lessThan(0.6));
     });
 
     test('every known crop resolves to a priced record', () {

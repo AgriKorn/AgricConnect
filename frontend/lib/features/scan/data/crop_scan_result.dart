@@ -8,6 +8,7 @@ class CropScanResult {
   const CropScanResult({
     required this.cropType,
     required this.cropConfidence,
+    required this.cropProbs,
     required this.freshnessStage,
     required this.freshnessConfidence,
     required this.freshnessProbs,
@@ -18,6 +19,11 @@ class CropScanResult {
   /// orange, pepper, plantain, potato, tomato).
   final String cropType;
   final double cropConfidence;
+
+  /// Full softmax over all 9 crop names, in CropScanModel.cropNames order —
+  /// lets callers look at e.g. the margin to the runner-up class, not just
+  /// the winning confidence (see noCropConfidenceThreshold's calibration).
+  final List<double> cropProbs;
 
   /// One of 'aging', 'fresh', 'spoiled'.
   final String freshnessStage;

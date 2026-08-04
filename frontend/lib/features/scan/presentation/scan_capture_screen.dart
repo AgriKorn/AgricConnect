@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/widgets/agri_toast.dart';
 import '../application/scan_controller.dart';
 
 /// Full-bleed live camera surface with a centered viewfinder (a plain black
@@ -27,6 +28,9 @@ class _ScanCaptureScreenState extends ConsumerState<ScanCaptureScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _scanLineController;
   CameraController? _cameraController;
+  List<CameraDescription> _cameras = [];
+  CameraLensDirection _preferredLensDirection = CameraLensDirection.back;
+  bool _switchingCamera = false;
 
   @override
   void initState() {
@@ -50,8 +54,9 @@ class _ScanCaptureScreenState extends ConsumerState<ScanCaptureScreen>
       if (cameras.isEmpty) {
         throw CameraException('noCamera', 'No camera found on this device.');
       }
+      _cameras = cameras;
       final description = cameras.firstWhere(
-        (c) => c.lensDirection == CameraLensDirection.back,
+        (c) => c.lensDirection == _preferredLensDirection,
         orElse: () => cameras.first,
       );
       final controller = CameraController(
@@ -68,6 +73,24 @@ class _ScanCaptureScreenState extends ConsumerState<ScanCaptureScreen>
     } catch (e) {
       if (kDebugMode) debugPrint('Camera unavailable, falling back to mock feed: $e');
     }
+  }
+
+  /// Swaps between the front and back lens. Only shown once [_initCamera]
+  /// has confirmed the device actually exposes more than one camera.
+  Future<void> _switchCamera() async {
+    if (_switchingCamera || _cameras.length < 2) return;
+    setState(() => _switchingCamera = true);
+
+    _preferredLensDirection = _preferredLensDirection == CameraLensDirection.back
+        ? CameraLensDirection.front
+        : CameraLensDirection.back;
+
+    final oldController = _cameraController;
+    setState(() => _cameraController = null);
+    await oldController?.dispose();
+
+    await _initCamera();
+    if (mounted) setState(() => _switchingCamera = false);
   }
 
   @override
@@ -118,13 +141,24 @@ class _ScanCaptureScreenState extends ConsumerState<ScanCaptureScreen>
       }
     }
 
-    await ref.read(scanControllerProvider.notifier).captureAndAnalyze(imagePath: imagePath);
-    _scanLineController.stop();
-
-    if (!mounted) {
-      return;
+    try {
+      await ref.read(scanControllerProvider.notifier).captureAndAnalyze(imagePath: imagePath);
+      _scanLineController.stop();
+      if (!mounted) {
+        return;
+      }
+      context.go('/farmer/scan/result');
+    } catch (_) {
+      _scanLineController.stop();
+      if (!mounted) {
+        return;
+      }
+      // Stay on the capture screen (no result to show) — surface exactly
+      // what ScanController set, e.g. "No crop detected..." vs the generic
+      // failure message, rather than a raw exception string.
+      final message = ref.read(scanControllerProvider).errorMessage ?? 'Scan failed. Please try again.';
+      showAgriToast(context, message, icon: Icons.error_outline_rounded, isError: true);
     }
-    context.go('/farmer/scan/result');
   }
 
   @override
@@ -173,10 +207,22 @@ class _ScanCaptureScreenState extends ConsumerState<ScanCaptureScreen>
                         onPressed: () => context.canPop() ? context.pop() : context.go('/farmer/home'),
                       ),
                       if (isScanning && !cameraReady) _DetectedPill(label: detectedLabel),
-                      _GlassIconButton(
-                        icon: scanState.isFlashOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
-                        active: scanState.isFlashOn,
-                        onPressed: _toggleFlash,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (_cameras.length > 1) ...[
+                            _GlassIconButton(
+                              icon: Icons.cameraswitch_rounded,
+                              onPressed: _switchingCamera ? null : _switchCamera,
+                            ),
+                            const SizedBox(width: 10),
+                          ],
+                          _GlassIconButton(
+                            icon: scanState.isFlashOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+                            active: scanState.isFlashOn,
+                            onPressed: _toggleFlash,
+                          ),
+                        ],
                       ),
                     ],
                   ),

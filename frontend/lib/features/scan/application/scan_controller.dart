@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/storage/local_prefs.dart';
+import '../../auth/application/auth_controller.dart';
+import '../../pricing/data/pricing_repository.dart';
 import '../data/crop_scan_model.dart';
 import '../data/crop_scan_presenter.dart';
 import '../data/scan_record.dart';
@@ -115,6 +117,9 @@ class ScanController extends Notifier<ScanState> {
       }
 
       return result;
+    } on NoCropDetectedException catch (e) {
+      state = state.copyWith(isScanning: false, errorMessage: e.toString());
+      rethrow;
     } catch (_) {
       state = state.copyWith(
         isScanning: false,
@@ -128,19 +133,53 @@ class ScanController extends Notifier<ScanState> {
   /// back to the mock cycle on web specifically — `tflite_flutter` has no
   /// web support (see crop_scan_model_web.dart), even though the `camera`
   /// plugin can still hand us a real [imagePath] there.
+  ///
+  /// Throws [NoCropDetectedException] rather than returning a guessed
+  /// result when the crop-classification confidence is too low to trust
+  /// (see [noCropConfidenceThreshold]) — e.g. the camera was pointed at a
+  /// hand, table, or empty background rather than actual produce.
   Future<ScanRecord> _analyzeImage(String imagePath) async {
     try {
       final model = await _model();
       final bytes = await File(imagePath).readAsBytes();
       final prediction = model.predict(bytes);
+      if (prediction.cropConfidence < noCropConfidenceThreshold) {
+        throw const NoCropDetectedException();
+      }
+      final recommendedPrice = await _fetchRealPrice(prediction);
       return buildScanRecord(
         prediction,
         id: 'scan-${DateTime.now().millisecondsSinceEpoch}',
         capturedAt: DateTime.now(),
         imagePath: imagePath,
+        recommendedPrice: recommendedPrice,
       );
     } on UnsupportedError {
       return _analyzeMock(imagePath: imagePath);
+    }
+  }
+
+  /// Real MOFA-backed price recommendation (see PricingRepository) for the
+  /// just-scanned crop, in the farmer's own region. Returns null — meaning
+  /// "fall back to buildScanRecord's local placeholder price" — whenever
+  /// that's not possible: no region on the profile, offline (PRD 7.1: this
+  /// app must work on patchy rural networks), or no MOFA reference price
+  /// exists yet for this crop+region.
+  Future<double?> _fetchRealPrice(CropScanResult prediction) async {
+    final region = ref.read(authControllerProvider).user?.region;
+    if (region == null) {
+      return null;
+    }
+    try {
+      final recommendation = await ref.read(pricingRepositoryProvider).recommend(
+            crop: prediction.cropType,
+            region: region,
+            freshness: computeFreshnessScore(prediction).toDouble(),
+            shelfLifeDays: prediction.shelfLifeDays.round(),
+          );
+      return recommendation.ceiling;
+    } catch (_) {
+      return null;
     }
   }
 

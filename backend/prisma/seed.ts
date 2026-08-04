@@ -10,6 +10,17 @@ const DEFAULT_CROPS = [
   { name: 'yam', category: 'tubers', basePriceGhsPerKg: 14.5 },
   { name: 'onion', category: 'vegetables', basePriceGhsPerKg: 18.0 },
   { name: 'pepper', category: 'vegetables', basePriceGhsPerKg: 20.0 },
+  // The remaining 6 must stay in sync with CROP_NAMES in ai/shelf_life.py —
+  // the on-device scan model only ever emits one of those 9 names, and
+  // listing creation 400s on any crop with no crop_types row (see
+  // listing.repository.prisma.ts). 'pepper' and 'plantain' above already
+  // cover 2 of the 9; 'tomato' covers a 3rd.
+  { name: 'carrot', category: 'vegetables', basePriceGhsPerKg: 10.0 },
+  { name: 'cucumber', category: 'vegetables', basePriceGhsPerKg: 6.0 },
+  { name: 'mango', category: 'fruits', basePriceGhsPerKg: 7.0 },
+  { name: 'okra', category: 'vegetables', basePriceGhsPerKg: 12.0 },
+  { name: 'orange', category: 'fruits', basePriceGhsPerKg: 5.0 },
+  { name: 'potato', category: 'tubers', basePriceGhsPerKg: 9.0 },
 ];
 
 const REGIONS = ['Greater Accra', 'Ashanti', 'Northern', 'Eastern', 'Western', 'Brong-Ahafo'];
