@@ -70,9 +70,20 @@ jobs:
           AWS_S3_BUCKET_PRIVATE: ${{ secrets.AWS_S3_BUCKET_PRIVATE }}
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          # Separate from the AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY secrets
+          # above (those authenticate the CI runner itself to push to ECR and
+          # call the Lightsail API) — these are the running container's own
+          # runtime credentials for signing S3 presigned URLs. Lightsail
+          # container services have no IAM-role mechanism for general AWS API
+          # access (only a narrow ECR-image-pull role), so the app must use a
+          # real access key, and create-container-service-deployment replaces
+          # the whole environment block on every deploy — any credential not
+          # listed explicitly here gets silently wiped on the next push.
+          APP_AWS_ACCESS_KEY_ID: ${{ secrets.APP_AWS_ACCESS_KEY_ID }}
+          APP_AWS_SECRET_ACCESS_KEY: ${{ secrets.APP_AWS_SECRET_ACCESS_KEY }}
         run: |
           aws lightsail create-container-service-deployment \
             --service-name container-service-1 \
-            --containers "{\"backend\":{\"image\":\"$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\",\"environment\":{\"NODE_ENV\":\"production\",\"PORT\":\"3000\",\"DATABASE_URL\":\"$DATABASE_URL\",\"JWT_SECRET\":\"$JWT_SECRET\",\"PAYSTACK_SECRET_KEY\":\"$PAYSTACK_SECRET_KEY\",\"SUPABASE_URL\":\"$SUPABASE_URL\",\"SUPABASE_ANON_KEY\":\"$SUPABASE_ANON_KEY\",\"AWS_S3_BUCKET_PUBLIC\":\"$AWS_S3_BUCKET_PUBLIC\",\"AWS_S3_BUCKET_PRIVATE\":\"$AWS_S3_BUCKET_PRIVATE\",\"GMAIL_USER\":\"$GMAIL_USER\",\"GMAIL_APP_PASSWORD\":\"$GMAIL_APP_PASSWORD\"},\"ports\":{\"3000\":\"HTTP\"}}}" \
+            --containers "{\"backend\":{\"image\":\"$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG\",\"environment\":{\"NODE_ENV\":\"production\",\"PORT\":\"3000\",\"DATABASE_URL\":\"$DATABASE_URL\",\"JWT_SECRET\":\"$JWT_SECRET\",\"PAYSTACK_SECRET_KEY\":\"$PAYSTACK_SECRET_KEY\",\"SUPABASE_URL\":\"$SUPABASE_URL\",\"SUPABASE_ANON_KEY\":\"$SUPABASE_ANON_KEY\",\"AWS_S3_BUCKET_PUBLIC\":\"$AWS_S3_BUCKET_PUBLIC\",\"AWS_S3_BUCKET_PRIVATE\":\"$AWS_S3_BUCKET_PRIVATE\",\"GMAIL_USER\":\"$GMAIL_USER\",\"GMAIL_APP_PASSWORD\":\"$GMAIL_APP_PASSWORD\",\"AWS_ACCESS_KEY_ID\":\"$APP_AWS_ACCESS_KEY_ID\",\"AWS_SECRET_ACCESS_KEY\":\"$APP_AWS_SECRET_ACCESS_KEY\",\"AWS_REGION\":\"eu-west-1\"},\"ports\":{\"3000\":\"HTTP\"}}}" \
             --public-endpoint "{\"containerName\":\"backend\",\"containerPort\":3000,\"healthCheck\":{\"path\":\"/api/health\"}}"
 
