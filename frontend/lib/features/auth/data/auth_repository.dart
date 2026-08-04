@@ -74,6 +74,12 @@ abstract class AuthRepository {
   /// [role] is only sent for a brand-new sign-up (defaults to buyer on the
   /// backend if omitted); existing accounts are matched by email regardless.
   Future<AuthResponseModel> loginWithGoogle({UserRole? role});
+  /// Shared tail of [loginWithGoogle] for callers that already have a
+  /// [GoogleSignInAccount] from somewhere other than an imperative
+  /// `GoogleSignIn.signIn()` call — namely the web sign-in button, which
+  /// hands one back via a stream instead (see
+  /// presentation/widgets/google_signin/google_signin_web.dart).
+  Future<AuthResponseModel> completeGoogleSignIn(GoogleSignInAccount googleUser, {UserRole? role});
   /// Invalidates [refreshToken] server-side so a stolen/leaked token can't
   /// keep minting new access tokens after the user has signed out.
   Future<void> logout(String refreshToken);
@@ -170,7 +176,19 @@ class HttpAuthRepository implements AuthRepository {
       if (googleUser == null) {
         throw const ApiException('Google sign-in was cancelled.');
       }
+      return await completeGoogleSignIn(googleUser, role: role);
+    } on DioException catch (e) {
+      throw ApiException(_extractErrorMessage(e));
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException(e.toString());
+    }
+  }
 
+  @override
+  Future<AuthResponseModel> completeGoogleSignIn(GoogleSignInAccount googleUser, {UserRole? role}) async {
+    try {
       final googleAuth = await googleUser.authentication;
       final idToken = googleAuth.idToken;
       if (idToken == null) {
@@ -476,6 +494,12 @@ class MockAuthRepository implements AuthRepository {
 
   @override
   Future<AuthResponseModel> loginWithGoogle({UserRole? role}) async {
+    await _simulateLatency();
+    throw const ApiException('Google sign-in is not available in offline/mock mode.');
+  }
+
+  @override
+  Future<AuthResponseModel> completeGoogleSignIn(GoogleSignInAccount googleUser, {UserRole? role}) async {
     await _simulateLatency();
     throw const ApiException('Google sign-in is not available in offline/mock mode.');
   }
