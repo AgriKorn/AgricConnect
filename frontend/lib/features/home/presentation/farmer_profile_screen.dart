@@ -7,10 +7,12 @@ import '../../../core/utils/currency.dart';
 import '../../../core/widgets/account_settings_screen.dart';
 import '../../../core/widgets/agri_dialog.dart';
 import '../../../core/widgets/help_support_screen.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/models/account_status.dart';
 import '../../auth/data/models/user_model.dart';
+import '../../orders/presentation/farmer_sales_screen.dart';
 import '../application/farmer_dashboard_providers.dart';
 import '../data/farmer_dashboard_repository.dart';
 import 'momo_payout_screen.dart';
@@ -75,7 +77,8 @@ class FarmerProfileScreen extends ConsumerWidget {
       body: ColoredBox(
         color: Theme.of(context).scaffoldBackgroundColor,
         child: SafeArea(
-          child: ListView(
+          child: ResponsiveContent(
+            child: ListView(
             padding: EdgeInsets.zero,
             children: [
               _ProfileHero(colorScheme: colorScheme, user: user, details: details),
@@ -132,6 +135,13 @@ class FarmerProfileScreen extends ConsumerWidget {
                         ),
                         _ActionRow(
                           colorScheme: colorScheme,
+                          label: 'My Sales',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (context) => const FarmerSalesScreen()),
+                          ),
+                        ),
+                        _ActionRow(
+                          colorScheme: colorScheme,
                           label: 'Payment Methods',
                           onTap: () => Navigator.of(context).push(
                             MaterialPageRoute(builder: (context) => const MomoPayoutScreen()),
@@ -176,6 +186,7 @@ class FarmerProfileScreen extends ConsumerWidget {
                 ),
               ),
             ],
+            ),
           ),
         ),
       ),
@@ -390,7 +401,7 @@ class _ActionRow extends StatelessWidget {
             Expanded(
               child: Text(label, style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 15)),
             ),
-            Icon(Icons.add_rounded, color: colorScheme.onSurfaceVariant, size: 20),
+            Icon(Icons.chevron_right_rounded, color: colorScheme.onSurfaceVariant, size: 20),
           ],
         ),
       ),

@@ -1,33 +1,20 @@
+import 'dart:math' as math;
+
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/widgets/coming_soon_screen.dart';
 import '../application/scan_controller.dart';
 
-const _cameraFeedFallbackAsset = 'assets/images/roma tomatoes.png';
-
-void _openComingSoon(BuildContext context, String title, IconData icon) {
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (context) => ComingSoonScreen(
-        title: title,
-        icon: icon,
-        message: '$title will be available in a future update.',
-      ),
-    ),
-  );
-}
-
-/// Full-bleed live camera surface with a centered viewfinder. Tapping the
-/// shutter takes a real photo (falls back to a bundled still image on
-/// platforms/devices with no camera — desktop, simulators, or web without
-/// permission) and simultaneously simulates detection + analysis: a
-/// skeleton scan line sweeps the frame while [ScanController.captureAndAnalyze]
-/// runs (still mocked — no AI backend exists yet), then the app moves to
-/// the results screen.
+/// Full-bleed live camera surface with a centered viewfinder (a plain black
+/// screen with a loading spinner on platforms/devices with no camera —
+/// desktop, simulators, or web without permission — never a stand-in photo).
+/// Tapping the shutter takes a real photo and simultaneously simulates
+/// detection + analysis: a loading-ellipsis skeleton pulses in the frame
+/// while [ScanController.captureAndAnalyze] runs (still mocked — no AI
+/// backend exists yet), then the app moves to the results screen.
 class ScanCaptureScreen extends ConsumerStatefulWidget {
   const ScanCaptureScreen({super.key});
 
@@ -46,7 +33,7 @@ class _ScanCaptureScreenState extends ConsumerState<ScanCaptureScreen>
     WidgetsBinding.instance.addObserver(this);
     _scanLineController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 1200),
     );
     _initCamera();
   }
@@ -118,17 +105,19 @@ class _ScanCaptureScreenState extends ConsumerState<ScanCaptureScreen>
 
   Future<void> _capture() async {
     final controller = _cameraController;
-    _scanLineController.repeat(reverse: true);
+    _scanLineController.repeat();
 
+    String? imagePath;
     if (controller != null && controller.value.isInitialized && !controller.value.isTakingPicture) {
       try {
-        await controller.takePicture();
+        final file = await controller.takePicture();
+        imagePath = file.path;
       } catch (e) {
         if (kDebugMode) debugPrint('takePicture failed: $e');
       }
     }
 
-    await ref.read(scanControllerProvider.notifier).captureAndAnalyze();
+    await ref.read(scanControllerProvider.notifier).captureAndAnalyze(imagePath: imagePath);
     _scanLineController.stop();
 
     if (!mounted) {
@@ -153,7 +142,7 @@ class _ScanCaptureScreenState extends ConsumerState<ScanCaptureScreen>
           if (cameraReady)
             _CameraPreviewCover(controller: controller)
           else
-            Image.asset(_cameraFeedFallbackAsset, fit: BoxFit.cover),
+            const Center(child: CircularProgressIndicator(color: Colors.white)),
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -211,19 +200,8 @@ class _ScanCaptureScreenState extends ConsumerState<ScanCaptureScreen>
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(28, 0, 28, 20),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _GlassIconButton(
-                        icon: Icons.photo_library_outlined,
-                        onPressed: () => _openComingSoon(context, 'Import from Gallery', Icons.photo_library_outlined),
-                      ),
-                      _ShutterButton(loading: isScanning, onPressed: isScanning ? null : _capture),
-                      _GlassIconButton(
-                        icon: Icons.settings_outlined,
-                        onPressed: () => _openComingSoon(context, 'Scan Settings', Icons.settings_outlined),
-                      ),
-                    ],
+                  child: Center(
+                    child: _ShutterButton(loading: isScanning, onPressed: isScanning ? null : _capture),
                   ),
                 ),
               ],
@@ -348,30 +326,7 @@ class _ViewfinderFrame extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             if (isScanning)
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  return AnimatedBuilder(
-                    animation: scanLineController,
-                    builder: (context, _) {
-                      final travel = constraints.maxHeight - 40;
-                      final top = 20 + travel * scanLineController.value;
-                      return Positioned(
-                        top: top,
-                        left: 18,
-                        right: 18,
-                        child: Container(
-                          height: 2.5,
-                          decoration: BoxDecoration(
-                            color: primary,
-                            borderRadius: BorderRadius.circular(999),
-                            boxShadow: [BoxShadow(color: primary.withValues(alpha: 0.8), blurRadius: 8)],
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
+              Center(child: _LoadingEllipsis(animation: scanLineController, color: primary)),
             if (isScanning)
               Align(
                 alignment: const Alignment(0, 0.82),
@@ -394,6 +349,42 @@ class _ViewfinderFrame extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Three dots pulsing in sequence (a classic "loading" ellipsis) — the
+/// skeleton shown in the viewfinder while a scan is analyzing.
+class _LoadingEllipsis extends StatelessWidget {
+  const _LoadingEllipsis({required this.animation, required this.color});
+
+  final Animation<double> animation;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, _) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (i) {
+            final phase = (animation.value + i / 3) % 1.0;
+            final scale = 0.55 + 0.45 * (0.5 - 0.5 * math.cos(2 * math.pi * phase));
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 5),
+              child: Transform.scale(
+                scale: scale,
+                child: Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                ),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }

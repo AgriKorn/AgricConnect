@@ -17,6 +17,7 @@ export class InMemoryTransactionRepository implements ITransactionRepository {
       id: randomUUID(),
       ...data,
       farmerName: null,
+      buyerName: null,
       driverName: null,
       driverPhone: null,
       driverId: null,

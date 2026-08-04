@@ -17,6 +17,7 @@ class ActiveShipment {
     required this.status,
     required this.escrowTotal,
     required this.hasOwnTransport,
+    this.farmerId,
     this.farmerName,
     this.farmerInitials,
     this.farmerLocation,
@@ -31,6 +32,7 @@ class ActiveShipment {
   final double escrowTotal;
   /// True for self-collect orders — no driver is ever assigned to these.
   final bool hasOwnTransport;
+  final String? farmerId;
   final String? farmerName;
   final String? farmerInitials;
   final String? farmerLocation;

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Mock data standing in for the real Listing Search endpoint until its
-/// backend contract is confirmed — same "build against a mock first"
-/// pattern used throughout the checklist (see features/home/data).
+/// Despite the file name, these are the real marketplace types — mapped
+/// from GET /marketplace and GET /marketplace/:id in marketplace_repository.dart.
 enum ProduceCategory { vegetables, fruits, grains }
 
 extension ProduceCategoryX on ProduceCategory {
@@ -29,6 +28,7 @@ class MarketplaceListing {
     required this.unit,
     required this.farmerName,
     this.farmerId,
+    this.farmerRegion,
     this.quantityAvailable,
     this.imageAsset,
     this.imageUrl,
@@ -42,91 +42,73 @@ class MarketplaceListing {
   final String unit;
   final String farmerName;
   final String? farmerId;
+  final String? farmerRegion;
   final double? quantityAvailable;
   final String? imageAsset;
   /// Real S3 photo the farmer uploaded for this listing, if any.
   final String? imageUrl;
+
+  // selectedMarketplaceListingsProvider is a Set<MarketplaceListing> that has
+  // to recognize the same listing whether it was selected from the grid tile
+  // or from a freshly-fetched ProductDetailScreen instance — default identity
+  // equality would treat those as two different listings.
+  @override
+  bool operator ==(Object other) => other is MarketplaceListing && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
 }
 
-const mockMarketplaceListings = [
-  MarketplaceListing(
-    id: 'mp1',
-    name: 'Organic Tomatoes',
-    category: ProduceCategory.vegetables,
-    freshnessScore: 96,
-    pricePerUnit: 18,
-    unit: 'kg',
-    farmerName: 'Ama Boateng',
-    imageAsset: 'assets/images/roma tomatoes.png',
-  ),
-  MarketplaceListing(
-    id: 'mp2',
-    name: 'Sweet Bell Peppers',
-    category: ProduceCategory.vegetables,
-    freshnessScore: 92,
-    pricePerUnit: 22,
-    unit: 'kg',
-    farmerName: 'Kojo Mensah',
-    imageAsset: 'assets/images/belll pepper.png',
-  ),
-  MarketplaceListing(
-    id: 'mp3',
-    name: 'Fresh Spinach',
-    category: ProduceCategory.vegetables,
-    freshnessScore: 85,
-    pricePerUnit: 12,
-    unit: 'bunch',
-    farmerName: 'Efua Asante',
-    imageAsset: 'assets/images/freah_spinach.webp',
-  ),
-  MarketplaceListing(
-    id: 'mp4',
-    name: 'Golden Pineapple',
-    category: ProduceCategory.fruits,
-    freshnessScore: 76,
-    pricePerUnit: 15,
-    unit: 'piece',
-    farmerName: 'Yaw Owusu',
-    imageAsset: 'assets/images/golden_pineapples.webp',
-  ),
-  MarketplaceListing(
-    id: 'mp5',
-    name: 'White Onions',
-    category: ProduceCategory.vegetables,
-    freshnessScore: 95,
-    pricePerUnit: 14,
-    unit: 'kg',
-    farmerName: 'Abena Darko',
-    imageAsset: 'assets/images/White_onion.webp',
-  ),
-  MarketplaceListing(
-    id: 'mp6',
-    name: 'Carrots (Bulk)',
-    category: ProduceCategory.vegetables,
-    freshnessScore: 89,
-    pricePerUnit: 16,
-    unit: 'kg',
-    farmerName: 'Kwame Adjei',
-    imageAsset: 'assets/images/carrots.jpg',
-  ),
-  MarketplaceListing(
-    id: 'mp7',
-    name: 'Ripe Mangoes',
-    category: ProduceCategory.fruits,
-    freshnessScore: 91,
-    pricePerUnit: 20,
-    unit: 'kg',
-    farmerName: 'Adjoa Frimpong',
-    imageAsset: 'assets/images/riped_mangoes.webp',
-  ),
-  MarketplaceListing(
-    id: 'mp8',
-    name: 'White Maize',
-    category: ProduceCategory.grains,
-    freshnessScore: 88,
-    pricePerUnit: 9,
-    unit: 'kg',
-    farmerName: 'Kwabena Osei',
-    imageAsset: 'assets/images/white_maize.jpg',
-  ),
-];
+/// GET /marketplace/:id — everything [MarketplaceListing] has, plus the
+/// fields only worth fetching for a single product detail view.
+class MarketplaceListingDetail {
+  const MarketplaceListingDetail({
+    required this.id,
+    required this.name,
+    required this.category,
+    required this.freshnessScore,
+    required this.pricePerUnit,
+    required this.unit,
+    required this.farmerName,
+    this.farmerId,
+    this.farmerRegion,
+    this.quantityAvailable,
+    this.shelfLifeDays,
+    this.imageUrl,
+    this.description,
+  });
+
+  final String id;
+  final String name;
+  final ProduceCategory category;
+  final int freshnessScore;
+  final double pricePerUnit;
+  final String unit;
+  final String farmerName;
+  final String? farmerId;
+  final String? farmerRegion;
+  final double? quantityAvailable;
+  final int? shelfLifeDays;
+  final String? imageUrl;
+  /// Free-text details the farmer added when listing, if any.
+  final String? description;
+}
+
+extension MarketplaceListingDetailX on MarketplaceListingDetail {
+  /// For handing off to the cart/checkout flow, which only needs the
+  /// [MarketplaceListing] subset of these fields.
+  MarketplaceListing toMarketplaceListing() {
+    return MarketplaceListing(
+      id: id,
+      name: name,
+      category: category,
+      freshnessScore: freshnessScore,
+      pricePerUnit: pricePerUnit,
+      unit: unit,
+      farmerName: farmerName,
+      farmerId: farmerId,
+      quantityAvailable: quantityAvailable,
+      imageUrl: imageUrl,
+    );
+  }
+}

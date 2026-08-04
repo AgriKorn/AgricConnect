@@ -38,6 +38,7 @@ export const createListingSchema = z.object({
     }).positive('Price per kg must be greater than 0'),
 
     imageUrl: z.string().url().optional(),
+    description: z.string().max(2000, 'Description cannot exceed 2000 characters').optional(),
   }),
 });
 

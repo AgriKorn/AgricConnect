@@ -74,7 +74,9 @@ abstract class AuthRepository {
   /// [role] is only sent for a brand-new sign-up (defaults to buyer on the
   /// backend if omitted); existing accounts are matched by email regardless.
   Future<AuthResponseModel> loginWithGoogle({UserRole? role});
-  Future<UserModel> debugApprove(String phone);
+  /// Invalidates [refreshToken] server-side so a stolen/leaked token can't
+  /// keep minting new access tokens after the user has signed out.
+  Future<void> logout(String refreshToken);
   Future<String> forgotPassword(String email);
   Future<void> resetPassword({required String token, required String newPassword});
   Future<ProfileData> fetchProfile();
@@ -203,24 +205,11 @@ class HttpAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<UserModel> debugApprove(String phone) async {
+  Future<void> logout(String refreshToken) async {
     try {
-      final response = await _dio.post(
-        '/users/approve-dev',
-        data: {'phone': _formatGhanaPhone(phone)},
-      );
-      final userData = response.data['data'] ?? response.data;
-      return _parseUserModel(userData);
-    } catch (_) {
-      // Return verified fallback model if endpoint is restricted to admin
-      return UserModel(
-        id: 'user-dev-approved',
-        phone: phone,
-        email: '',
-        role: UserRole.farmer,
-        name: 'Approved User',
-        status: AccountStatus.verified,
-      );
+      await _dio.post(ApiEndpoints.authLogout, data: {'refreshToken': refreshToken});
+    } on DioException catch (e) {
+      throw ApiException(_extractErrorMessage(e));
     }
   }
 
@@ -492,15 +481,8 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<UserModel> debugApprove(String phone) async {
+  Future<void> logout(String refreshToken) async {
     await _simulateLatency();
-    final user = _usersByPhone[phone];
-    if (user == null) {
-      throw const ApiException('No account found for this phone number.');
-    }
-    final approved = user.copyWith(status: AccountStatus.verified);
-    _usersByPhone[phone] = approved;
-    return approved;
   }
 
   @override

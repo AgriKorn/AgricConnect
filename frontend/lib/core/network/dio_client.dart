@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../features/auth/application/auth_controller.dart';
 import '../storage/secure_storage.dart';
 import 'api_endpoints.dart';
 
@@ -49,8 +50,12 @@ final dioProvider = Provider<Dio>((ref) {
       } catch (_) {
         // Refresh token itself is dead (expired/revoked) — clear the stale
         // pair so the app stops attaching a token that will never work,
-        // rather than repeating this failed refresh on every request.
+        // rather than repeating this failed refresh on every request. Also
+        // flip the session to unauthenticated so the router's redirect guard
+        // actually fires, instead of leaving the UI stuck on authenticated
+        // screens where every request silently 401s from here on.
         await secureStorage.clear();
+        ref.read(authControllerProvider.notifier).forceLogout();
         return null;
       } finally {
         refreshInFlight = null;

@@ -58,7 +58,11 @@ class HttpFarmerDashboardRepository implements FarmerDashboardRepository {
       final data = response.data['data'] ?? response.data;
       return FarmerDashboardSummary.fromJson(data as Map<String, dynamic>);
     } on DioException catch (e) {
-      final serverMessage = e.response?.data?['error']?['message']?.toString();
+      String? serverMessage;
+      final responseData = e.response?.data;
+      if (responseData is Map) {
+        serverMessage = responseData['error']?['message']?.toString();
+      }
       throw ApiException(serverMessage ?? e.message ?? 'Failed to load dashboard summary.');
     }
   }

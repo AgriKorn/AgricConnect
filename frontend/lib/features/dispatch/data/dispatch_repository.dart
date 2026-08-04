@@ -14,6 +14,12 @@ class DispatchJobModel {
     required this.amountGhs,
     required this.status,
     required this.createdAt,
+    this.farmerName,
+    this.farmerPhone,
+    this.pickupRegion,
+    this.buyerName,
+    this.buyerPhone,
+    this.dropoffRegion,
   });
 
   final String id;
@@ -23,6 +29,14 @@ class DispatchJobModel {
   final double amountGhs;
   final String status;
   final DateTime createdAt;
+  /// Pickup contact — the farmer who listed the produce.
+  final String? farmerName;
+  final String? farmerPhone;
+  final String? pickupRegion;
+  /// Dropoff contact — the buyer who purchased it.
+  final String? buyerName;
+  final String? buyerPhone;
+  final String? dropoffRegion;
 
   factory DispatchJobModel.fromJson(Map<String, dynamic> json) {
     return DispatchJobModel(
@@ -33,6 +47,12 @@ class DispatchJobModel {
       amountGhs: double.tryParse(json['amountGhs']?.toString() ?? '') ?? 0.0,
       status: json['status']?.toString() ?? 'PENDING',
       createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ?? DateTime.now(),
+      farmerName: json['farmerName']?.toString(),
+      farmerPhone: json['farmerPhone']?.toString(),
+      pickupRegion: json['pickupRegion']?.toString(),
+      buyerName: json['buyerName']?.toString(),
+      buyerPhone: json['buyerPhone']?.toString(),
+      dropoffRegion: json['dropoffRegion']?.toString(),
     );
   }
 }
@@ -59,8 +79,9 @@ class HttpDispatchRepository implements DispatchRepository {
       );
       final rawList = response.data['data']?['jobs'] as List? ?? [];
       return rawList.map((item) => DispatchJobModel.fromJson(item as Map<String, dynamic>)).toList();
-    } on DioException {
-      return const [];
+    } on DioException catch (e) {
+      final serverMessage = e.response?.data?['error']?['message']?.toString();
+      throw ApiException(serverMessage ?? e.message ?? 'Failed to load jobs.');
     }
   }
 

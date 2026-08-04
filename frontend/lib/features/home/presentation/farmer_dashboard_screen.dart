@@ -7,8 +7,10 @@ import '../../../core/utils/currency.dart';
 import '../../../core/utils/freshness.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../orders/presentation/farmer_sales_screen.dart';
 import '../application/farmer_dashboard_providers.dart';
 import '../data/farmer_dashboard_mock.dart';
 import '../data/farmer_dashboard_repository.dart';
@@ -36,7 +38,8 @@ class FarmerDashboardScreen extends ConsumerWidget {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: ListView(
+            child: ResponsiveContent(
+              child: ListView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               children: [
                 _DashboardHeader(
@@ -94,6 +97,7 @@ class FarmerDashboardScreen extends ConsumerWidget {
                 const SizedBox(height: 12),
                 _OverviewGrid(colorScheme: colorScheme, summary: summaryAsync.valueOrNull, alertCount: alertCount),
               ],
+              ),
             ),
           ),
         ],
@@ -128,7 +132,10 @@ class _DashboardHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const UserAvatar(size: 52),
+        GestureDetector(
+          onTap: () => context.go('/farmer/profile'),
+          child: const SizedBox(width: 52, height: 52, child: UserAvatar(size: 52)),
+        ),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -379,27 +386,6 @@ class _ListingCard extends StatelessWidget {
                       '${formatGhs(listing.price)} / ${listing.unit}',
                       style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w600, fontSize: 12),
                     ),
-                    if (listing.tag != null) ...[
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              listing.tag!,
-                              style: TextStyle(color: colorScheme.onSurface, fontSize: 10.5, fontWeight: FontWeight.w600),
-                            ),
-                            const SizedBox(width: 3),
-                            Icon(Icons.auto_awesome_rounded, size: 10, color: colorScheme.onSurface),
-                          ],
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -440,6 +426,9 @@ class _OverviewGrid extends StatelessWidget {
                 dotColor: colorScheme.primary,
                 value: '${summary?.activeOrders ?? 0}',
                 label: 'Active Orders',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => const FarmerSalesScreen()),
+                ),
               ),
             ),
           ],
@@ -477,16 +466,18 @@ class _StatTile extends StatelessWidget {
     required this.dotColor,
     required this.value,
     required this.label,
+    this.onTap,
   });
 
   final ColorScheme colorScheme;
   final Color dotColor;
   final String value;
   final String label;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final content = Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         border: Border.all(color: dotColor.withValues(alpha: 0.5)),
@@ -515,8 +506,11 @@ class _StatTile extends StatelessWidget {
               ],
             ),
           ),
+          if (onTap != null) Icon(Icons.chevron_right_rounded, color: colorScheme.onSurfaceVariant, size: 18),
         ],
       ),
     );
+    if (onTap == null) return content;
+    return InkWell(borderRadius: BorderRadius.circular(20), onTap: onTap, child: content);
   }
 }

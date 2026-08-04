@@ -6,6 +6,8 @@ export interface Transaction {
   buyerId: string;
   farmerId: string;
   farmerName: string | null;
+  /** The buyer's display name — what a farmer sees on their sales list. */
+  buyerName: string | null;
   /** Name/phone/id of the driver who accepted this delivery job — null until one has (or for self-collect orders, always). */
   driverName: string | null;
   driverPhone: string | null;

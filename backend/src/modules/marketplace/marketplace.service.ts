@@ -23,7 +23,13 @@ export class MarketplaceService {
       limit: query.limit,
     };
 
-    if (query.region) {
+    if (query.farmerId) {
+      // A specific farmer's store page — takes precedence over the broader
+      // region filter, since asking for "this one farmer's listings" and
+      // "every farmer in a region" at once isn't a combination the UI ever
+      // needs.
+      filters.farmerIds = [query.farmerId];
+    } else if (query.region) {
       filters.farmerIds = await this.users.findFarmerIdsByRegion(query.region);
     }
 

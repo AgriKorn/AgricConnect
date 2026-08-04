@@ -1,9 +1,11 @@
 import crypto from 'crypto';
 import QRCode from 'qrcode';
-import { ForbiddenError, NotFoundError, PayoutNotConfiguredError } from '../../utils/errors';
+import { ConflictError, ForbiddenError, NotFoundError, PayoutNotConfiguredError } from '../../utils/errors';
 import { auditService } from '../audit/audit.service';
 import logger from '../../utils/logger';
+import { mofaPriceRepository } from '../pricing/pricing.repository.prisma';
 import { s3Service, PresignedUploadUrlResult } from '../../services/s3.service';
+import { transactionRepository } from '../transaction/transaction.repository.prisma';
 import { userRepository } from '../user/user.repository.prisma';
 import { CreateListingInput, UpdateListingInput } from './listing.schema';
 import { IListingRepository } from './listing.repository';
@@ -74,6 +76,8 @@ export class ListingService {
     }
 
     const { listingHash, qrCodeData } = await generateListingProof(farmerId, data);
+    const region = farmer.profile.farmRegion || farmer.profile.operatingRegion;
+    const mofaReference = region ? await mofaPriceRepository.findLatest(data.cropType, region) : null;
 
     const listing = await this.repo.create({
       farmerId,
@@ -81,6 +85,8 @@ export class ListingService {
       listingHash,
       qrCodeData,
       status: 'ACTIVE',
+      region,
+      mofaReferencePrice: mofaReference?.pricePerKg,
     });
 
     await auditNonFatal('LISTING_CREATED', listing.id, () =>
@@ -107,6 +113,17 @@ export class ListingService {
 
   async deleteListing(id: string, farmerId: string): Promise<Listing> {
     const listing = await this.assertOwnedListing(id, farmerId);
+
+    // A buyer may already be holding this listing in escrow (PAYMENT_HELD) —
+    // deleting the listing doesn't touch that order, so without this guard a
+    // farmer could "delete" a sale they're still on the hook to deliver
+    // while a buyer's money sits waiting, with no indication anything is
+    // still owed.
+    const activeOrder = await transactionRepository.findActiveByListingId(id);
+    if (activeOrder) {
+      throw new ConflictError('This listing has an active order and cannot be deleted until it is delivered or resolved');
+    }
+
     return this.repo.softDelete(listing.id);
   }
 

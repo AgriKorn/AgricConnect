@@ -1,5 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { BadRequestError, ConflictError, NotFoundError } from '../../utils/errors';
+import { auditService } from '../audit/audit.service';
+import { notificationService } from '../notification/notification.service';
 import { transactionRepository } from '../transaction/transaction.repository.prisma';
 import { Transaction } from '../transaction/transaction.types';
 import { IUserRepository } from '../user/user.repository';
@@ -25,7 +27,7 @@ export class AdminService {
    * bootstrap script, since "admin" was deliberately never a
    * self-service registration role.
    */
-  async createAdmin(data: CreateAdminInput): Promise<SafeUser> {
+  async createAdmin(data: CreateAdminInput, createdBy: string): Promise<SafeUser> {
     const existingEmail = await this.users.findByEmail(data.email);
     if (existingEmail) throw new ConflictError('Email already registered', 'EMAIL_ALREADY_REGISTERED');
 
@@ -44,6 +46,7 @@ export class AdminService {
     });
     // Admin-created admins are trusted immediately — no self-approval loop.
     const activated = await this.users.update(user.id, { status: 'ACTIVE' });
+    await auditService.log('ADMIN_CREATED' as any, user.id, { name: data.name, email: data.email }, createdBy);
     return toSafeUser(activated);
   }
 
@@ -71,6 +74,7 @@ export class AdminService {
     }
 
     const updated = await this.users.update(adminId, { status: 'REJECTED', refreshToken: null });
+    await auditService.log('ADMIN_REMOVED' as any, adminId, { removedAdminName: admin.name }, requestingAdminId);
     return toSafeUser(updated);
   }
 
@@ -79,15 +83,27 @@ export class AdminService {
     return users.map(toSafeUser);
   }
 
-  async approveUser(userId: string): Promise<SafeUser> {
+  async approveUser(userId: string, approvedBy: string): Promise<SafeUser> {
     const user = await this.assertPending(userId);
-    const updated = await this.users.update(user.id, { status: 'ACTIVE' });
+    const updated = await this.users.update(user.id, { status: 'ACTIVE', approvedBy, approvedAt: new Date() });
+    await auditService.log('USER_APPROVED' as any, user.id, { role: user.role }, approvedBy);
+    await notificationService.sendNotification({
+      userId: user.id,
+      type: 'ACCOUNT_APPROVED',
+      message: 'Your account has been approved. You can now sign in and use AgriConnect.',
+    });
     return toSafeUser(updated);
   }
 
-  async rejectUser(userId: string): Promise<SafeUser> {
+  async rejectUser(userId: string, rejectedBy: string): Promise<SafeUser> {
     const user = await this.assertPending(userId);
-    const updated = await this.users.update(user.id, { status: 'REJECTED' });
+    const updated = await this.users.update(user.id, { status: 'REJECTED', approvedBy: rejectedBy, approvedAt: new Date() });
+    await auditService.log('USER_REJECTED' as any, user.id, { role: user.role }, rejectedBy);
+    await notificationService.sendNotification({
+      userId: user.id,
+      type: 'ACCOUNT_REJECTED',
+      message: 'Your account application was not approved. Contact support if you believe this is a mistake.',
+    });
     return toSafeUser(updated);
   }
 

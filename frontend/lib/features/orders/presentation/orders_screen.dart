@@ -6,6 +6,8 @@ import '../../../core/utils/currency.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/responsive_content.dart';
+import '../../marketplace/presentation/farmer_store_screen.dart';
 import '../application/orders_providers.dart';
 import '../data/orders_mock.dart';
 import 'confirm_delivery_screen.dart';
@@ -74,7 +76,8 @@ class OrdersScreen extends ConsumerWidget {
           SafeArea(
             child: RefreshIndicator(
               onRefresh: () => ref.refresh(myOrdersProvider.future),
-              child: Column(
+              child: ResponsiveContent(
+                child: Column(
                 children: [
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -179,6 +182,7 @@ class OrdersScreen extends ConsumerWidget {
                           ),
                   ),
                 ],
+                ),
               ),
             ),
           ),
@@ -340,23 +344,46 @@ class _ActiveShipmentCard extends StatelessWidget {
             const SizedBox(height: 16),
             Row(
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest, shape: BoxShape.circle),
-                  alignment: Alignment.center,
-                  child: Text(
-                    shipment.farmerInitials ?? '?',
-                    style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 14),
-                  ),
-                ),
-                const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    shipment.farmerName!,
-                    style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 15),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: shipment.farmerId == null
+                        ? null
+                        : () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => FarmerStoreScreen(
+                                  farmerId: shipment.farmerId!,
+                                  farmerName: shipment.farmerName!,
+                                  farmerRegion: shipment.farmerLocation,
+                                ),
+                              ),
+                            ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(color: colorScheme.surfaceContainerHighest, shape: BoxShape.circle),
+                          alignment: Alignment.center,
+                          child: Text(
+                            shipment.farmerInitials ?? '?',
+                            style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 14),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            shipment.farmerName!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 15),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 GestureDetector(
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(builder: (context) => OrderTrackingScreen(shipment: shipment)),

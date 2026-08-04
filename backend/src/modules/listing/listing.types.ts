@@ -21,6 +21,8 @@ export interface Listing {
   qrCodeData: string;
   /** Public S3 URL of the farmer's real photo of this crop — null until they upload one. */
   imageUrl?: string;
+  /** Free-text details the farmer added — null until they write one. */
+  description?: string | null;
   status: ListingStatus;
   createdAt: Date;
   updatedAt: Date;

@@ -9,6 +9,7 @@ import '../../../core/widgets/edit_profile_screen.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/help_support_screen.dart';
 import '../../../core/widgets/privacy_policy_screen.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../../core/widgets/user_avatar.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../auth/data/models/account_status.dart';
@@ -109,7 +110,8 @@ class BuyerProfileScreen extends ConsumerWidget {
       body: ColoredBox(
         color: Theme.of(context).scaffoldBackgroundColor,
         child: SafeArea(
-          child: ListView(
+          child: ResponsiveContent(
+            child: ListView(
             padding: EdgeInsets.zero,
             children: [
               _ProfileHero(colorScheme: colorScheme, profile: profile),
@@ -277,6 +279,7 @@ class BuyerProfileScreen extends ConsumerWidget {
                 ),
               ),
             ],
+            ),
           ),
         ),
       ),

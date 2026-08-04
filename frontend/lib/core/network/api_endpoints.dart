@@ -11,6 +11,7 @@ class ApiEndpoints {
   static const String authForgotPassword = '/auth/forgot-password';
   static const String authResetPassword = '/auth/reset-password';
   static const String authRefresh = '/auth/refresh';
+  static const String authLogout = '/auth/logout';
   static const String authGoogle = '/auth/google';
 
   // User & Profile Endpoints

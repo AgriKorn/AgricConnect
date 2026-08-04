@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>AgriConnect uses the camera to inspect produce and score its freshness with AI.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>AgriConnect needs access to your photos so you can add an image to your listing.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

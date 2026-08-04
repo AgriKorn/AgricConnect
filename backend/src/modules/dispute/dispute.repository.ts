@@ -6,5 +6,6 @@ export interface IDisputeRepository {
   create(data: CreateDisputeRecord): Promise<Dispute>;
   findById(id: string): Promise<Dispute | null>;
   findAll(): Promise<Dispute[]>;
-  resolve(id: string, resolution: string): Promise<Dispute>;
+  resolve(id: string, resolution: string, resolvedBy: string): Promise<Dispute>;
+  findOpenByTransaction(transactionId: string): Promise<Dispute | null>;
 }

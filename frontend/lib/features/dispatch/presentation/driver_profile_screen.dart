@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/utils/currency.dart';
+import '../../../core/widgets/agri_bottom_sheet.dart';
+import '../../../core/widgets/agri_dialog.dart';
+import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/help_support_screen.dart';
+import '../../../core/widgets/responsive_content.dart';
+import '../../../core/widgets/user_avatar.dart';
 import '../../auth/application/auth_controller.dart';
-import '../../../core/widgets/agri_dialog.dart';
+import '../../auth/data/auth_repository.dart';
 import '../application/dispatch_providers.dart';
 import '../data/driver_profile_mock.dart';
 
@@ -49,17 +56,13 @@ void _openDriverHelp(BuildContext context) {
   );
 }
 
-String _initialsOf(String name) {
-  final parts = name.trim().split(RegExp(r'\s+'));
-  final first = parts.first[0];
-  final last = parts.length > 1 ? parts.last[0] : '';
-  return (first + last).toUpperCase();
-}
-
-/// Driver-specific Profile tab: hero (rating/deliveries), On-Time/Earnings
-/// stats, Vehicle Details, Verified Documents, and Account Settings
-/// (language, notifications, sign out). Farmer/Buyer still use their own
-/// profile screens — this one replicates the driver-specific reference.
+/// Driver-specific Profile tab: hero (verified badge/deliveries/earnings —
+/// all real), Vehicle Details, Verified Documents, and Account Settings
+/// (notifications, help, sign out). Vehicle details and document
+/// verification have no backing system in the backend yet (no vehicle
+/// registration or document upload flow exists), so both route to a
+/// "coming soon" state instead of showing invented values — same as
+/// Language, which was already honest about not being wired up.
 class DriverProfileScreen extends ConsumerWidget {
   const DriverProfileScreen({super.key});
 
@@ -67,13 +70,14 @@ class DriverProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final details = ref.watch(driverProfileDetailsProvider);
-    final notificationsOn = ref.watch(driverNotificationsProvider);
+    final notificationsOn = ref.watch(driverNotificationsProvider).valueOrNull ?? true;
 
     return Scaffold(
       body: ColoredBox(
         color: Theme.of(context).scaffoldBackgroundColor,
         child: SafeArea(
-          child: ListView(
+          child: ResponsiveContent(
+            child: ListView(
             padding: EdgeInsets.zero,
             children: [
               _ProfileHero(colorScheme: colorScheme, details: details),
@@ -88,7 +92,17 @@ class DriverProfileScreen extends ConsumerWidget {
                       style: TextStyle(color: colorScheme.onSurface, fontSize: 20, fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 12),
-                    _VehicleCard(colorScheme: colorScheme, vehicle: details.vehicle),
+                    _InfoCard(
+                      colorScheme: colorScheme,
+                      children: [
+                        _ActionRow(
+                          colorScheme: colorScheme,
+                          label: 'Add your vehicle details',
+                          onTap: () => _openComingSoon(context, 'Vehicle Details', Icons.local_shipping_outlined),
+                          isLast: true,
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 28),
                     Text(
                       'Verified Documents',
@@ -98,13 +112,12 @@ class DriverProfileScreen extends ConsumerWidget {
                     _InfoCard(
                       colorScheme: colorScheme,
                       children: [
-                        for (var i = 0; i < details.documents.length; i++)
-                          _ActionRow(
-                            colorScheme: colorScheme,
-                            label: details.documents[i],
-                            onTap: () => _openComingSoon(context, details.documents[i], Icons.description_outlined),
-                            isLast: i == details.documents.length - 1,
-                          ),
+                        _ActionRow(
+                          colorScheme: colorScheme,
+                          label: 'Upload verification documents',
+                          onTap: () => _openComingSoon(context, 'Document Verification', Icons.description_outlined),
+                          isLast: true,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 28),
@@ -157,6 +170,7 @@ class DriverProfileScreen extends ConsumerWidget {
                 ),
               ),
             ],
+            ),
           ),
         ),
       ),
@@ -164,14 +178,71 @@ class DriverProfileScreen extends ConsumerWidget {
   }
 }
 
-class _ProfileHero extends StatelessWidget {
+class _ProfileHero extends ConsumerStatefulWidget {
   const _ProfileHero({required this.colorScheme, required this.details});
 
   final ColorScheme colorScheme;
   final DriverProfileDetails details;
 
   @override
+  ConsumerState<_ProfileHero> createState() => _ProfileHeroState();
+}
+
+class _ProfileHeroState extends ConsumerState<_ProfileHero> {
+  final _imagePicker = ImagePicker();
+  bool _uploadingPhoto = false;
+
+  Future<void> _changePhoto() async {
+    final source = await showAgriBottomSheet<ImageSource>(
+      context,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.photo_camera_outlined),
+            title: const Text('Take a photo'),
+            onTap: () => Navigator.of(context).pop(ImageSource.camera),
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library_outlined),
+            title: const Text('Choose from gallery'),
+            onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+          ),
+        ],
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    final picked = await _imagePicker.pickImage(source: source, maxWidth: 1024, imageQuality: 85);
+    if (picked == null || !mounted) return;
+
+    setState(() => _uploadingPhoto = true);
+    try {
+      final bytes = await picked.readAsBytes();
+      final ext = picked.name.contains('.') ? picked.name.split('.').last.toLowerCase() : 'jpg';
+      final contentType = ext == 'png' ? 'image/png' : 'image/jpeg';
+
+      final publicUrl = await ref.read(authRepositoryProvider).uploadProfilePhoto(
+            bytes: bytes,
+            fileName: picked.name,
+            contentType: contentType,
+          );
+
+      await ref.read(authControllerProvider.notifier).updatePhotoUrl(publicUrl);
+
+      if (!mounted) return;
+      showAgriToast(context, 'Profile photo updated');
+    } on ApiException catch (e) {
+      if (mounted) showAgriToast(context, e.message);
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final colorScheme = widget.colorScheme;
+    final details = widget.details;
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.bottomCenter,
@@ -202,12 +273,47 @@ class _ProfileHero extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 4),
-              CircleAvatar(
-                radius: 56,
-                backgroundColor: colorScheme.onPrimary.withValues(alpha: 0.2),
-                child: Text(
-                  _initialsOf(details.name),
-                  style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w800, fontSize: 34),
+              GestureDetector(
+                onTap: _uploadingPhoto ? null : _changePhoto,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    SizedBox(
+                      width: 112,
+                      height: 112,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: colorScheme.onPrimary.withValues(alpha: 0.3), width: 3),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(3),
+                          child: ClipOval(child: UserAvatar(size: 100)),
+                        ),
+                      ),
+                    ),
+                    if (_uploadingPhoto)
+                      const Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(color: Colors.black38, shape: BoxShape.circle),
+                          child: Center(child: CircularProgressIndicator(color: Colors.white)),
+                        ),
+                      ),
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.25),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: colorScheme.primary, width: 2),
+                        ),
+                        child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 15),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 16),
@@ -222,16 +328,9 @@ class _ProfileHero extends StatelessWidget {
                   color: Colors.black.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(999),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.star_rounded, color: Color(0xFFFFC107), size: 16),
-                    const SizedBox(width: 6),
-                    Text(
-                      '${details.rating.toStringAsFixed(1)} (${details.deliveriesCount} deliveries)',
-                      style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w700, fontSize: 13.5),
-                    ),
-                  ],
+                child: Text(
+                  details.verified ? 'Verified Driver' : 'AgriConnect Driver',
+                  style: TextStyle(color: colorScheme.onPrimary, fontWeight: FontWeight.w700, fontSize: 13.5),
                 ),
               ),
             ],
@@ -246,8 +345,8 @@ class _ProfileHero extends StatelessWidget {
               Expanded(
                 child: _StatPill(
                   colorScheme: colorScheme,
-                  value: '${details.onTimePercent}%',
-                  label: 'On-Time',
+                  value: '${details.deliveriesCount}',
+                  label: 'Deliveries',
                 ),
               ),
               const SizedBox(width: 12),
@@ -298,68 +397,6 @@ class _StatPill extends StatelessWidget {
                 ),
                 Text(label, style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11.5)),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _VehicleCard extends StatelessWidget {
-  const _VehicleCard({required this.colorScheme, required this.vehicle});
-
-  final ColorScheme colorScheme;
-  final DriverVehicle vehicle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: colorScheme.primary.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(Icons.local_shipping_rounded, color: colorScheme.primary, size: 22),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  vehicle.model,
-                  style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w800, fontSize: 15.5),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${vehicle.category} • ${vehicle.capacityTons} Tons',
-                  style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12.5),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
-            ),
-            child: Text(
-              vehicle.plateNumber,
-              style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 12.5),
             ),
           ),
         ],

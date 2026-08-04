@@ -14,6 +14,8 @@ import '../../../core/widgets/agri_dialog.dart';
 import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/empty_state.dart';
+import '../../../core/widgets/responsive_content.dart';
+import '../../auth/presentation/widgets/auth_visuals.dart';
 import '../../home/application/farmer_dashboard_providers.dart';
 import '../../home/data/farmer_dashboard_mock.dart';
 
@@ -108,7 +110,8 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: Column(
+            child: ResponsiveContent(
+              child: Column(
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -179,6 +182,7 @@ class _MyListingsScreenState extends ConsumerState<MyListingsScreen> {
                   ),
                 ),
               ],
+              ),
             ),
           ),
         ],
@@ -283,20 +287,35 @@ class _StatusTab extends StatelessWidget {
   }
 }
 
-class _ListingRow extends StatelessWidget {
+class _ListingRow extends ConsumerWidget {
   const _ListingRow({required this.listing, required this.colorScheme, required this.onDelete});
 
   final FarmerListingSummary listing;
   final ColorScheme colorScheme;
   final VoidCallback onDelete;
 
-  void _showManageSheet(BuildContext context) {
+  void _showManageSheet(BuildContext context, WidgetRef ref) {
     showAgriBottomSheet(
       context,
       builder: (sheetContext) => Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Editing price/quantity only makes sense while a listing is still
+          // for sale — a sold order already recorded its own frozen amount,
+          // so changing the listing afterward wouldn't affect anything real.
+          if (listing.status == 'Active')
+            ListTile(
+              leading: Icon(Icons.edit_outlined, color: Theme.of(context).colorScheme.onSurface),
+              title: Text(
+                'Edit Listing',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurface, fontWeight: FontWeight.w700),
+              ),
+              onTap: () {
+                Navigator.of(sheetContext).pop();
+                _showEditSheet(context, ref);
+              },
+            ),
           ListTile(
             leading: Icon(Icons.delete_outline_rounded, color: Theme.of(context).colorScheme.error),
             title: Text(
@@ -313,8 +332,93 @@ class _ListingRow extends StatelessWidget {
     );
   }
 
+  void _showEditSheet(BuildContext context, WidgetRef ref) {
+    final priceController = TextEditingController(text: listing.price.toStringAsFixed(2));
+    final quantityController = TextEditingController(text: listing.quantityKg.toStringAsFixed(0));
+    final formKey = GlobalKey<FormState>();
+    bool saving = false;
+
+    showAgriBottomSheet(
+      context,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setState) {
+          final colorScheme = Theme.of(sheetContext).colorScheme;
+          Future<void> save() async {
+            if (!formKey.currentState!.validate()) return;
+            setState(() => saving = true);
+            try {
+              await ref.read(farmerListingsProvider.notifier).updateListing(
+                    listing.id,
+                    pricePerKg: double.parse(priceController.text),
+                    quantityKg: double.parse(quantityController.text),
+                  );
+              if (sheetContext.mounted) Navigator.of(sheetContext).pop();
+              if (context.mounted) showAgriToast(context, '${listing.cropType} updated');
+            } on ApiException catch (e) {
+              setState(() => saving = false);
+              if (sheetContext.mounted) showAgriToast(sheetContext, e.message);
+            }
+          }
+
+          return Form(
+            key: formKey,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Edit ${listing.cropType}',
+                    style: TextStyle(color: colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 20),
+                  AuthFieldLabel('Price per kg (GHS)', colorScheme),
+                  const SizedBox(height: 8),
+                  AuthTextField(
+                    controller: priceController,
+                    hint: 'e.g. 8.50',
+                    icon: Icons.sell_outlined,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    colorScheme: colorScheme,
+                    validator: (value) {
+                      final parsed = double.tryParse(value ?? '');
+                      return (parsed == null || parsed <= 0) ? 'Enter a valid price' : null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  AuthFieldLabel('Quantity (kg)', colorScheme),
+                  const SizedBox(height: 8),
+                  AuthTextField(
+                    controller: quantityController,
+                    hint: 'e.g. 100',
+                    icon: Icons.scale_outlined,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    colorScheme: colorScheme,
+                    validator: (value) {
+                      final parsed = double.tryParse(value ?? '');
+                      return (parsed == null || parsed <= 0) ? 'Enter a valid quantity' : null;
+                    },
+                  ),
+                  const SizedBox(height: 22),
+                  AuthPillButton(
+                    label: 'Save Changes',
+                    loading: saving,
+                    onPressed: save,
+                    colorScheme: colorScheme,
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final freshness = freshnessColorFor(listing.freshnessScore, Theme.of(context).brightness);
     final accent = colorScheme.primary;
     return Container(
@@ -360,7 +464,7 @@ class _ListingRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${formatGhs(listing.price)} / ${listing.unit}',
+                  '${formatGhs(listing.price)} / ${listing.unit} · ${listing.quantityKg.toStringAsFixed(0)}${listing.unit} available',
                   style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w700, fontSize: 14),
                 ),
                 if (listing.status == 'Active' && listing.qrCodeData != null) ...[
@@ -373,26 +477,6 @@ class _ListingRow extends StatelessWidget {
                       'Show delivery QR',
                       style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w700, fontSize: 12.5),
                     ),
-                  ),
-                ],
-                if (listing.tag != null) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          listing.tag!,
-                          style: TextStyle(color: colorScheme.onSurface, fontSize: 11.5, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      const Spacer(),
-                      Icon(Icons.auto_awesome_rounded, size: 16, color: colorScheme.onSurfaceVariant),
-                    ],
                   ),
                 ],
               ],
@@ -421,7 +505,7 @@ class _ListingRow extends StatelessWidget {
                 padding: EdgeInsets.zero,
                 tooltip: 'Manage listing',
                 icon: const Icon(Icons.more_vert_rounded, color: Colors.white, size: 18),
-                onPressed: () => _showManageSheet(context),
+                onPressed: () => _showManageSheet(context, ref),
               ),
             ),
           ),

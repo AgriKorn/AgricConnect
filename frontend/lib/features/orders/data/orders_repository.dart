@@ -13,7 +13,9 @@ class OrderItemModel {
     required this.status,
     required this.createdAt,
     required this.hasOwnTransport,
+    this.farmerId,
     this.farmerName,
+    this.buyerName,
     this.driverName,
     this.driverPhone,
   });
@@ -24,7 +26,10 @@ class OrderItemModel {
   final String status;
   final DateTime createdAt;
   final bool hasOwnTransport;
+  final String? farmerId;
   final String? farmerName;
+  /// Set when the signed-in user is the farmer on this order — who bought it.
+  final String? buyerName;
   final String? driverName;
   final String? driverPhone;
 }
@@ -106,12 +111,23 @@ class HttpOrdersRepository implements OrdersRepository {
         status: item['status']?.toString() ?? 'PAYMENT_HELD',
         createdAt: DateTime.tryParse(item['createdAt']?.toString() ?? '') ?? DateTime.now(),
         hasOwnTransport: item['hasOwnTransport'] == true,
+        farmerId: item['farmerId']?.toString(),
         farmerName: item['farmerName']?.toString(),
+        buyerName: item['buyerName']?.toString(),
         driverName: item['driverName']?.toString(),
         driverPhone: item['driverPhone']?.toString(),
       )).toList();
-    } on DioException {
-      return const [];
+    } on DioException catch (e) {
+      // Swallowing this to `[]` used to make a failed fetch indistinguishable
+      // from "genuinely no orders yet" — both the buyer's Orders screen and
+      // the farmer's My Sales screen already have a real error state built
+      // for ordersAsync, it just never fired.
+      String? serverMessage;
+      final responseData = e.response?.data;
+      if (responseData is Map) {
+        serverMessage = responseData['error']?['message']?.toString();
+      }
+      throw ApiException(serverMessage ?? e.message ?? 'Failed to load orders.');
     }
   }
 

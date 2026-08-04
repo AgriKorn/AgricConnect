@@ -41,7 +41,9 @@ async function main() {
     process.exit(1);
   }
 
-  const admin = await adminService.createAdmin(parsed.data.body);
+  // Non-UUID marker: no requesting admin exists for a CLI-invoked bootstrap —
+  // audit.repository stores a null actor for any id that doesn't parse as a UUID.
+  const admin = await adminService.createAdmin(parsed.data.body, 'cli-script');
   console.log(`✅ Admin account created: ${admin.name} <${admin.email}> (${admin.id})`);
   console.log('   They can log in immediately with this email and the password you set.');
 }

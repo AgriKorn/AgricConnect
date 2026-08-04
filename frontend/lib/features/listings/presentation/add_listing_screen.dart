@@ -9,6 +9,7 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/utils/freshness.dart';
 import '../../../core/widgets/agri_bottom_sheet.dart';
 import '../../../core/widgets/agri_toast.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../auth/presentation/widgets/auth_visuals.dart';
 import '../../home/application/farmer_dashboard_providers.dart';
 import '../../marketplace/data/marketplace_repository.dart';
@@ -42,7 +43,6 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   late final TextEditingController _shelfLifeController;
   late final TextEditingController _descriptionController;
   late double _freshnessScore;
-  String? _tag;
   String? _imageUrl;
   bool _uploadingPhoto = false;
   bool _submitting = false;
@@ -60,11 +60,6 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
     );
     _descriptionController = TextEditingController();
     _freshnessScore = (scan?.score ?? 100).toDouble();
-    _tag = switch (scan?.qualityGrade) {
-      'Grade A' => 'Premium',
-      'Grade B' => 'Verified',
-      _ => null,
-    };
   }
 
   @override
@@ -150,6 +145,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
             farmerLong: long,
             pricePerKg: double.parse(_priceController.text.trim()),
             imageUrl: _imageUrl,
+            description: _descriptionController.text.trim(),
           );
 
       if (!mounted) return;
@@ -173,7 +169,8 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: SingleChildScrollView(
+            child: ResponsiveContent(
+              child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               child: Form(
                 key: _formKey,
@@ -295,62 +292,6 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                               return (days == null || days <= 0) ? 'Enter a valid number of days' : null;
                             },
                           ),
-                          const SizedBox(height: 20),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              AuthFieldLabel('Freshness Score', colorScheme),
-                              Text(
-                                '${_freshnessScore.round()}%',
-                                style: TextStyle(
-                                  color: freshnessColorFor(_freshnessScore.round(), Theme.of(context).brightness),
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                          SliderTheme(
-                            data: SliderThemeData(
-                              activeTrackColor: colorScheme.primary,
-                              thumbColor: colorScheme.primary,
-                              inactiveTrackColor: colorScheme.surfaceContainerHighest,
-                              overlayColor: colorScheme.primary.withValues(alpha: 0.15),
-                            ),
-                            child: Slider(
-                              value: _freshnessScore,
-                              min: 0,
-                              max: 100,
-                              divisions: 100,
-                              onChanged: (value) => setState(() => _freshnessScore = value),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          AuthFieldLabel('Tag (optional)', colorScheme),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            children: [
-                              _TagChoiceChip(
-                                label: 'None',
-                                selected: _tag == null,
-                                colorScheme: colorScheme,
-                                onTap: () => setState(() => _tag = null),
-                              ),
-                              _TagChoiceChip(
-                                label: 'Verified',
-                                selected: _tag == 'Verified',
-                                colorScheme: colorScheme,
-                                onTap: () => setState(() => _tag = 'Verified'),
-                              ),
-                              _TagChoiceChip(
-                                label: 'Premium',
-                                selected: _tag == 'Premium',
-                                colorScheme: colorScheme,
-                                onTap: () => setState(() => _tag = 'Premium'),
-                              ),
-                            ],
-                          ),
                           const SizedBox(height: 16),
                           AuthFieldLabel('Description (optional)', colorScheme),
                           const SizedBox(height: 8),
@@ -378,6 +319,7 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
                     ),
                   ],
                 ),
+              ),
               ),
             ),
           ),
@@ -482,43 +424,6 @@ class _PrefillBanner extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _TagChoiceChip extends StatelessWidget {
-  const _TagChoiceChip({
-    required this.label,
-    required this.selected,
-    required this.colorScheme,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final ColorScheme colorScheme;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        decoration: BoxDecoration(
-          color: selected ? colorScheme.primary : colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(999),
-          border: selected ? null : Border.all(color: colorScheme.outline.withValues(alpha: 0.3)),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
-          ),
-        ),
       ),
     );
   }

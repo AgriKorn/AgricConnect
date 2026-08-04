@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/widgets/agri_toast.dart';
-import '../../../core/widgets/coming_soon_screen.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../../core/widgets/theme_toggle_button.dart';
 import '../application/auth_controller.dart';
 import '../application/session_state.dart';
@@ -12,18 +12,6 @@ import '../data/models/user_role.dart';
 import 'widgets/auth_visuals.dart';
 
 const _markAsset = 'assets/images/agri_mark.png';
-
-void _openComingSoon(BuildContext context, String title, IconData icon) {
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (context) => ComingSoonScreen(
-        title: title,
-        icon: icon,
-        message: '$title will be available in a future update.',
-      ),
-    ),
-  );
-}
 
 /// Checklist 1.2: shared fields for every role, plus fields specific to
 /// [role]. Client-side validation before submit; submit disabled in-flight.
@@ -154,7 +142,8 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: SingleChildScrollView(
+            child: ResponsiveContent(
+              child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               child: Form(
                 key: _formKey,
@@ -222,10 +211,15 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                             keyboardType: TextInputType.phone,
                             colorScheme: colorScheme,
                             validator: (value) {
-                              final phone = value?.trim() ?? '';
+                              final phone = value?.trim().replaceAll(RegExp(r'\s+'), '') ?? '';
                               if (phone.isEmpty) return 'Enter your phone number';
-                              if (!RegExp(r'^[0-9+]{9,15}$').hasMatch(phone)) {
-                                return 'Enter a valid phone number';
+                              // Mirrors the backend's normalizePhone + phoneSchema: accepts
+                              // 0XXXXXXXXX, 233XXXXXXXXX, or +233XXXXXXXXX before rejecting —
+                              // a looser client check here just means the server has the
+                              // final say on a phone number that looks fine but isn't.
+                              final isValidGhanaPhone = RegExp(r'^(0\d{9}|233\d{9}|\+233\d{9})$').hasMatch(phone);
+                              if (!isValidGhanaPhone) {
+                                return 'Enter a valid Ghana phone number (e.g. 024 123 4567)';
                               }
                               return null;
                             },
@@ -280,8 +274,8 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                             colorScheme: colorScheme,
                             onToggleObscure: () =>
                                 setState(() => _obscurePassword = !_obscurePassword),
-                            validator: (value) => (value == null || value.length < 6)
-                                ? 'At least 6 characters'
+                            validator: (value) => (value == null || value.length < 8)
+                                ? 'At least 8 characters'
                                 : null,
                           ),
                           _Field(
@@ -345,47 +339,9 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        Expanded(child: Divider(color: colorScheme.outline.withValues(alpha: 0.3))),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Text(
-                            'or sign up with',
-                            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12.5, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                        Expanded(child: Divider(color: colorScheme.outline.withValues(alpha: 0.3))),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _SocialButton(
-                            colorScheme: colorScheme,
-                            label: 'Google',
-                            iconBuilder: (color) => Text(
-                              'G',
-                              style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 18),
-                            ),
-                            onTap: () => _openComingSoon(context, 'Sign up with Google', Icons.g_mobiledata_rounded),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _SocialButton(
-                            colorScheme: colorScheme,
-                            label: 'Apple',
-                            iconBuilder: (color) => Icon(Icons.apple_rounded, color: color, size: 20),
-                            onTap: () => _openComingSoon(context, 'Sign up with Apple', Icons.apple_rounded),
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
+              ),
               ),
             ),
           ),
@@ -481,7 +437,7 @@ class _TermsCheckbox extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: value ? colorScheme.primary : Colors.transparent,
-              border: value ? null : Border.all(color: colorScheme.outline.withValues(alpha: 0.5)),
+              border: value ? null : Border.all(color: colorScheme.outline.withValues(alpha: 0.9)),
             ),
             child: value ? Icon(Icons.check_rounded, color: colorScheme.onPrimary, size: 16) : null,
           ),
@@ -493,43 +449,6 @@ class _TermsCheckbox extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _SocialButton extends StatelessWidget {
-  const _SocialButton({
-    required this.colorScheme,
-    required this.label,
-    required this.iconBuilder,
-    required this.onTap,
-  });
-
-  final ColorScheme colorScheme;
-  final String label;
-  final Widget Function(Color color) iconBuilder;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 52,
-      child: OutlinedButton(
-        onPressed: onTap,
-        style: OutlinedButton.styleFrom(
-          foregroundColor: colorScheme.onSurface,
-          side: BorderSide(color: colorScheme.outline.withValues(alpha: 0.4)),
-          shape: const StadiumBorder(),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            iconBuilder(colorScheme.onSurface),
-            const SizedBox(width: 8),
-            Text(label, style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 14.5)),
-          ],
-        ),
       ),
     );
   }

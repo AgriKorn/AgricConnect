@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/motion.dart';
+import '../../../core/widgets/responsive_content.dart';
 import '../../../core/widgets/theme_toggle_button.dart';
 import '../data/models/user_role.dart';
 import 'widgets/auth_visuals.dart';
@@ -38,7 +39,8 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
         children: [
           AmbientBackground(colorScheme: colorScheme),
           SafeArea(
-            child: SingleChildScrollView(
+            child: ResponsiveContent(
+              child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -129,6 +131,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                     ],
                   ),
                 ],
+              ),
               ),
             ),
           ),

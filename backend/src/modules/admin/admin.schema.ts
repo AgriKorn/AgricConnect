@@ -17,3 +17,10 @@ export const createAdminSchema = z.object({
 });
 
 export type CreateAdminInput = z.infer<typeof createAdminSchema>['body'];
+
+export const manualAssignDriverSchema = z.object({
+  body: z.object({
+    transactionId: z.string({ required_error: 'transactionId is required' }).uuid('transactionId must be a valid UUID'),
+    driverId: z.string({ required_error: 'driverId is required' }).uuid('driverId must be a valid UUID'),
+  }),
+});

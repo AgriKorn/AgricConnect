@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/storage/local_prefs.dart';
 import '../../../core/storage/secure_storage.dart';
+import '../../home/application/farmer_dashboard_providers.dart';
 import '../data/auth_repository.dart';
 import '../data/models/account_status.dart';
 import '../data/models/auth_response_model.dart';
@@ -19,11 +21,8 @@ const _sessionSnapshotKey = 'auth_session_snapshot';
 /// this via [authControllerProvider] (claude.md: role/verificationStatus
 /// claims drive the redirect guard).
 class AuthController extends Notifier<SessionState> {
-  late String? _phoneForDebugApproval;
-
   @override
   SessionState build() {
-    _phoneForDebugApproval = null;
     Future.microtask(_restoreSession);
     return SessionState.initial();
   }
@@ -75,7 +74,6 @@ class AuthController extends Notifier<SessionState> {
     state = state.copyWith(isSubmitting: true, errorMessage: null);
     try {
       final result = await ref.read(authRepositoryProvider).register(request);
-      _phoneForDebugApproval = request.phone;
 
       // Registration succeeded. The backend does NOT return tokens on
       // registration, so we set a success message and direct the user to log
@@ -116,6 +114,11 @@ class AuthController extends Notifier<SessionState> {
     final updated = currentUser.copyWith(name: name, region: region);
     state = state.copyWith(user: updated);
     await _persistUser(updated);
+
+    // farmerDashboardSummaryProvider caches its GET /dashboard/farmer-summary
+    // fetch for the app's lifetime — without this, a region edit here (or the
+    // weather it drives) keeps showing whatever was fetched at login.
+    ref.invalidate(farmerDashboardSummaryProvider);
   }
 
   /// Separate from [updateProfile] so changing the photo doesn't force a
@@ -138,7 +141,6 @@ class AuthController extends Notifier<SessionState> {
       final response = await ref
           .read(authRepositoryProvider)
           .login(email: email, password: password);
-      _phoneForDebugApproval = response.user.phone;
       await _applyAuthResponse(response);
     } on ApiException catch (e) {
       state = state.copyWith(isSubmitting: false, errorMessage: e.message);
@@ -149,7 +151,6 @@ class AuthController extends Notifier<SessionState> {
     state = state.copyWith(isSubmitting: true, errorMessage: null);
     try {
       final response = await ref.read(authRepositoryProvider).loginWithGoogle(role: role);
-      _phoneForDebugApproval = response.user.phone;
       await _applyAuthResponse(response);
     } on ApiException catch (e) {
       state = state.copyWith(isSubmitting: false, errorMessage: e.message);
@@ -173,19 +174,29 @@ class AuthController extends Notifier<SessionState> {
     );
   }
 
-  /// Dev-only: stands in for Admin approval (Phase 9 not yet built).
-  Future<void> debugApprove() async {
-    final phone = _phoneForDebugApproval;
-    if (phone == null) return;
-    final user = await ref.read(authRepositoryProvider).debugApprove(phone);
-    state = state.copyWith(status: AuthStatus.authenticated, user: user);
-    await ref
-        .read(localPrefsProvider)
-        .setString(_sessionSnapshotKey, jsonEncode({'user': user.toJson()}));
+  Future<void> logout() async {
+    try {
+      final refreshToken = await ref.read(secureStorageProvider).readRefreshToken();
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        await ref.read(authRepositoryProvider).logout(refreshToken);
+      }
+    } catch (_) {
+      // Best-effort server-side revocation — the user must still end up
+      // signed out locally even if this call fails (offline, already
+      // expired, backend unreachable).
+    }
+    await _clearPersistedSession();
+    state = const SessionState(status: AuthStatus.unauthenticated);
   }
 
-  Future<void> logout() async {
-    await _clearPersistedSession();
+  /// Called when a background token refresh discovers the refresh token
+  /// itself is dead (expired/revoked elsewhere) — without this, the app
+  /// silently wipes local tokens but keeps showing authenticated screens
+  /// while every subsequent request quietly 401s, since nothing ever tells
+  /// the router's redirect guard the session actually ended.
+  void forceLogout() {
+    if (state.status == AuthStatus.unauthenticated) return;
+    unawaited(_clearPersistedSession());
     state = const SessionState(status: AuthStatus.unauthenticated);
   }
 }

@@ -79,6 +79,18 @@ export class TransactionService {
           orderId: transaction.id,
         });
 
+        // The buyer otherwise gets no confirmation their payment went
+        // through at all until delivery is confirmed, which can be days
+        // later — confirmDelivery() already notifies both sides, this makes
+        // purchase() do the same instead of leaving the buyer half of it out.
+        await notificationService.sendNotification({
+          userId: buyerId,
+          type: 'PURCHASE_CONFIRMED',
+          message: `Your order for ${listing.quantityKg}kg of ${listing.cropType} is confirmed. GHS ${amountGhs} is held in escrow until delivery.`,
+          listingId,
+          orderId: transaction.id,
+        });
+
         let dispatch: DriverJob | null = null;
         if (!hasOwnTransport) {
           dispatch = await dispatchService.assignDriver({

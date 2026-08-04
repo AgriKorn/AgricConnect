@@ -40,6 +40,7 @@ class FarmerListingsController extends AsyncNotifier<List<FarmerListingSummary>>
     required double farmerLong,
     required double pricePerKg,
     String? imageUrl,
+    String? description,
   }) async {
     await ref.read(marketplaceRepositoryProvider).createListing(
           cropType: cropType,
@@ -50,6 +51,7 @@ class FarmerListingsController extends AsyncNotifier<List<FarmerListingSummary>>
           farmerLong: farmerLong,
           pricePerKg: pricePerKg,
           imageUrl: imageUrl,
+          description: description,
         );
     ref.invalidateSelf();
     await future;
@@ -57,6 +59,15 @@ class FarmerListingsController extends AsyncNotifier<List<FarmerListingSummary>>
 
   Future<void> deleteListing(String id) async {
     await ref.read(marketplaceRepositoryProvider).deleteListing(id);
+    ref.invalidateSelf();
+    await future;
+  }
+
+  /// Price and quantity are the only fields the backend allows editing after
+  /// a listing is created (PATCH /listings/:id) — crop, freshness, and shelf
+  /// life are fixed at creation time.
+  Future<void> updateListing(String id, {double? pricePerKg, double? quantityKg}) async {
+    await ref.read(marketplaceRepositoryProvider).updateListing(id, pricePerKg: pricePerKg, quantityKg: quantityKg);
     ref.invalidateSelf();
     await future;
   }

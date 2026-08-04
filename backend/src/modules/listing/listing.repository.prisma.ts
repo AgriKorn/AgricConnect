@@ -17,6 +17,7 @@ const mapPrismaToListing = (p: any): Listing => ({
   listingHash: p.listing_hash ? p.listing_hash.trim() : '',
   qrCodeData: p.qr_code_data || '',
   imageUrl: p.photo_url || undefined,
+  description: p.description ?? null,
   status: p.status === 'sold' ? 'SOLD' : p.status === 'active' ? 'ACTIVE' : 'INACTIVE',
   createdAt: p.created_at,
   updatedAt: p.updated_at,
@@ -40,23 +41,30 @@ export class PrismaListingRepository implements IListingRepository {
       });
     }
 
+    // Anchor the ceiling/floor to a real government reference price when one
+    // exists for this crop and region — without it there's no real market
+    // data to compare against, so fall back to a plain band around the
+    // farmer's own price rather than mislabeling that as a MOFA reference.
+    const referencePrice = data.mofaReferencePrice ?? data.pricePerKg;
+
     const created = await prisma.produce_listings.create({
       data: {
         farmer_id: data.farmerId,
         crop_type_id: crop.id,
         quantity_kg: new Prisma.Decimal(data.quantityKg),
-        region: 'Greater Accra',
+        region: data.region || 'Greater Accra',
         gps_lat: new Prisma.Decimal(data.farmerLat),
         gps_lng: new Prisma.Decimal(data.farmerLong),
         freshness_score: new Prisma.Decimal(data.freshnessScore),
         estimated_viable_days: data.shelfLifeDays,
-        mofa_reference_price: new Prisma.Decimal(data.pricePerKg),
-        price_ceiling: new Prisma.Decimal(data.pricePerKg * 1.2),
-        price_floor: new Prisma.Decimal(data.pricePerKg * 0.8),
+        mofa_reference_price: new Prisma.Decimal(referencePrice),
+        price_ceiling: new Prisma.Decimal(referencePrice * 1.2),
+        price_floor: new Prisma.Decimal(referencePrice * 0.8),
         listed_price: new Prisma.Decimal(data.pricePerKg),
         listing_hash: data.listingHash,
         qr_code_data: data.qrCodeData,
         ...(data.imageUrl && { photo_url: data.imageUrl }),
+        ...(data.description && { description: data.description }),
         status: 'active',
       },
       include: { crop_types: true },
