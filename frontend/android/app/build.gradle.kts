@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.agriconnect"
+    namespace = "com.agriconnect.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -15,8 +15,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.agriconnect"
+        applicationId = "com.agriconnect.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 26 // Android 8.0, per PRD 7.1 / checklist 0.1
@@ -25,10 +24,25 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("debug") {
+            // Checked-in keystore (not the Gradle-implicit per-machine one) so the
+            // signing certificate's SHA-1 — registered with the Android OAuth client
+            // in Google Cloud Console for Google Sign-In — stays identical across
+            // local builds and CI. Without this, every CI run got its own ephemeral
+            // debug.keystore, so Google Sign-In broke again on the next APK build.
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // TODO: Add a real release signing config before shipping to Play Store.
+            // Signing with the (checked-in) debug key for now, so `flutter run
+            // --release` and the CI-built APK work and stay Google-Sign-In-compatible.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
