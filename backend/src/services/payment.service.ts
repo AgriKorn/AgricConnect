@@ -117,7 +117,13 @@ export class PaystackPaymentService implements IPaymentService {
       };
     } catch (error: any) {
       logger.error('[Paystack Transfer Error]:', error?.response?.data || error.message);
-      throw new Error('Payout transfer failed with Paystack API');
+      // Unlike refundTransaction/resolveMomoAccount below, this threw a bare
+      // Error — which the global handler reports as an opaque 500 "unexpected
+      // error occurred", hiding the real reason (bad bank code, farmer's momo
+      // number rejected, insufficient platform balance, ...) from both the
+      // buyer confirming delivery and whoever has to debug it afterward.
+      const paystackMessage = error?.response?.data?.message;
+      throw new BadRequestError(paystackMessage || 'Payout transfer failed with Paystack API');
     }
   }
 
