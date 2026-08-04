@@ -19,26 +19,21 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
-// Some plugins (e.g. tflite_flutter) ship Java/Kotlin compile targets that
-// don't match each other, which fails release builds with "Inconsistent JVM
-// Target Compatibility". Force every module to the same target as :app.
-// Uses plugins.withId (not afterEvaluate) so this works regardless of when
-// each subproject gets evaluated relative to this block.
+// tflite_flutter's own build.gradle sets its Java compileOptions to 11 but
+// leaves Kotlin unset, so Kotlin defaults to the build's JDK (17) and
+// assembleRelease fails with "Inconsistent JVM Target Compatibility" between
+// compileReleaseJavaWithJavac (11) and compileReleaseKotlin (17).
+//
+// Scoped to just that plugin, and only touching the Kotlin side: every other
+// module already builds fine on its own, and forcing compileOptions
+// (Java source/targetCompatibility) here throws "sourceCompatibility has
+// been finalized" for modules whose AGP config already locked that property.
 subprojects {
-    listOf("com.android.application", "com.android.library").forEach { pluginId ->
-        plugins.withId(pluginId) {
-            extensions.configure(com.android.build.gradle.BaseExtension::class.java) {
-                compileOptions {
-                    sourceCompatibility = JavaVersion.VERSION_17
-                    targetCompatibility = JavaVersion.VERSION_17
-                }
-            }
-        }
-    }
+    if (project.name != "tflite_flutter") return@subprojects
     plugins.withId("org.jetbrains.kotlin.android") {
         tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile::class.java).configureEach {
             compilerOptions {
-                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+                jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
             }
         }
     }
