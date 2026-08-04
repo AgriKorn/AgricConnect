@@ -25,7 +25,7 @@ android {
     }
 
     signingConfigs {
-        create("debug") {
+        getByName("debug") {
             // Checked-in keystore (not the Gradle-implicit per-machine one) so the
             // signing certificate's SHA-1 — registered with the Android OAuth client
             // in Google Cloud Console for Google Sign-In — stays identical across
