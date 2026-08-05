@@ -97,32 +97,38 @@ leak via the marketplace API (see §5). Treat as HIGH, not CRITICAL.
 
 ## 3. 🟠 MoMo encryption is inert in production
 
-**Status: PARTIALLY FIXED — plumbing is in place, the key is not.**
+**Status: NOT FIXED — see §8, the workflow edit was deliberately skipped.**
 
 Commit `3067141` ("feat(security): encrypt Mobile Money numbers at rest (SRS
-Security NFR)") is **doing nothing live**. `deploy.yml` never passed
+Security NFR)") is **doing nothing live**. `deploy.yml` does not pass
 `FIELD_ENCRYPTION_KEY`, so `utils/encryption.ts:31-41` logs one warning and
 stores Mobile Money numbers **in plaintext** — financial PII.
-
-**Already done:** `FIELD_ENCRYPTION_KEY` is now wired through `deploy.yml`
-(step `env:` + container JSON). While the secret is unset it resolves to `""`,
-which `loadKey()` treats as absent, so current behaviour is unchanged.
 
 ### ⚠️ Do NOT set this key in the Lightsail console
 
 `aws lightsail create-container-service-deployment` replaces the container's
 **entire** environment block. A key set by hand in the console is wiped by the
 next push — and `decrypt()` (`encryption.ts:84`) then **throws on every
-already-encrypted row**, breaking farmer payouts outright. The workflow plumbing
-above exists specifically so this cannot happen.
+already-encrypted row**, breaking farmer payouts outright.
+
+**So the workflow must be edited first — the console is never the right place.**
 
 ### Fix
 
-1. `openssl rand -base64 32`
-2. Add as the GitHub secret `FIELD_ENCRYPTION_KEY`. The plumbing is already there.
-3. Existing plaintext rows stay readable — `decrypt()` passes through
+1. Add `FIELD_ENCRYPTION_KEY: ${{ secrets.FIELD_ENCRYPTION_KEY }}` to
+   `deploy.yml`'s deploy-step `env:` block, **and**
+   `\"FIELD_ENCRYPTION_KEY\":\"$FIELD_ENCRYPTION_KEY\"` inside the
+   `--containers` environment JSON. Both, or it is wiped on the next deploy.
+2. `openssl rand -base64 32`
+3. Add it as the GitHub secret `FIELD_ENCRYPTION_KEY`.
+4. Existing plaintext rows stay readable — `decrypt()` passes through
    non-prefixed values — but they are **not** retroactively encrypted. Write a
    one-off backfill if that matters for the SRS claim.
+
+Ordering note: step 1 is safe to land before step 3. An unset secret expands to
+`""`, which `loadKey()` treats as absent, so behaviour stays exactly as it is
+today until a real key is supplied. (Contrast §2, where the same pattern is
+*not* safe.)
 
 ---
 
@@ -271,15 +277,6 @@ Baseline instead:
 - **Real scans are no longer captioned as fake.** The result screen
   unconditionally read *"Preview — sample result, not a real scan"*; it is now
   conditional on the new `ScanRecord.isSampleResult`.
-- **Production deploys locked to `main`.** Backend CD and Frontend CD triggered
-  on `feature/frontend-integration` and `feature/K1-scaffolding`, so any push to
-  either redeployed live production. Use `workflow_dispatch` for deliberate
-  branch deploys. (`build-apk.yml` intentionally left alone — it only builds an
-  artifact and never touches production.)
-- **Silent frontend deploy failures.** `deploy-frontend.yml` ended its
-  deployment step with `|| true`, so a failed deploy reported green against a
-  stale site.
-- **`FIELD_ENCRYPTION_KEY` plumbing** — see §3.
 - **500s on malformed address IDs.** `PATCH`/`DELETE /api/users/addresses/:id`
   had no UUID validation, so a Postgres cast error surfaced as a raw 500 instead
   of a 404.
@@ -290,7 +287,49 @@ Baseline instead:
 
 ---
 
-## 8. Correctness backlog (not security)
+## 8. Deferred: three `.github/workflows/` changes
+
+**Status: NOT APPLIED — the workflow files are deliberately unchanged.**
+
+These were prepared and validated (YAML parsed, Lightsail container JSON
+re-parsed with all vars expanded) but **not** committed, by decision. Each is a
+small, self-contained edit whenever you want it.
+
+Note: changing files under `.github/workflows/` requires a token with the
+`workflow` scope. The `Kobi-Ampem` login used for this work has
+`gist, read:org, repo` only, so these edits also cannot be pushed with it as-is
+(`gh auth refresh -h github.com -s workflow` would add the scope).
+
+**a. Lock production deploys to `main`.** `deploy.yml` triggers on `main`,
+`feature/K1-scaffolding` and `feature/frontend-integration`;
+`deploy-frontend.yml` on `main` and `feature/frontend-integration`. Both deploy
+straight to live production (`container-service-1` / `-2`), so **any push to
+either feature branch redeploys production** — including mid-demo. Drop the
+`feature/*` entries; `workflow_dispatch` already covers deliberate branch
+deploys.
+
+*Leave `build-apk.yml` alone* — it only builds an artifact and never touches
+production, so restricting it removes a useful branch check for no safety gain.
+
+**b. Unmask frontend deploy failures.** `deploy-frontend.yml`'s last line ends
+with `|| true`, so a failed Lightsail deployment reports green while the live
+site stays stale. Delete the `|| true`.
+
+**c. Wire `FIELD_ENCRYPTION_KEY`.** See §3 — this is the prerequisite for making
+MoMo encryption actually work in production.
+
+Two further workflow-level gaps worth fixing at the same time:
+
+- Backend CD's job is named "**Test**, Build Docker & Deploy" but runs no test,
+  lint, or build step, and `ci.yml` only fires on `pull_request` — so a direct
+  push to `main` (the normal deploy path) reaches production with zero tests run.
+- No CI job runs `flutter analyze` or `flutter test` at all; the APK and web
+  builds are compile-only gates. This is why the broken scan tensor shape (§7)
+  shipped green.
+
+---
+
+## 9. Correctness backlog (not security)
 
 Confirmed by reading code; none is a demo blocker.
 
