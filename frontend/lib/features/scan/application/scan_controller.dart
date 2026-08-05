@@ -45,6 +45,14 @@ class ScanController extends Notifier<ScanState> {
   int _sampleIndex = 0;
   Future<CropScanModel>? _modelFuture;
 
+  /// Re-entrancy guard for [captureAndAnalyze], tracked separately from
+  /// [ScanState.isScanning] — that flag now flips on the instant the
+  /// shutter is tapped (see [beginCapture]), before this method even runs,
+  /// so it can no longer double as "a scan is currently in flight" without
+  /// every call seeing it already true and short-circuiting to whatever
+  /// stale result happens to be cached.
+  bool _analyzing = false;
+
   @override
   ScanState build() {
     _restoreCachedResult();
@@ -86,13 +94,24 @@ class ScanController extends Notifier<ScanState> {
   String get previewCropType =>
       _sampleResults[_sampleIndex % _sampleResults.length].cropType;
 
+  /// Flips [ScanState.isScanning] on immediately, before the camera has even
+  /// finished taking the photo. [captureAndAnalyze] does this too, but only
+  /// once `takePicture()` (a real, noticeable camera-hardware delay) has
+  /// already resolved — leaving a dead gap between tapping the shutter and
+  /// any visible feedback that the tap was registered at all. The capture
+  /// screen calls this the instant the button is pressed instead.
+  void beginCapture() {
+    state = state.copyWith(isScanning: true, errorMessage: null);
+  }
+
   Future<ScanRecord> captureAndAnalyze({String? imagePath}) async {
-    if (state.isScanning) {
+    if (_analyzing) {
       final existing = state.lastResult;
       if (existing != null) {
         return existing;
       }
     }
+    _analyzing = true;
 
     state = state.copyWith(isScanning: true, errorMessage: null);
     final stopwatch = Stopwatch()..start();
@@ -121,6 +140,8 @@ class ScanController extends Notifier<ScanState> {
         errorMessage: 'Scan failed. Please try again.',
       );
       rethrow;
+    } finally {
+      _analyzing = false;
     }
   }
 
