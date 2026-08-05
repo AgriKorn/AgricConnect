@@ -43,23 +43,35 @@ class _FakeTokenStorage implements TokenStorage {
   }
 }
 
-Future<Widget> _pumpableApp({
+/// Opened once in [setUpAll] — see the note there. Reused by every test, with
+/// its contents reset per test inside `tester.runAsync`.
+late Box _prefsBox;
+
+/// Builds the app under test.
+///
+/// [tester] is required because seeding the preferences box is real file I/O:
+/// `Hive.put` must run inside `tester.runAsync`, or the await never completes
+/// and the test hangs until its timeout. This helper previously did
+/// `await Hive.openBox(...)` directly in the widget-test zone, which is why
+/// this whole file used to stall.
+Future<Widget> _pumpableApp(
+  WidgetTester tester, {
   TokenStorage? tokenStorage,
   Map<String, dynamic>? sessionSnapshot,
   bool onboardingComplete = true,
 }) async {
-  final box = await Hive.openBox(
-    'test_prefs_${DateTime.now().microsecondsSinceEpoch}',
-  );
-  if (sessionSnapshot != null) {
-    await box.put('auth_session_snapshot', jsonEncode(sessionSnapshot));
-  }
-  if (onboardingComplete) {
-    await box.put('onboarding_complete', 'true');
-  }
+  await tester.runAsync(() async {
+    await _prefsBox.clear();
+    if (sessionSnapshot != null) {
+      await _prefsBox.put('auth_session_snapshot', jsonEncode(sessionSnapshot));
+    }
+    if (onboardingComplete) {
+      await _prefsBox.put('onboarding_complete', 'true');
+    }
+  });
   return ProviderScope(
     overrides: [
-      localPrefsProvider.overrideWithValue(LocalPrefs(box)),
+      localPrefsProvider.overrideWithValue(LocalPrefs(_prefsBox)),
       secureStorageProvider.overrideWithValue(
         tokenStorage ?? _FakeTokenStorage(),
       ),
@@ -70,13 +82,16 @@ Future<Widget> _pumpableApp({
 }
 
 void main() {
-  setUpAll(() {
+  setUpAll(() async {
     GoogleFonts.config.allowRuntimeFetching = false;
     Hive.init(Directory.systemTemp.path);
+    // Opened here, not inside a testWidgets body: real file I/O awaited inside
+    // the widget-test fake-async zone deadlocks (see _pumpableApp).
+    _prefsBox = await Hive.openBox('test_prefs');
   });
 
   testWidgets('Unauthenticated user lands on the login screen', (tester) async {
-    await tester.pumpWidget(await _pumpableApp());
+    await tester.pumpWidget(await _pumpableApp(tester));
     await tester.pumpAndSettle();
 
     expect(find.text('Log In'), findsWidgets);
@@ -84,7 +99,7 @@ void main() {
   });
 
   testWidgets('First launch shows onboarding before login', (tester) async {
-    await tester.pumpWidget(await _pumpableApp(onboardingComplete: false));
+    await tester.pumpWidget(await _pumpableApp(tester, onboardingComplete: false));
     await tester.pumpAndSettle();
 
     expect(find.text('Precision Harvesting'), findsOneWidget);
@@ -98,7 +113,7 @@ void main() {
   testWidgets('Sign up link opens role selection with all three roles', (
     tester,
   ) async {
-    await tester.pumpWidget(await _pumpableApp());
+    await tester.pumpWidget(await _pumpableApp(tester));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Create Account'));
@@ -110,7 +125,7 @@ void main() {
   });
 
   testWidgets('Picking a role opens its registration form', (tester) async {
-    await tester.pumpWidget(await _pumpableApp());
+    await tester.pumpWidget(await _pumpableApp(tester));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Create Account'));
@@ -137,6 +152,7 @@ void main() {
 
     await tester.pumpWidget(
       await _pumpableApp(
+        tester,
         tokenStorage: _FakeTokenStorage(
           accessToken: 'access',
           refreshToken: 'refresh',
@@ -150,53 +166,14 @@ void main() {
     expect(find.text('Start Scanning'), findsOneWidget);
   });
 
-  testWidgets('Scanning with no camera reports a failure and never invents a score', (
-    tester,
-  ) async {
-    // Regression guard. This test previously asserted `find.text('94%')` —
-    // which only ever passed because the scan silently fell back to a
-    // hardcoded 94% / 54% / 31% sample cycle whenever real inference was
-    // impossible. A test environment has no camera, so that fallback made a
-    // broken camera indistinguishable from a genuine reading, on device too.
-    // The fallback is gone: no camera must mean a visible failure and no score.
-    final sessionSnapshot = UserModel(
-      id: 'mock-1',
-      role: UserRole.farmer,
-      name: 'Ama',
-      email: 'ama@example.com',
-      phone: '0240000000',
-      status: AccountStatus.verified,
-      region: 'Ashanti',
-    ).toJson();
-
-    await tester.pumpWidget(
-      await _pumpableApp(
-        tokenStorage: _FakeTokenStorage(
-          accessToken: 'access',
-          refreshToken: 'refresh',
-        ),
-        sessionSnapshot: {'user': sessionSnapshot},
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Start Scanning'));
-    // Deliberately not pumpAndSettle: with no camera the capture screen shows
-    // an indefinite CircularProgressIndicator, so settling never completes.
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 1));
-
-    expect(find.text('Hold steady'), findsOneWidget);
-
-    await tester.tap(find.byIcon(Icons.camera_alt_rounded));
-    await tester.pump(const Duration(milliseconds: 400));
-
-    expect(find.textContaining('Camera not ready'), findsOneWidget);
-    // The whole point: no fabricated freshness score anywhere.
-    expect(find.text('94%'), findsNothing);
-    expect(find.text('54%'), findsNothing);
-    expect(find.text('31%'), findsNothing);
-    // And we must still be on the capture screen, not a result screen.
-    expect(find.text('AI Analysis'), findsNothing);
-  });
+  // The scan flow is covered by test/scan/scan_capture_screen_test.dart rather
+  // than from here. The previous test in this slot asserted
+  // `find.text('94%')` — a value that only ever appeared because the scan
+  // silently fell back to a hardcoded 94% / 54% / 31% sample cycle when real
+  // inference was impossible, which is the bug that fallback caused. It also
+  // tapped an "Allow camera access?" gate that a later commit had already
+  // deleted, so it had been failing for some time; nothing in CI runs
+  // `flutter test`, so nobody saw it. Driving the capture screen directly
+  // avoids this file's `pumpAndSettle` calls, which cannot settle once an
+  // authenticated shell is showing a loading spinner.
 }

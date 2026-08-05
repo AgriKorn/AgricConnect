@@ -39,7 +39,6 @@ void main() {
 
       expect(record.score, 98); // round(100 * (0.97 + 0.5*0.02))
       expect(record.qualityGrade, 'Grade A');
-      expect(record.shelfLifeLabel, '7 Days');
       expect(record.attributes.first.label, 'Good Condition');
       expect(record.attributes.first.kind, ScanAttributeKind.positive);
     });
@@ -59,7 +58,6 @@ void main() {
 
       expect(record.score, lessThan(10));
       expect(record.qualityGrade, 'Grade C');
-      expect(record.shelfLifeLabel, endsWith('Hours'));
       expect(record.attributes.any((a) => a.label == 'Spoilage Detected'), isTrue);
     });
 
@@ -108,10 +106,10 @@ void main() {
       );
     });
 
-    test('the record never carries a crop species or a price', () {
-      // Regression guard for the two things the engine must not decide. Both
+    test('the record never carries a crop species, price or shelf life', () {
+      // Regression guard for the three things the engine must not decide. All
       // were removed from ScanRecord, so this is enforced by the type system —
-      // this test documents the intent and fails to compile if either returns.
+      // this test documents the intent and fails if any of them returns.
       final record = buildScanRecord(
         _result(
           cropType: 'cucumber',
@@ -128,19 +126,24 @@ void main() {
       expect(json.containsKey('cropType'), isFalse);
       expect(json.containsKey('recommendedPrice'), isFalse);
       expect(json.containsKey('priceUnit'), isFalse);
+      // Shelf life came from the model's crop guess, so it is gone too.
+      expect(json.containsKey('shelfLifeDays'), isFalse);
+      expect(json.containsKey('shelfLifeLabel'), isFalse);
     });
 
-    test('every crop the model can emit produces the same shaped record', () {
-      // The crop label must make no difference to the output now.
+    test('neither the crop label nor the model shelf-life affects the record', () {
+      // Both are ignored now, so nine different crops with nine different
+      // in-graph shelf-life values must all yield the same freshness output.
       final scores = <int>{};
-      for (final crop in CropScanModel.cropNames) {
+      for (var i = 0; i < CropScanModel.cropNames.length; i++) {
+        final crop = CropScanModel.cropNames[i];
         final record = buildScanRecord(
           _result(
             cropType: crop,
             cropConfidence: 0.9,
             freshnessStage: 'fresh',
             freshnessProbs: [0.05, 0.9, 0.05],
-            shelfLifeDays: 5,
+            shelfLifeDays: i.toDouble(), // varies per crop; must be ignored
           ),
           id: 'scan-$crop',
           capturedAt: DateTime(2026, 1, 1),
@@ -171,8 +174,6 @@ void main() {
       expect(restored.id, record.id);
       expect(restored.score, record.score);
       expect(restored.qualityGrade, record.qualityGrade);
-      expect(restored.shelfLifeDays, record.shelfLifeDays);
-      expect(restored.shelfLifeLabel, record.shelfLifeLabel);
       expect(restored.confidence, record.confidence);
       expect(restored.imagePath, '/tmp/photo.jpg');
       expect(restored.attributes.map((a) => a.label), record.attributes.map((a) => a.label));

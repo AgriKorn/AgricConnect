@@ -51,8 +51,6 @@ ScanRecord buildScanRecord(
   return ScanRecord(
     id: id,
     score: score,
-    shelfLifeLabel: _shelfLifeLabel(result.shelfLifeDays),
-    shelfLifeDays: result.shelfLifeDays,
     qualityGrade: qualityGrade,
     confidence: result.freshnessConfidence,
     attributes: attributes,
@@ -61,10 +59,3 @@ ScanRecord buildScanRecord(
   );
 }
 
-String _shelfLifeLabel(double days) {
-  if (days < 1) {
-    final hours = (days * 24).round().clamp(1, 23);
-    return '$hours Hours';
-  }
-  return '${days.round()} Days';
-}

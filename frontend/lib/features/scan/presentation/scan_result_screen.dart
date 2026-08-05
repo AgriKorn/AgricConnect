@@ -179,8 +179,7 @@ class _ResultAppBar extends StatelessWidget {
               // crop_scan_presenter.dart for why both were removed.
               await Clipboard.setData(ClipboardData(
                 text:
-                    '${result.score}% freshness (${result.qualityGrade}), '
-                    '${result.shelfLifeLabel} shelf life.',
+                    '${result.score}% freshness (${result.qualityGrade}).',
               ));
               if (context.mounted) {
                 showAgriToast(context, 'Scan summary copied to clipboard');
@@ -275,26 +274,11 @@ class _FreshnessCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 26),
-          Row(
-            children: [
-              Expanded(
-                child: _StatPill(
-                  colorScheme: colorScheme,
-                  icon: Icons.calendar_today_rounded,
-                  value: result.shelfLifeLabel,
-                  label: 'Shelf Life',
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _StatPill(
-                  colorScheme: colorScheme,
-                  icon: Icons.local_fire_department_rounded,
-                  value: result.qualityGrade,
-                  label: 'Quality',
-                ),
-              ),
-            ],
+          _StatPill(
+            colorScheme: colorScheme,
+            icon: Icons.local_fire_department_rounded,
+            value: result.qualityGrade,
+            label: 'Quality',
           ),
         ],
       ),

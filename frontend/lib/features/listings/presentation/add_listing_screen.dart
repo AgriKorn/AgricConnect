@@ -45,26 +45,22 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   void initState() {
     super.initState();
     final scan = widget.prefill;
-    // Deliberately not prefilled from scan.cropType: the on-device model has
-    // a fixed 9-crop vocabulary and no "not a crop" class, so it always
-    // guesses *something* — including confidently wrong guesses on
-    // non-produce photos. Species identification is out of scope for this
-    // scan feature (see crop_scan_presenter.dart); the farmer names their
-    // own produce, the scan only supplies freshness/shelf-life/price.
+    // Nothing here is prefilled from the scan except the freshness score.
+    //
+    // The model has a fixed 9-crop vocabulary and no "not a crop" class, so its
+    // crop head always names *something* — confidently, even for a photo with
+    // no produce in it. Everything that was derived from that guess has been
+    // removed rather than shown as an AI suggestion:
+    //   * crop name  — the farmer names their own produce;
+    //   * price      — was a per-crop base rate keyed by the guessed species,
+    //                  so a misread crop silently set the asking price;
+    //   * shelf life — the model computes it in-graph from the same guess.
+    // The scan contributes the freshness score alone, which comes from the
+    // freshness head and does not depend on the species (crop_scan_presenter.dart).
     _nameController = TextEditingController();
-    // Not prefilled from the scan either: the old "AI recommended price" was a
-    // per-crop base rate looked up by the model's *guessed* species, so a
-    // misidentified crop silently set the farmer's asking price. The farmer
-    // sets their own price; the scan contributes freshness and shelf life only.
     _priceController = TextEditingController();
     _quantityController = TextEditingController();
-    _shelfLifeController = TextEditingController(
-      // Reads the scan's raw day count directly rather than re-parsing its
-      // display label — that label switches to hour units under 1 day
-      // (e.g. "8 Hours"), and grabbing the leading digits from it would
-      // silently submit 8 *days* instead of 8 hours to the backend.
-      text: scan == null ? '' : scan.shelfLifeDays.round().toString(),
-    );
+    _shelfLifeController = TextEditingController();
     _descriptionController = TextEditingController();
     _freshnessScore = (scan?.score ?? 100).toDouble();
   }

@@ -32,9 +32,9 @@ class ScanAttribute {
   }
 }
 
-/// The outcome of one real on-device scan.
+/// The outcome of one real on-device scan: a freshness reading, nothing else.
 ///
-/// Deliberately carries **no crop species and no price**:
+/// Deliberately carries **no crop species, no price and no shelf life**:
 ///
 /// * Species — the model has a fixed 9-crop vocabulary and no "not a crop"
 ///   class, so it always emits some crop with some confidence, including for
@@ -44,6 +44,14 @@ class ScanAttribute {
 /// * Price — the previous recommendation was derived from that same untrusted
 ///   species guess (a wrong guess silently moved the farmer's suggested
 ///   price), so it has been removed rather than shown as an "AI price tip".
+/// * Shelf life — `agriconnect.tflite` computes `shelf_life_days` *in-graph*
+///   from its own crop guess (ArgMax over the crop head, then Gather against a
+///   baked-in table — see ai/README.md), so it inherited the same
+///   unreliability. Removed for that reason; the farmer states shelf life on
+///   the listing form.
+///
+/// What remains — the freshness score and the grade derived from it — depends
+/// only on the freshness head, which is species-independent.
 ///
 /// There is no "sample"/mock variant of this class any more: if a real
 /// inference cannot be run, the scan fails loudly instead of inventing a
@@ -52,8 +60,6 @@ class ScanRecord {
   const ScanRecord({
     required this.id,
     required this.score,
-    required this.shelfLifeLabel,
-    required this.shelfLifeDays,
     required this.qualityGrade,
     required this.confidence,
     required this.attributes,
@@ -65,18 +71,12 @@ class ScanRecord {
 
   /// 0-100, from the model's freshness head only.
   final int score;
-  final String shelfLifeLabel; // short display form, e.g. "12 Days"
-
-  /// The raw days-remaining number `shelfLifeLabel` was formatted from.
-  /// Anything that needs a real number (e.g. prefilling a listing's
-  /// shelf-life field) should read this, not re-parse the display label —
-  /// the label switches to hour units under 1 day, and a naive "grab the
-  /// leading digits" parse would silently read "8 Hours" as 8 *days*.
-  final double shelfLifeDays;
   final String qualityGrade; // e.g. "Grade A"
 
-  /// Lower of the model's two head confidences. Drives the low-confidence
-  /// retake caveat in [ScanAttribute] form; not displayed as a raw number.
+  /// The freshness head's confidence — deliberately *not* combined with the
+  /// crop head's, so a confidently-wrong species cannot mask an uncertain
+  /// freshness reading. Drives the low-confidence retake caveat in
+  /// [ScanAttribute] form; never displayed as a raw number.
   final double confidence;
   final List<ScanAttribute> attributes;
   final DateTime capturedAt;
@@ -91,8 +91,6 @@ class ScanRecord {
     return ScanRecord(
       id: id,
       score: score,
-      shelfLifeLabel: shelfLifeLabel,
-      shelfLifeDays: shelfLifeDays,
       qualityGrade: qualityGrade,
       confidence: confidence,
       attributes: attributes,
@@ -105,8 +103,6 @@ class ScanRecord {
     return {
       'id': id,
       'score': score,
-      'shelfLifeLabel': shelfLifeLabel,
-      'shelfLifeDays': shelfLifeDays,
       'qualityGrade': qualityGrade,
       'confidence': confidence,
       'attributes': attributes.map((a) => a.toJson()).toList(),
@@ -119,8 +115,6 @@ class ScanRecord {
     return ScanRecord(
       id: json['id'] as String,
       score: json['score'] as int,
-      shelfLifeLabel: json['shelfLifeLabel'] as String,
-      shelfLifeDays: (json['shelfLifeDays'] as num).toDouble(),
       qualityGrade: json['qualityGrade'] as String,
       confidence: (json['confidence'] as num).toDouble(),
       attributes: (json['attributes'] as List<dynamic>)
