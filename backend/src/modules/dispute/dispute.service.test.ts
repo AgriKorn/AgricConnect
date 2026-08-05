@@ -71,7 +71,7 @@ describe('DisputeService', () => {
         id: 'tx-500',
         buyerId: 'buyer-1',
         farmerId: 'farmer-1',
-        status: 'PAYMENT_HELD',
+        status: 'DRIVER_ASSIGNED',
       } as any);
 
       const mockDispute = createMockDispute();
@@ -90,7 +90,7 @@ describe('DisputeService', () => {
       expect(result).toEqual(mockDispute);
     });
 
-    it('should throw ConflictError if the order is not in PAYMENT_HELD (e.g. already delivered/cancelled)', async () => {
+    it('should throw ConflictError if the order is not in an active pre-release status (e.g. already released/cancelled)', async () => {
       jest.spyOn(transactionRepository, 'findById').mockResolvedValue({
         id: 'tx-500',
         buyerId: 'buyer-1',
@@ -107,7 +107,7 @@ describe('DisputeService', () => {
         id: 'tx-500',
         buyerId: 'buyer-1',
         farmerId: 'farmer-1',
-        status: 'PAYMENT_HELD',
+        status: 'DRIVER_ASSIGNED',
       } as any);
       mockRepo.findOpenByTransaction.mockResolvedValue(createMockDispute());
 
@@ -159,7 +159,7 @@ describe('DisputeService', () => {
         driverId: null,
         cropType: 'tomato',
         amountGhs: 3000,
-        status: 'PAYMENT_HELD',
+        status: 'DRIVER_ASSIGNED',
         hasOwnTransport: false,
         paymentReference: 'stub_ref',
         transferCode: null,
@@ -201,7 +201,7 @@ describe('DisputeService', () => {
         driverId: null,
         cropType: 'tomato',
         amountGhs: 3000,
-        status: 'PAYMENT_HELD',
+        status: 'DRIVER_ASSIGNED',
         hasOwnTransport: false,
         paymentReference: 'stub_ref',
         transferCode: null,
@@ -247,7 +247,7 @@ describe('DisputeService', () => {
         driverId: null,
         cropType: 'tomato',
         amountGhs: 3000,
-        status: 'PAYMENT_HELD',
+        status: 'DRIVER_ASSIGNED',
         hasOwnTransport: false,
         paymentReference: 'stub_ref',
         transferCode: null,
@@ -289,7 +289,7 @@ describe('DisputeService', () => {
         buyerId: 'buyer-1',
         farmerId: 'farmer-1',
         amountGhs: 3000,
-        status: 'PAYMENT_HELD',
+        status: 'DRIVER_ASSIGNED',
         paymentReference: 'stub_ref',
         transferCode: null,
         createdAt: new Date(),

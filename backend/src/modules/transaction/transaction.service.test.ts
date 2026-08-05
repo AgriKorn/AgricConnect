@@ -34,7 +34,7 @@ describe('TransactionService', () => {
     driverId: null,
     cropType: 'tomato',
     amountGhs: 3000,
-    status: 'PAYMENT_HELD',
+    status: 'AWAITING_DRIVER',
     hasOwnTransport: false,
     paymentReference: 'stub_ref',
     transferCode: null,
@@ -235,79 +235,192 @@ describe('TransactionService', () => {
   });
 
   describe('confirmDelivery', () => {
-    it('should throw BadRequestError if QR hash does not match listing hash', async () => {
-      const transactionId = 'tx-100';
-
-      mockRepo.findById.mockResolvedValue(createMockTx({ id: transactionId, listingId: 'listing-1', buyerId: 'buyer-1' }));
-      jest.spyOn(dispatchService, 'getDriverJobs').mockResolvedValue([]);
-
-      jest.spyOn(listingRepository, 'findById').mockResolvedValue({
-        id: 'listing-1',
-        listingHash: 'correct-qr-hash-123',
-      } as any);
-
-      await expect(transactionService.confirmDelivery(transactionId, 'WRONG-QR-HASH', 'buyer-1')).rejects.toThrow(
-        'QR hash does not match this listing',
-      );
-    });
-
-    it('should propagate failure and prevent downstream markCompleted if QR scan record fails (Failure Injection)', async () => {
-      const transactionId = 'tx-100';
-      const validHash = 'correct-hash-123';
-
-      mockRepo.findById.mockResolvedValue(createMockTx({ id: transactionId, listingId: 'listing-1', buyerId: 'buyer-1' }));
-      jest.spyOn(dispatchService, 'getDriverJobs').mockResolvedValue([]);
-
-      jest.spyOn(listingRepository, 'findById').mockResolvedValue({
-        id: 'listing-1',
-        listingHash: validHash,
-      } as any);
-
-      jest.spyOn(userRepository, 'findById').mockResolvedValue({
-        id: 'farmer-789',
-        profile: { momoNumber: '+233541234567', momoNetwork: 'MTN' },
-      } as any);
-      jest.spyOn(paymentService, 'initiateTransfer').mockResolvedValue({ transferCode: 'trf_test123', status: 'success' });
-
-      // Failure injection: qr_scans write fails
-      mockPrisma.qr_scans.create.mockRejectedValue(new Error('QR Scan DB insert failure'));
-      const markCompletedSpy = jest.spyOn(dispatchService, 'markCompleted');
-
-      await expect(transactionService.confirmDelivery(transactionId, validHash, 'buyer-1')).rejects.toThrow(
-        'QR Scan DB insert failure',
+    it('should throw ForbiddenError if anyone but the buyer tries to confirm', async () => {
+      mockRepo.findById.mockResolvedValue(
+        createMockTx({ hasOwnTransport: true, status: 'AWAITING_DRIVER', buyerId: 'buyer-1' }),
       );
 
-      // Assert downstream dispatch markCompleted was NEVER invoked
-      expect(markCompletedSpy).not.toHaveBeenCalled();
+      await expect(transactionService.confirmDelivery('tx-100', 'any-code', 'assigned-driver')).rejects.toThrow(ForbiddenError);
     });
 
-    it('should successfully confirm delivery and release escrow funds', async () => {
-      const transactionId = 'tx-100';
-      const validHash = 'correct-hash-123';
+    describe('self-collect orders', () => {
+      it('should throw BadRequestError if the scanned code does not match the listing hash', async () => {
+        mockRepo.findById.mockResolvedValue(
+          createMockTx({ hasOwnTransport: true, status: 'AWAITING_DRIVER', buyerId: 'buyer-1' }),
+        );
+        jest.spyOn(listingRepository, 'findById').mockResolvedValue({ id: 'listing-1', listingHash: 'correct-qr-hash-123' } as any);
 
-      const mockTx = createMockTx({ id: transactionId, listingId: 'listing-1', buyerId: 'buyer-1', status: 'PAYMENT_HELD' });
+        await expect(transactionService.confirmDelivery('tx-100', 'WRONG-QR-HASH', 'buyer-1')).rejects.toThrow(
+          'QR code does not match this listing',
+        );
+      });
+
+      it('should throw BadRequestError if the order is not awaiting pickup confirmation', async () => {
+        mockRepo.findById.mockResolvedValue(
+          createMockTx({ hasOwnTransport: true, status: 'RELEASED', buyerId: 'buyer-1' }),
+        );
+
+        await expect(transactionService.confirmDelivery('tx-100', 'any-code', 'buyer-1')).rejects.toThrow(
+          'not awaiting pickup confirmation',
+        );
+      });
+
+      it('should propagate failure and prevent downstream markCompleted if QR scan record fails (Failure Injection)', async () => {
+        const validHash = 'correct-hash-123';
+        mockRepo.findById.mockResolvedValue(
+          createMockTx({ hasOwnTransport: true, status: 'AWAITING_DRIVER', buyerId: 'buyer-1' }),
+        );
+        jest.spyOn(listingRepository, 'findById').mockResolvedValue({ id: 'listing-1', listingHash: validHash } as any);
+        jest.spyOn(userRepository, 'findById').mockResolvedValue({
+          id: 'farmer-789',
+          profile: { momoNumber: '+233541234567', momoNetwork: 'MTN' },
+        } as any);
+        jest.spyOn(paymentService, 'initiateTransfer').mockResolvedValue({ transferCode: 'trf_test123', status: 'success' });
+
+        // Failure injection: qr_scans write fails
+        mockPrisma.qr_scans.create.mockRejectedValue(new Error('QR Scan DB insert failure'));
+        const markCompletedSpy = jest.spyOn(dispatchService, 'markCompleted');
+
+        await expect(transactionService.confirmDelivery('tx-100', validHash, 'buyer-1')).rejects.toThrow(
+          'QR Scan DB insert failure',
+        );
+
+        // Assert downstream dispatch markCompleted was NEVER invoked
+        expect(markCompletedSpy).not.toHaveBeenCalled();
+      });
+
+      it('should successfully confirm delivery and release escrow funds', async () => {
+        const validHash = 'correct-hash-123';
+        const mockTx = createMockTx({ hasOwnTransport: true, status: 'AWAITING_DRIVER', buyerId: 'buyer-1' });
+        mockRepo.findById.mockResolvedValue(mockTx);
+        jest.spyOn(listingRepository, 'findById').mockResolvedValue({ id: 'listing-1', listingHash: validHash } as any);
+        jest.spyOn(userRepository, 'findById').mockResolvedValue({
+          id: 'farmer-789',
+          profile: { momoNumber: '+233541234567', momoNetwork: 'MTN' },
+        } as any);
+        jest.spyOn(paymentService, 'initiateTransfer').mockResolvedValue({ transferCode: 'trf_test123', status: 'success' });
+
+        mockPrisma.qr_scans.create.mockResolvedValue({} as any);
+        const releasedTx = { ...mockTx, status: 'RELEASED' as const, transferCode: 'trf_test123' };
+        mockRepo.update.mockResolvedValue(releasedTx);
+
+        jest.spyOn(notificationService, 'sendNotification').mockResolvedValue({} as any);
+        jest.spyOn(dispatchService, 'markCompleted').mockResolvedValue({} as any);
+
+        const result = await transactionService.confirmDelivery('tx-100', validHash, 'buyer-1');
+
+        expect(paymentService.initiateTransfer).toHaveBeenCalledWith('+233541234567', mockTx.amountGhs, expect.any(String), 'MTN');
+        expect(mockPrisma.qr_scans.create).toHaveBeenCalledWith({
+          data: { order_id: 'tx-100', scanned_by: 'buyer-1', scanned_hash: validHash, hash_match: true },
+        });
+        expect(mockRepo.update).toHaveBeenCalledWith('tx-100', { status: 'RELEASED', transferCode: 'trf_test123' });
+        expect(dispatchService.markCompleted).toHaveBeenCalledWith('tx-100');
+        expect(result).toEqual(releasedTx);
+      });
+    });
+
+    describe('driver-delivered orders', () => {
+      it('should throw BadRequestError if the order is not yet awaiting delivery confirmation', async () => {
+        mockRepo.findById.mockResolvedValue(
+          createMockTx({ hasOwnTransport: false, status: 'IN_TRANSIT', buyerId: 'buyer-1' }),
+        );
+
+        await expect(transactionService.confirmDelivery('tx-100', 'some-code', 'buyer-1')).rejects.toThrow(
+          'not awaiting delivery confirmation',
+        );
+      });
+
+      it('should throw BadRequestError if the scanned code does not match the stored delivery code', async () => {
+        mockRepo.findById.mockResolvedValue(
+          createMockTx({ hasOwnTransport: false, status: 'DELIVERED_PENDING_CONFIRMATION', buyerId: 'buyer-1' }),
+        );
+        mockPrisma.orders.findUnique.mockResolvedValue({
+          delivery_code: 'real-code',
+          delivery_code_expires_at: new Date(Date.now() + 60_000),
+        } as any);
+
+        await expect(transactionService.confirmDelivery('tx-100', 'WRONG-CODE', 'buyer-1')).rejects.toThrow(
+          'Delivery code is missing, incorrect, or expired',
+        );
+      });
+
+      it('should throw BadRequestError if the delivery code has expired', async () => {
+        mockRepo.findById.mockResolvedValue(
+          createMockTx({ hasOwnTransport: false, status: 'DELIVERED_PENDING_CONFIRMATION', buyerId: 'buyer-1' }),
+        );
+        mockPrisma.orders.findUnique.mockResolvedValue({
+          delivery_code: 'real-code',
+          delivery_code_expires_at: new Date(Date.now() - 1000),
+        } as any);
+
+        await expect(transactionService.confirmDelivery('tx-100', 'real-code', 'buyer-1')).rejects.toThrow(
+          'Delivery code is missing, incorrect, or expired',
+        );
+      });
+
+      it("should release escrow when the buyer scans the driver's correct delivery code", async () => {
+        const mockTx = createMockTx({ hasOwnTransport: false, status: 'DELIVERED_PENDING_CONFIRMATION', buyerId: 'buyer-1' });
+        mockRepo.findById.mockResolvedValue(mockTx);
+        mockPrisma.orders.findUnique.mockResolvedValue({
+          delivery_code: 'real-code',
+          delivery_code_expires_at: new Date(Date.now() + 60_000),
+        } as any);
+        jest.spyOn(userRepository, 'findById').mockResolvedValue({
+          id: 'farmer-789',
+          profile: { momoNumber: '+233541234567', momoNetwork: 'MTN' },
+        } as any);
+        jest.spyOn(paymentService, 'initiateTransfer').mockResolvedValue({ transferCode: 'trf_test123', status: 'success' });
+        mockPrisma.qr_scans.create.mockResolvedValue({} as any);
+        const releasedTx = { ...mockTx, status: 'RELEASED' as const, transferCode: 'trf_test123' };
+        mockRepo.update.mockResolvedValue(releasedTx);
+        jest.spyOn(notificationService, 'sendNotification').mockResolvedValue({} as any);
+        jest.spyOn(dispatchService, 'markCompleted').mockResolvedValue({} as any);
+
+        const result = await transactionService.confirmDelivery('tx-100', 'real-code', 'buyer-1');
+
+        expect(mockRepo.update).toHaveBeenCalledWith('tx-100', { status: 'RELEASED', transferCode: 'trf_test123' });
+        expect(dispatchService.markCompleted).toHaveBeenCalledWith('tx-100');
+        expect(result).toEqual(releasedTx);
+      });
+    });
+  });
+
+  describe('autoReleaseIfExpired', () => {
+    it('should return null if the order is not awaiting delivery confirmation', async () => {
+      mockRepo.findById.mockResolvedValue(createMockTx({ status: 'IN_TRANSIT' }));
+
+      const result = await transactionService.autoReleaseIfExpired('tx-100');
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null if the delivery code has not expired yet', async () => {
+      mockRepo.findById.mockResolvedValue(createMockTx({ status: 'DELIVERED_PENDING_CONFIRMATION' }));
+      mockPrisma.orders.findUnique.mockResolvedValue({ delivery_code_expires_at: new Date(Date.now() + 60_000) } as any);
+
+      const result = await transactionService.autoReleaseIfExpired('tx-100');
+
+      expect(result).toBeNull();
+    });
+
+    it('should release escrow without a qr_scans row once the confirmation window has passed', async () => {
+      const mockTx = createMockTx({ status: 'DELIVERED_PENDING_CONFIRMATION' });
       mockRepo.findById.mockResolvedValue(mockTx);
-      jest.spyOn(dispatchService, 'getDriverJobs').mockResolvedValue([]);
-      jest.spyOn(listingRepository, 'findById').mockResolvedValue({ id: 'listing-1', listingHash: validHash } as any);
-
+      mockPrisma.orders.findUnique.mockResolvedValue({ delivery_code_expires_at: new Date(Date.now() - 1000) } as any);
       jest.spyOn(userRepository, 'findById').mockResolvedValue({
         id: 'farmer-789',
         profile: { momoNumber: '+233541234567', momoNetwork: 'MTN' },
       } as any);
       jest.spyOn(paymentService, 'initiateTransfer').mockResolvedValue({ transferCode: 'trf_test123', status: 'success' });
-
-      mockPrisma.qr_scans.create.mockResolvedValue({} as any);
       const releasedTx = { ...mockTx, status: 'RELEASED' as const, transferCode: 'trf_test123' };
       mockRepo.update.mockResolvedValue(releasedTx);
-
       jest.spyOn(notificationService, 'sendNotification').mockResolvedValue({} as any);
       jest.spyOn(dispatchService, 'markCompleted').mockResolvedValue({} as any);
 
-      const result = await transactionService.confirmDelivery(transactionId, validHash, 'buyer-1');
+      const result = await transactionService.autoReleaseIfExpired('tx-100');
 
-      expect(paymentService.initiateTransfer).toHaveBeenCalledWith('+233541234567', mockTx.amountGhs, expect.any(String), 'MTN');
-      expect(mockRepo.update).toHaveBeenCalledWith(transactionId, { status: 'RELEASED', transferCode: 'trf_test123' });
-      expect(dispatchService.markCompleted).toHaveBeenCalledWith(transactionId);
+      expect(mockPrisma.qr_scans.create).not.toHaveBeenCalled();
+      expect(mockRepo.update).toHaveBeenCalledWith('tx-100', { status: 'RELEASED', transferCode: 'trf_test123' });
       expect(result).toEqual(releasedTx);
     });
   });

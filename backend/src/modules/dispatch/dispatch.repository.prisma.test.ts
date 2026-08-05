@@ -32,7 +32,8 @@ describe('PrismaDispatchRepository', () => {
     orders: {
       listing_id: 'listing-1',
       amount: 100,
-      order_status: 'in_transit',
+      order_status: 'driver_assigned',
+      delivery_code: null,
       users: { full_name: 'Buyer Name', phone_number: '+233200000001', region: 'Greater Accra' },
       produce_listings: {
         quantity_kg: 20,
@@ -57,12 +58,30 @@ describe('PrismaDispatchRepository', () => {
       expect(whereClause()).toEqual({ driver_id: 'driver-1', status: 'notified' });
     });
 
-    it('should filter ACCEPTED to accepted assignments whose order is not yet completed', async () => {
+    it('should filter ACCEPTED to accepted assignments whose order is still awaiting pickup', async () => {
       await repo.findJobsForDriver('driver-1', 'ACCEPTED');
       expect(whereClause()).toEqual({
         driver_id: 'driver-1',
         status: 'accepted',
-        orders: { order_status: { not: 'completed' } },
+        orders: { order_status: 'driver_assigned' },
+      });
+    });
+
+    it('should filter IN_TRANSIT to accepted assignments whose order has been picked up', async () => {
+      await repo.findJobsForDriver('driver-1', 'IN_TRANSIT');
+      expect(whereClause()).toEqual({
+        driver_id: 'driver-1',
+        status: 'accepted',
+        orders: { order_status: 'in_transit' },
+      });
+    });
+
+    it('should filter DELIVERED to accepted assignments awaiting buyer confirmation', async () => {
+      await repo.findJobsForDriver('driver-1', 'DELIVERED');
+      expect(whereClause()).toEqual({
+        driver_id: 'driver-1',
+        status: 'accepted',
+        orders: { order_status: 'delivered_pending_confirmation' },
       });
     });
 
@@ -87,10 +106,26 @@ describe('PrismaDispatchRepository', () => {
   });
 
   describe('status mapping on read', () => {
-    it('should report an accepted assignment on a not-yet-completed order as ACCEPTED', async () => {
+    it('should report an accepted assignment on a driver_assigned order as ACCEPTED', async () => {
       mockPrisma.driver_assignments.findMany.mockResolvedValue([baseRow()] as any);
       const [job] = await repo.findJobsForDriver('driver-1');
       expect(job.status).toBe('ACCEPTED');
+    });
+
+    it('should report an accepted assignment on an in_transit order as IN_TRANSIT', async () => {
+      mockPrisma.driver_assignments.findMany.mockResolvedValue([
+        baseRow({ orders: { ...baseRow().orders, order_status: 'in_transit' } }),
+      ] as any);
+      const [job] = await repo.findJobsForDriver('driver-1');
+      expect(job.status).toBe('IN_TRANSIT');
+    });
+
+    it('should report an accepted assignment on a delivered_pending_confirmation order as DELIVERED', async () => {
+      mockPrisma.driver_assignments.findMany.mockResolvedValue([
+        baseRow({ orders: { ...baseRow().orders, order_status: 'delivered_pending_confirmation' } }),
+      ] as any);
+      const [job] = await repo.findJobsForDriver('driver-1');
+      expect(job.status).toBe('DELIVERED');
     });
 
     it('should report an accepted assignment on a completed order as COMPLETED, not ACCEPTED', async () => {
@@ -99,6 +134,18 @@ describe('PrismaDispatchRepository', () => {
       ] as any);
       const [job] = await repo.findJobsForDriver('driver-1');
       expect(job.status).toBe('COMPLETED');
+    });
+
+    it('should render the delivery code as a QR image once DELIVERED, and omit it otherwise', async () => {
+      mockPrisma.driver_assignments.findMany.mockResolvedValue([
+        baseRow({ orders: { ...baseRow().orders, order_status: 'delivered_pending_confirmation', delivery_code: 'abc123' } }),
+      ] as any);
+      const [delivered] = await repo.findJobsForDriver('driver-1');
+      expect(delivered.deliveryQrImage).toEqual(expect.stringContaining('data:image'));
+
+      mockPrisma.driver_assignments.findMany.mockResolvedValue([baseRow()] as any);
+      const [accepted] = await repo.findJobsForDriver('driver-1');
+      expect(accepted.deliveryQrImage).toBeNull();
     });
 
     it('should report a notified assignment as PENDING', async () => {

@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,7 +10,6 @@ import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/responsive_content.dart';
-import '../../orders/presentation/confirm_delivery_screen.dart';
 import '../application/dispatch_providers.dart';
 import '../data/dispatch_mock.dart';
 import 'widgets/job_request_card.dart';
@@ -89,16 +91,25 @@ class DriverHomeScreen extends ConsumerWidget {
                         : _ActiveTripCard(
                             trip: activeTrip,
                             colorScheme: colorScheme,
-                            onConfirmDelivery: () async {
-                              final result = await Navigator.of(context).push<bool>(
-                                MaterialPageRoute(
-                                  builder: (_) => ConfirmDeliveryScreen(transactionId: activeTrip.job.transactionId),
-                                ),
-                              );
-                              if (result == true) {
-                                await ref.read(activeTripProvider.notifier).refresh();
+                            onMarkPickedUp: () async {
+                              try {
+                                await ref.read(activeTripProvider.notifier).markPickedUp(activeTrip.job.id);
+                                if (context.mounted) showAgriToast(context, 'Marked as picked up.');
+                              } catch (_) {
                                 if (context.mounted) {
-                                  showAgriToast(context, 'Delivery confirmed — payment released to the farmer.');
+                                  showAgriToast(context, 'Could not update this trip. Try again.', isError: true);
+                                }
+                              }
+                            },
+                            onMarkDelivered: () async {
+                              try {
+                                await ref.read(activeTripProvider.notifier).markDelivered(activeTrip.job.id);
+                                if (context.mounted) {
+                                  showAgriToast(context, 'Show the QR code to the buyer to release payment.');
+                                }
+                              } catch (_) {
+                                if (context.mounted) {
+                                  showAgriToast(context, 'Could not update this trip. Try again.', isError: true);
                                 }
                               }
                             },
@@ -330,17 +341,26 @@ class _ActiveTripCard extends StatelessWidget {
   const _ActiveTripCard({
     required this.trip,
     required this.colorScheme,
-    required this.onConfirmDelivery,
+    required this.onMarkPickedUp,
+    required this.onMarkDelivered,
     required this.onOpenNavigation,
   });
 
   final ActiveTrip trip;
   final ColorScheme colorScheme;
-  final VoidCallback onConfirmDelivery;
+  final VoidCallback onMarkPickedUp;
+  final VoidCallback onMarkDelivered;
   final VoidCallback onOpenNavigation;
 
   @override
   Widget build(BuildContext context) {
+    final delivered = trip.status == 'DELIVERED';
+    final statusLabel = switch (trip.status) {
+      'IN_TRANSIT' => 'IN TRANSIT',
+      'DELIVERED' => 'AWAITING BUYER SCAN',
+      _ => 'PICKUP PENDING',
+    };
+
     return Container(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
@@ -368,50 +388,98 @@ class _ActiveTripCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(color: colorScheme.primary, borderRadius: BorderRadius.circular(999)),
-                  child: const Text(
-                    'IN TRANSIT',
-                    style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                  child: Text(
+                    statusLabel,
+                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
                   ),
                 ),
                 const SizedBox(height: 14),
                 JobRequestCard(job: trip.job, colorScheme: colorScheme),
                 const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: onOpenNavigation,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: colorScheme.primary,
-                          side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.5)),
-                          shape: const StadiumBorder(),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                if (delivered)
+                  _DeliveryQrPanel(colorScheme: colorScheme, qrImage: trip.deliveryQrImage)
+                else
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: onOpenNavigation,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: colorScheme.primary,
+                            side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.5)),
+                            shape: const StadiumBorder(),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          icon: const Icon(Icons.navigation_rounded, size: 18),
+                          label: const Text('Navigate', style: TextStyle(fontWeight: FontWeight.w700)),
                         ),
-                        icon: const Icon(Icons.navigation_rounded, size: 18),
-                        label: const Text('Navigate', style: TextStyle(fontWeight: FontWeight.w700)),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: onConfirmDelivery,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: colorScheme.primary,
-                          foregroundColor: colorScheme.onPrimary,
-                          shape: const StadiumBorder(),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: trip.status == 'IN_TRANSIT' ? onMarkDelivered : onMarkPickedUp,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: colorScheme.primary,
+                            foregroundColor: colorScheme.onPrimary,
+                            shape: const StadiumBorder(),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          icon: Icon(trip.status == 'IN_TRANSIT' ? Icons.flag_rounded : Icons.inventory_2_rounded, size: 18),
+                          label: Text(
+                            trip.status == 'IN_TRANSIT' ? 'Delivered' : 'Picked Up',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
                         ),
-                        icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
-                        label: const Text('Confirm', style: TextStyle(fontWeight: FontWeight.w700)),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DeliveryQrPanel extends StatelessWidget {
+  const _DeliveryQrPanel({required this.colorScheme, required this.qrImage});
+
+  final ColorScheme colorScheme;
+  final String? qrImage;
+
+  @override
+  Widget build(BuildContext context) {
+    Uint8List? imageBytes;
+    final data = qrImage;
+    if (data != null && data.startsWith('data:image')) {
+      try {
+        imageBytes = base64Decode(data.split(',').last);
+      } catch (_) {
+        imageBytes = null;
+      }
+    }
+
+    return Column(
+      children: [
+        Text(
+          'Show this to the buyer to release payment',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 13.5),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+          child: imageBytes != null
+              ? Image.memory(imageBytes, width: 180, height: 180)
+              : const SizedBox(
+                  width: 180,
+                  height: 180,
+                  child: Center(child: Icon(Icons.qr_code_2_rounded, size: 64, color: Colors.black26)),
+                ),
+        ),
+      ],
     );
   }
 }

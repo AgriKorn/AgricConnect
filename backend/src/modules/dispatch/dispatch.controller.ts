@@ -36,3 +36,25 @@ export const declineJobHandler = async (req: Request, res: Response, next: NextF
     next(err);
   }
 };
+
+export const markPickedUpHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = (req as any).user;
+    if (!user) throw new UnauthorizedError();
+    const job = await dispatchService.markPickedUp(req.params.jobId, user.userId);
+    sendSuccess(res, job);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const markDeliveredHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = (req as any).user;
+    if (!user) throw new UnauthorizedError();
+    const job = await dispatchService.markDelivered(req.params.jobId, user.userId);
+    sendSuccess(res, job);
+  } catch (err) {
+    next(err);
+  }
+};

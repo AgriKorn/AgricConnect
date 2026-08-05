@@ -395,7 +395,7 @@ export function convertOpenAPIToPostman() {
               ],
               body: {
                 mode: 'raw',
-                raw: JSON.stringify({ qrHash: 'hash-of-listing-qr-code' }, null, 2),
+                raw: JSON.stringify({ code: 'scanned-qr-value' }, null, 2),
               },
               url: {
                 raw: '{{baseUrl}}/api/transactions/{{transactionId}}/confirm-delivery',

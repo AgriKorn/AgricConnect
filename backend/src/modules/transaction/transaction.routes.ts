@@ -39,7 +39,12 @@ router.get('/', getMyTransactionsHandler);
  * @swagger
  * /transactions/{id}/confirm-delivery:
  *   post:
- *     summary: Confirm delivery via QR hash match — releases escrowed funds to the farmer
+ *     summary: Buyer confirms delivery by scanning a QR code — releases escrowed funds to the farmer
+ *     description: >
+ *       For self-collect orders this is the farmer's static per-listing QR, scanned at pickup.
+ *       For driver-delivered orders this is the one-time QR the driver generates via
+ *       PATCH /dispatch/{jobId}/mark-delivered, scanned off the driver's screen at hand-off.
+ *       Only the buyer may call this endpoint.
  *     tags: [Transactions]
  *     security: [{ bearerAuth: [] }]
  *     parameters:
@@ -50,11 +55,12 @@ router.get('/', getMyTransactionsHandler);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [qrHash]
- *             properties: { qrHash: { type: string } }
+ *             required: [code]
+ *             properties: { code: { type: string } }
  *     responses:
  *       200: { description: Transaction RELEASED, payment transferred to farmer }
- *       400: { description: QR hash does not match the listing }
+ *       400: { description: Code does not match, is expired, or order isn't awaiting confirmation }
+ *       403: { description: Only the buyer may confirm delivery }
  */
 router.post('/:id/confirm-delivery', validate(transactionIdParamSchema), validate(confirmDeliverySchema), confirmDeliveryHandler);
 router.get('/:id', validate(transactionIdParamSchema), getTransactionHandler);

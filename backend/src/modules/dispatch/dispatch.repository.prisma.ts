@@ -1,3 +1,4 @@
+import QRCode from 'qrcode';
 import { prisma } from '../../config/db';
 import { CreateDriverJobRecord, IDispatchRepository } from './dispatch.repository';
 import { DriverJob, DriverJobStatus } from './dispatch.types';
@@ -17,6 +18,8 @@ const statusToPrisma = (status: DriverJobStatus): assignment_status => {
     case 'DECLINED':
       return 'declined';
     case 'ACCEPTED':
+    case 'IN_TRANSIT':
+    case 'DELIVERED':
     case 'COMPLETED':
       return 'accepted';
     case 'PENDING':
@@ -28,7 +31,16 @@ const statusToPrisma = (status: DriverJobStatus): assignment_status => {
 const statusFromPrisma = (assignmentStatus: assignment_status, orderStatus?: string | null): DriverJobStatus => {
   switch (assignmentStatus) {
     case 'accepted':
-      return orderStatus === 'completed' ? 'COMPLETED' : 'ACCEPTED';
+      switch (orderStatus) {
+        case 'completed':
+          return 'COMPLETED';
+        case 'delivered_pending_confirmation':
+          return 'DELIVERED';
+        case 'in_transit':
+          return 'IN_TRANSIT';
+        default:
+          return 'ACCEPTED';
+      }
     case 'declined':
     case 'expired':
       return 'DECLINED';
@@ -52,24 +64,30 @@ const jobInclude = {
   },
 } as const;
 
-const mapPrismaToJob = (a: any): DriverJob => ({
-  id: a.id,
-  transactionId: a.order_id,
-  listingId: a.orders?.listing_id || 'unknown',
-  driverId: a.driver_id,
-  cropType: a.orders?.produce_listings?.crop_types?.name || 'crop',
-  quantityKg: a.orders?.produce_listings?.quantity_kg ? Number(a.orders.produce_listings.quantity_kg) : 100,
-  amountGhs: a.orders?.amount ? Number(a.orders.amount) : 0,
-  status: statusFromPrisma(a.status, a.orders?.order_status),
-  createdAt: a.notified_at,
-  updatedAt: a.responded_at || a.notified_at,
-  farmerName: a.orders?.produce_listings?.users?.full_name || null,
-  farmerPhone: a.orders?.produce_listings?.users?.phone_number || null,
-  pickupRegion: a.orders?.produce_listings?.region || null,
-  buyerName: a.orders?.users?.full_name || null,
-  buyerPhone: a.orders?.users?.phone_number || null,
-  dropoffRegion: a.orders?.users?.region || null,
-});
+const mapPrismaToJob = async (a: any): Promise<DriverJob> => {
+  const status = statusFromPrisma(a.status, a.orders?.order_status);
+  const deliveryQrImage = status === 'DELIVERED' && a.orders?.delivery_code ? await QRCode.toDataURL(a.orders.delivery_code) : null;
+
+  return {
+    id: a.id,
+    transactionId: a.order_id,
+    listingId: a.orders?.listing_id || 'unknown',
+    driverId: a.driver_id,
+    cropType: a.orders?.produce_listings?.crop_types?.name || 'crop',
+    quantityKg: a.orders?.produce_listings?.quantity_kg ? Number(a.orders.produce_listings.quantity_kg) : 100,
+    amountGhs: a.orders?.amount ? Number(a.orders.amount) : 0,
+    status,
+    createdAt: a.notified_at,
+    updatedAt: a.responded_at || a.notified_at,
+    farmerName: a.orders?.produce_listings?.users?.full_name || null,
+    farmerPhone: a.orders?.produce_listings?.users?.phone_number || null,
+    pickupRegion: a.orders?.produce_listings?.region || null,
+    buyerName: a.orders?.users?.full_name || null,
+    buyerPhone: a.orders?.users?.phone_number || null,
+    dropoffRegion: a.orders?.users?.region || null,
+    deliveryQrImage,
+  };
+};
 
 export class PrismaDispatchRepository implements IDispatchRepository {
   async create(data: CreateDriverJobRecord): Promise<DriverJob> {
@@ -104,7 +122,7 @@ export class PrismaDispatchRepository implements IDispatchRepository {
       include: jobInclude,
       orderBy: { sequence_number: 'asc' },
     });
-    return list.map(mapPrismaToJob);
+    return Promise.all(list.map(mapPrismaToJob));
   }
 
   async findActiveForTransaction(transactionId: string): Promise<DriverJob | null> {
@@ -121,13 +139,20 @@ export class PrismaDispatchRepository implements IDispatchRepository {
 
   async findJobsForDriver(driverId: string, status?: DriverJobStatus): Promise<DriverJob[]> {
     const where: any = { driver_id: driverId };
-    // ACCEPTED and COMPLETED share the same assignment_status ('accepted') —
-    // see the note above statusFromPrisma — so telling them apart at the
-    // query level requires filtering on the linked order's order_status too,
-    // not just statusToPrisma's single enum value.
+    // ACCEPTED/IN_TRANSIT/DELIVERED/COMPLETED all share the same
+    // assignment_status ('accepted') — see the note above statusFromPrisma —
+    // so telling them apart at the query level requires filtering on the
+    // linked order's order_status too, not just statusToPrisma's single enum
+    // value.
     if (status === 'ACCEPTED') {
       where.status = 'accepted';
-      where.orders = { order_status: { not: 'completed' } };
+      where.orders = { order_status: 'driver_assigned' };
+    } else if (status === 'IN_TRANSIT') {
+      where.status = 'accepted';
+      where.orders = { order_status: 'in_transit' };
+    } else if (status === 'DELIVERED') {
+      where.status = 'accepted';
+      where.orders = { order_status: 'delivered_pending_confirmation' };
     } else if (status === 'COMPLETED') {
       where.status = 'accepted';
       where.orders = { order_status: 'completed' };
@@ -142,7 +167,7 @@ export class PrismaDispatchRepository implements IDispatchRepository {
       include: jobInclude,
       orderBy: { notified_at: 'desc' },
     });
-    return list.map(mapPrismaToJob);
+    return Promise.all(list.map(mapPrismaToJob));
   }
 
   async update(id: string, status: DriverJobStatus): Promise<DriverJob> {

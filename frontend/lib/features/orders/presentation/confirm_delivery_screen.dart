@@ -5,13 +5,18 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../core/network/api_exception.dart';
 import '../data/orders_repository.dart';
 
-/// Scans (or manually accepts) the farmer's listing QR code and calls
+/// Scans (or manually enters) a QR code and calls
 /// POST /transactions/:id/confirm-delivery, releasing escrow to the farmer.
-/// Reachable from both the buyer's Orders screen and a driver's Job History.
+/// Only ever reachable from the buyer's side (Orders screen / Order
+/// Tracking) — for a self-collect order this is the farmer's static
+/// listing QR, shown at pickup; for a driver-delivered order it's the
+/// one-time QR the driver generates by tapping "Mark Delivered", shown on
+/// the driver's own screen at hand-off.
 class ConfirmDeliveryScreen extends ConsumerStatefulWidget {
-  const ConfirmDeliveryScreen({super.key, required this.transactionId});
+  const ConfirmDeliveryScreen({super.key, required this.transactionId, required this.hasOwnTransport});
 
   final String transactionId;
+  final bool hasOwnTransport;
 
   @override
   ConsumerState<ConfirmDeliveryScreen> createState() => _ConfirmDeliveryScreenState();
@@ -32,8 +37,8 @@ class _ConfirmDeliveryScreenState extends ConsumerState<ConfirmDeliveryScreen> {
     super.dispose();
   }
 
-  Future<void> _submit(String qrHash) async {
-    if (_submitting || qrHash.trim().isEmpty) return;
+  Future<void> _submit(String code) async {
+    if (_submitting || code.trim().isEmpty) return;
     setState(() {
       _submitting = true;
       _error = null;
@@ -41,7 +46,7 @@ class _ConfirmDeliveryScreenState extends ConsumerState<ConfirmDeliveryScreen> {
     try {
       await ref.read(ordersRepositoryProvider).confirmDelivery(
             transactionId: widget.transactionId,
-            qrHash: qrHash.trim(),
+            code: code.trim(),
           );
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -80,7 +85,9 @@ class _ConfirmDeliveryScreenState extends ConsumerState<ConfirmDeliveryScreen> {
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
-                'Scan the QR code the farmer shows you to release payment and confirm delivery.',
+                widget.hasOwnTransport
+                    ? 'Scan the QR code the farmer shows you to release payment and confirm pickup.'
+                    : 'Scan the QR code the driver shows you to release payment and confirm delivery.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.white70, fontSize: 13.5, height: 1.4),
               ),
@@ -167,7 +174,7 @@ class _ManualEntryForm extends StatelessWidget {
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.white12,
-              hintText: 'Paste or type the listing code',
+              hintText: 'Paste or type the code',
               hintStyle: const TextStyle(color: Colors.white38),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
             ),

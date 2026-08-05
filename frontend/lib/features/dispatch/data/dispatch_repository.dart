@@ -20,6 +20,7 @@ class DispatchJobModel {
     this.buyerName,
     this.buyerPhone,
     this.dropoffRegion,
+    this.deliveryQrImage,
   });
 
   final String id;
@@ -37,6 +38,10 @@ class DispatchJobModel {
   final String? buyerName;
   final String? buyerPhone;
   final String? dropoffRegion;
+  /// Data-URI QR image of the one-time delivery code, present only once
+  /// status is DELIVERED — shown on the driver's screen for the buyer to
+  /// scan and release escrow.
+  final String? deliveryQrImage;
 
   factory DispatchJobModel.fromJson(Map<String, dynamic> json) {
     return DispatchJobModel(
@@ -53,6 +58,7 @@ class DispatchJobModel {
       buyerName: json['buyerName']?.toString(),
       buyerPhone: json['buyerPhone']?.toString(),
       dropoffRegion: json['dropoffRegion']?.toString(),
+      deliveryQrImage: json['deliveryQrImage']?.toString(),
     );
   }
 }
@@ -74,6 +80,8 @@ abstract class DispatchRepository {
   Future<List<DispatchJobModel>> fetchJobs({String? status});
   Future<void> acceptJob(String jobId);
   Future<void> declineJob(String jobId);
+  Future<DispatchJobModel> markPickedUp(String jobId);
+  Future<DispatchJobModel> markDelivered(String jobId);
   Future<bool> fetchIsAvailable();
   Future<void> setAvailability(bool isAvailable);
 }
@@ -112,6 +120,28 @@ class HttpDispatchRepository implements DispatchRepository {
       await _dio.patch('/dispatch/$jobId/decline');
     } on DioException catch (e) {
       throw ApiException(_extractDioErrorMessage(e) ?? e.message ?? 'Failed to decline job.');
+    }
+  }
+
+  @override
+  Future<DispatchJobModel> markPickedUp(String jobId) async {
+    try {
+      final response = await _dio.patch('/dispatch/$jobId/picked-up');
+      final data = response.data['data'] ?? response.data;
+      return DispatchJobModel.fromJson(data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiException(_extractDioErrorMessage(e) ?? e.message ?? 'Failed to mark job as picked up.');
+    }
+  }
+
+  @override
+  Future<DispatchJobModel> markDelivered(String jobId) async {
+    try {
+      final response = await _dio.patch('/dispatch/$jobId/mark-delivered');
+      final data = response.data['data'] ?? response.data;
+      return DispatchJobModel.fromJson(data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiException(_extractDioErrorMessage(e) ?? e.message ?? 'Failed to mark job as delivered.');
     }
   }
 

@@ -15,7 +15,7 @@ export const transactionIdParamSchema = z.object({
 
 export const confirmDeliverySchema = z.object({
   body: z.object({
-    qrHash: z.string({ required_error: 'qrHash is required' }).min(1, 'qrHash cannot be empty'),
+    code: z.string({ required_error: 'code is required' }).min(1, 'code cannot be empty'),
   }),
 });
 

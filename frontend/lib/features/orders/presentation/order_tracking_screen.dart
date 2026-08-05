@@ -63,7 +63,9 @@ class OrderTrackingScreen extends ConsumerWidget {
 
   Future<void> _confirmArrival(BuildContext context, WidgetRef ref) async {
     final result = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => ConfirmDeliveryScreen(transactionId: shipment.id)),
+      MaterialPageRoute(
+        builder: (_) => ConfirmDeliveryScreen(transactionId: shipment.id, hasOwnTransport: shipment.hasOwnTransport),
+      ),
     );
     if (result == true) {
       ref.invalidate(myOrdersProvider);
@@ -130,11 +132,12 @@ class OrderTrackingScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
-                _ConfirmArrivalBar(
-                  colorScheme: colorScheme,
-                  total: shipment.escrowTotal,
-                  onConfirm: () => _confirmArrival(context, ref),
-                ),
+                if (shipment.status == BuyerOrderStatus.awaitingConfirmation)
+                  _ConfirmArrivalBar(
+                    colorScheme: colorScheme,
+                    total: shipment.escrowTotal,
+                    onConfirm: () => _confirmArrival(context, ref),
+                  ),
               ],
               ),
             ),

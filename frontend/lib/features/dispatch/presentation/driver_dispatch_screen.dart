@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,7 +10,6 @@ import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/responsive_content.dart';
-import '../../orders/presentation/confirm_delivery_screen.dart';
 import '../application/dispatch_providers.dart';
 import '../data/dispatch_mock.dart';
 import 'widgets/job_request_card.dart';
@@ -69,16 +71,25 @@ class DriverDispatchScreen extends ConsumerWidget {
                       : _ActiveTripCard(
                           trip: activeTrip,
                           colorScheme: colorScheme,
-                          onConfirmDelivery: () async {
-                            final result = await Navigator.of(context).push<bool>(
-                              MaterialPageRoute(
-                                builder: (_) => ConfirmDeliveryScreen(transactionId: activeTrip.job.transactionId),
-                              ),
-                            );
-                            if (result == true) {
-                              await ref.read(activeTripProvider.notifier).refresh();
+                          onMarkPickedUp: () async {
+                            try {
+                              await ref.read(activeTripProvider.notifier).markPickedUp(activeTrip.job.id);
+                              if (context.mounted) showAgriToast(context, 'Marked as picked up.');
+                            } catch (_) {
                               if (context.mounted) {
-                                showAgriToast(context, 'Delivery confirmed — payment released to the farmer.');
+                                showAgriToast(context, 'Could not update this trip. Try again.', isError: true);
+                              }
+                            }
+                          },
+                          onMarkDelivered: () async {
+                            try {
+                              await ref.read(activeTripProvider.notifier).markDelivered(activeTrip.job.id);
+                              if (context.mounted) {
+                                showAgriToast(context, 'Show the QR code to the buyer to release payment.');
+                              }
+                            } catch (_) {
+                              if (context.mounted) {
+                                showAgriToast(context, 'Could not update this trip. Try again.', isError: true);
                               }
                             }
                           },
@@ -276,11 +287,17 @@ class _NoActiveTripCard extends StatelessWidget {
 }
 
 class _ActiveTripCard extends StatelessWidget {
-  const _ActiveTripCard({required this.trip, required this.colorScheme, required this.onConfirmDelivery});
+  const _ActiveTripCard({
+    required this.trip,
+    required this.colorScheme,
+    required this.onMarkPickedUp,
+    required this.onMarkDelivered,
+  });
 
   final ActiveTrip trip;
   final ColorScheme colorScheme;
-  final VoidCallback onConfirmDelivery;
+  final VoidCallback onMarkPickedUp;
+  final VoidCallback onMarkDelivered;
 
   @override
   Widget build(BuildContext context) {
@@ -336,22 +353,101 @@ class _ActiveTripCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: FilledButton.icon(
-              onPressed: onConfirmDelivery,
-              style: FilledButton.styleFrom(
-                backgroundColor: colorScheme.primary,
-                foregroundColor: colorScheme.onPrimary,
-                shape: const StadiumBorder(),
-              ),
-              icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
-              label: const Text('Confirm Delivery', style: TextStyle(fontWeight: FontWeight.w700)),
-            ),
+          _TripAction(
+            trip: trip,
+            colorScheme: colorScheme,
+            onMarkPickedUp: onMarkPickedUp,
+            onMarkDelivered: onMarkDelivered,
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The trip card's action area — what a driver does next depends entirely
+/// on where the order actually is: collect from the farmer, hand off to the
+/// buyer, or (once handed off) just show the one-time QR until the buyer
+/// scans it. There's no driver action at all in the DELIVERED state — the
+/// only thing that moves the order past it is the buyer's scan.
+class _TripAction extends StatelessWidget {
+  const _TripAction({
+    required this.trip,
+    required this.colorScheme,
+    required this.onMarkPickedUp,
+    required this.onMarkDelivered,
+  });
+
+  final ActiveTrip trip;
+  final ColorScheme colorScheme;
+  final VoidCallback onMarkPickedUp;
+  final VoidCallback onMarkDelivered;
+
+  @override
+  Widget build(BuildContext context) {
+    if (trip.status == 'DELIVERED') {
+      return _DeliveryQrPanel(colorScheme: colorScheme, qrImage: trip.deliveryQrImage);
+    }
+
+    final isPickedUp = trip.status == 'IN_TRANSIT';
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: FilledButton.icon(
+        onPressed: isPickedUp ? onMarkDelivered : onMarkPickedUp,
+        style: FilledButton.styleFrom(
+          backgroundColor: colorScheme.primary,
+          foregroundColor: colorScheme.onPrimary,
+          shape: const StadiumBorder(),
+        ),
+        icon: Icon(isPickedUp ? Icons.flag_rounded : Icons.inventory_2_rounded, size: 18),
+        label: Text(
+          isPickedUp ? 'Mark Delivered' : 'Mark Picked Up',
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+      ),
+    );
+  }
+}
+
+class _DeliveryQrPanel extends StatelessWidget {
+  const _DeliveryQrPanel({required this.colorScheme, required this.qrImage});
+
+  final ColorScheme colorScheme;
+  final String? qrImage;
+
+  @override
+  Widget build(BuildContext context) {
+    Uint8List? imageBytes;
+    final data = qrImage;
+    if (data != null && data.startsWith('data:image')) {
+      try {
+        imageBytes = base64Decode(data.split(',').last);
+      } catch (_) {
+        imageBytes = null;
+      }
+    }
+
+    return Column(
+      children: [
+        Text(
+          'Show this to the buyer to release payment',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: colorScheme.onSurface, fontWeight: FontWeight.w700, fontSize: 13.5),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+          child: imageBytes != null
+              ? Image.memory(imageBytes, width: 180, height: 180)
+              : const SizedBox(
+                  width: 180,
+                  height: 180,
+                  child: Center(child: Icon(Icons.qr_code_2_rounded, size: 64, color: Colors.black26)),
+                ),
+        ),
+      ],
     );
   }
 }

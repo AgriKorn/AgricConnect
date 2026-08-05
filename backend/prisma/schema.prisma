@@ -183,29 +183,37 @@ model notifications {
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 /// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
 model orders {
-  id                 String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id                       String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   // Not @unique: double-sale protection is the atomic active->sold status
   // flip on produce_listings in TransactionService.purchase(), not this. A
   // hard unique constraint here meant a listing could never be re-listed
   // after its one and only order was cancelled/refunded/failed — the
   // listing correctly reopens to 'active' but every re-purchase attempt
   // hit a database unique-constraint violation forever after.
-  listing_id         String               @db.Uuid
-  buyer_id           String               @db.Uuid
-  transport_mode     transport_mode
-  order_status       order_status         @default(pending_payment)
-  amount             Decimal              @db.Decimal(10, 2)
-  created_at         DateTime             @default(now()) @db.Timestamptz(6)
-  updated_at         DateTime             @default(now()) @db.Timestamptz(6)
-  delivered_at       DateTime?            @db.Timestamptz(6)
-  completed_at       DateTime?            @db.Timestamptz(6)
-  disputes           Dispute[]
-  driver_assignments driver_assignments[]
-  notifications      notifications[]
-  users              User                 @relation(fields: [buyer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  produce_listings   produce_listings     @relation(fields: [listing_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  payments           payments?
-  qr_scans           qr_scans?
+  listing_id               String               @db.Uuid
+  buyer_id                 String               @db.Uuid
+  transport_mode           transport_mode
+  order_status             order_status         @default(pending_payment)
+  amount                   Decimal              @db.Decimal(10, 2)
+  created_at               DateTime             @default(now()) @db.Timestamptz(6)
+  updated_at               DateTime             @default(now()) @db.Timestamptz(6)
+  delivered_at             DateTime?            @db.Timestamptz(6)
+  completed_at             DateTime?            @db.Timestamptz(6)
+  // One-time token minted when the driver taps "Mark Delivered" — rendered
+  // as a QR on the driver's screen for the buyer to scan. Not the same
+  // secret as produce_listings.listing_hash (that one exists from the
+  // moment the listing is created and is only used for the no-driver
+  // self-collect handoff); this one only exists once the driver is
+  // physically at the drop-off, so nothing lets it be used before then.
+  delivery_code            String?              @db.VarChar(64)
+  delivery_code_expires_at DateTime?            @db.Timestamptz(6)
+  disputes                 Dispute[]
+  driver_assignments       driver_assignments[]
+  notifications            notifications[]
+  users                    User                 @relation(fields: [buyer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  produce_listings         produce_listings     @relation(fields: [listing_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  payments                 payments?
+  qr_scans                 qr_scans?
 
   @@index([buyer_id], map: "idx_orders_buyer")
   @@index([order_status], map: "idx_orders_status")

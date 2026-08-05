@@ -1,4 +1,4 @@
-import { Transaction, TransactionStatus } from './transaction.types';
+import { Transaction } from './transaction.types';
 
 export type CreateTransactionRecord = Pick<
   Transaction,
@@ -13,5 +13,3 @@ export interface ITransactionRepository {
   findAll(): Promise<Transaction[]>;
   update(id: string, data: Partial<Pick<Transaction, 'status' | 'transferCode'>>): Promise<Transaction>;
 }
-
-export const isActiveStatus = (status: TransactionStatus): boolean => status === 'PAYMENT_HELD';

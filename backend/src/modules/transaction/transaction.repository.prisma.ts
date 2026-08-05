@@ -26,12 +26,28 @@ const transactionInclude = {
   driver_assignments: acceptedDriverInclude,
 } as const;
 
+const statusFromOrderStatus: Record<string, TransactionStatus> = {
+  pending_payment: 'AWAITING_DRIVER',
+  awaiting_driver: 'AWAITING_DRIVER',
+  driver_assigned: 'DRIVER_ASSIGNED',
+  in_transit: 'IN_TRANSIT',
+  delivered_pending_confirmation: 'DELIVERED_PENDING_CONFIRMATION',
+  completed: 'RELEASED',
+  disputed: 'DISPUTED',
+  cancelled: 'CANCELLED',
+};
+
 const mapPrismaToTransaction = (order: any, farmerId?: string): Transaction => {
-  let status: TransactionStatus = 'PAYMENT_HELD';
-  if (order.order_status === 'completed' || order.payments?.status === 'released') {
+  // payments.status is set in the same update() call as order_status (see
+  // below), so these should never disagree — the payments check is just
+  // defensive redundancy in case a row is ever read mid-transition.
+  let status: TransactionStatus;
+  if (order.payments?.status === 'released') {
     status = 'RELEASED';
-  } else if (order.order_status === 'cancelled' || order.payments?.status === 'refunded') {
+  } else if (order.payments?.status === 'refunded') {
     status = 'CANCELLED';
+  } else {
+    status = statusFromOrderStatus[order.order_status] ?? 'AWAITING_DRIVER';
   }
 
   return {

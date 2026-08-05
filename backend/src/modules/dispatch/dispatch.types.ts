@@ -1,4 +1,4 @@
-export type DriverJobStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'COMPLETED';
+export type DriverJobStatus = 'PENDING' | 'ACCEPTED' | 'IN_TRANSIT' | 'DELIVERED' | 'DECLINED' | 'COMPLETED';
 
 export interface DriverJob {
   id: string;
@@ -19,4 +19,11 @@ export interface DriverJob {
   buyerName: string | null;
   buyerPhone: string | null;
   dropoffRegion: string | null;
+  /**
+   * Data-URI QR image of the one-time delivery code, present only once
+   * status is DELIVERED — the buyer scans this straight off the driver's
+   * screen to confirm receipt and release escrow. Regenerated on read from
+   * the stored code, not persisted as an image.
+   */
+  deliveryQrImage: string | null;
 }

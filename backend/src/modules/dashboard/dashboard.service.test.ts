@@ -97,7 +97,7 @@ describe('DashboardService', () => {
     mockTransactions.findManyForUser.mockResolvedValue([
       makeTx({ id: 'tx-1', status: 'RELEASED', amountGhs: 100 }),
       makeTx({ id: 'tx-2', status: 'RELEASED', amountGhs: 50 }),
-      makeTx({ id: 'tx-3', status: 'PAYMENT_HELD', amountGhs: 75 }),
+      makeTx({ id: 'tx-3', status: 'DRIVER_ASSIGNED', amountGhs: 75 }),
       makeTx({ id: 'tx-4', status: 'CANCELLED', amountGhs: 999 }),
     ]);
     mockListings.findManyByFarmer.mockResolvedValue([]);

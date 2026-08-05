@@ -37,6 +37,7 @@ describe('DispatchService', () => {
     buyerName: 'Test Buyer',
     buyerPhone: '+233542222222',
     dropoffRegion: 'Ashanti',
+    deliveryQrImage: null,
     ...overrides,
   });
 
@@ -184,6 +185,72 @@ describe('DispatchService', () => {
       mockPrisma.driver_assignments.findFirst.mockResolvedValue(null);
 
       await expect(dispatchService.acceptJob('job-1', driverId)).rejects.toThrow('Job is no longer pending');
+    });
+  });
+
+  describe('markPickedUp', () => {
+    it('should move the order to in_transit when called by the assigned, accepted driver', async () => {
+      const driverId = 'assigned-driver-uuid';
+      mockRepo.findById
+        .mockResolvedValueOnce(createMockJob({ driverId, status: 'ACCEPTED' }))
+        .mockResolvedValueOnce(createMockJob({ driverId, status: 'IN_TRANSIT' }));
+      jest.spyOn(auditService, 'log').mockResolvedValue({} as any);
+
+      const result = await dispatchService.markPickedUp('job-1', driverId);
+
+      expect(mockPrisma.orders.update).toHaveBeenCalledWith({
+        where: { id: 'tx-1' },
+        data: { order_status: 'in_transit' },
+      });
+      expect(auditService.log).toHaveBeenCalledWith('DRIVER_PICKED_UP', 'tx-1', { driverId, jobId: 'job-1' }, driverId);
+      expect(result.status).toBe('IN_TRANSIT');
+    });
+
+    it('should reject when the job is not yet ACCEPTED (e.g. still PENDING)', async () => {
+      mockRepo.findById.mockResolvedValue(createMockJob({ driverId: 'd-1', status: 'PENDING' }));
+
+      await expect(dispatchService.markPickedUp('job-1', 'd-1')).rejects.toThrow(ForbiddenError);
+      expect(mockPrisma.orders.update).not.toHaveBeenCalled();
+    });
+
+    it('should reject when the job was not offered to this driver', async () => {
+      mockRepo.findById.mockResolvedValue(createMockJob({ driverId: 'someone-else', status: 'ACCEPTED' }));
+
+      await expect(dispatchService.markPickedUp('job-1', 'd-1')).rejects.toThrow(ForbiddenError);
+    });
+  });
+
+  describe('markDelivered', () => {
+    it('should mint a delivery code, move the order to delivered_pending_confirmation, and notify the buyer', async () => {
+      const driverId = 'assigned-driver-uuid';
+      mockRepo.findById
+        .mockResolvedValueOnce(createMockJob({ driverId, status: 'IN_TRANSIT' }))
+        .mockResolvedValueOnce(createMockJob({ driverId, status: 'DELIVERED', deliveryQrImage: 'data:image/png;base64,xyz' }));
+      mockPrisma.orders.findUnique.mockResolvedValue({ id: 'tx-1', buyer_id: 'buyer-1' } as any);
+      jest.spyOn(auditService, 'log').mockResolvedValue({} as any);
+      jest.spyOn(notificationService, 'sendNotification').mockResolvedValue({} as any);
+
+      const result = await dispatchService.markDelivered('job-1', driverId);
+
+      const updateCall = mockPrisma.orders.update.mock.calls[0][0] as any;
+      expect(updateCall.where).toEqual({ id: 'tx-1' });
+      expect(updateCall.data.order_status).toBe('delivered_pending_confirmation');
+      expect(typeof updateCall.data.delivery_code).toBe('string');
+      expect(updateCall.data.delivery_code.length).toBeGreaterThan(0);
+      expect(updateCall.data.delivery_code_expires_at).toBeInstanceOf(Date);
+
+      expect(auditService.log).toHaveBeenCalledWith('DRIVER_MARKED_DELIVERED', 'tx-1', { driverId, jobId: 'job-1' }, driverId);
+      expect(notificationService.sendNotification).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'buyer-1', type: 'DELIVERY_CODE_READY' }),
+      );
+      expect(result.deliveryQrImage).toBe('data:image/png;base64,xyz');
+    });
+
+    it('should reject when the job is not yet IN_TRANSIT (e.g. still ACCEPTED)', async () => {
+      mockRepo.findById.mockResolvedValue(createMockJob({ driverId: 'd-1', status: 'ACCEPTED' }));
+
+      await expect(dispatchService.markDelivered('job-1', 'd-1')).rejects.toThrow(ForbiddenError);
+      expect(mockPrisma.orders.update).not.toHaveBeenCalled();
     });
   });
 

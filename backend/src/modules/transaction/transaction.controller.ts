@@ -41,7 +41,7 @@ export const confirmDeliveryHandler = async (req: Request, res: Response, next: 
   try {
     const user = (req as any).user;
     if (!user) throw new UnauthorizedError();
-    const transaction = await transactionService.confirmDelivery(req.params.id, req.body.qrHash, user.userId);
+    const transaction = await transactionService.confirmDelivery(req.params.id, req.body.code, user.userId);
     sendSuccess(res, transaction);
   } catch (err) {
     next(err);

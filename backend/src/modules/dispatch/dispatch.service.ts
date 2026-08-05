@@ -1,10 +1,11 @@
+import crypto from 'crypto';
 import { prisma } from '../../config/db';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/errors';
 import { auditService } from '../audit/audit.service';
 import { notificationService } from '../notification/notification.service';
 import { userRepository } from '../user/user.repository.prisma';
 import { dispatchRepository, PrismaDispatchRepository } from './dispatch.repository.prisma';
-import { DriverJob } from './dispatch.types';
+import { DriverJob, DriverJobStatus } from './dispatch.types';
 
 export interface AssignDriverParams {
   transactionId: string;
@@ -12,6 +13,14 @@ export interface AssignDriverParams {
   cropType: string;
   quantityKg: number;
 }
+
+/**
+ * How long a buyer has to scan the driver's delivery QR before escrow
+ * auto-releases anyway (see DeliveryAutoReleaseWorker). Also doubles as the
+ * delivery code's own expiry, so an unscanned code can't be reused/replayed
+ * past the point the order releases without it.
+ */
+export const DELIVERY_CONFIRMATION_WINDOW_HOURS = 48;
 
 export class DispatchService {
   constructor(
@@ -101,7 +110,7 @@ export class DispatchService {
       quantityKg,
     });
 
-    await auditService.log('DRIVER_MANUALLY_ASSIGNED' as any, transactionId, { driverId, jobId: job.id }, assignedBy);
+    await auditService.log('DRIVER_MANUALLY_ASSIGNED', transactionId, { driverId, jobId: job.id }, assignedBy);
 
     await notificationService.sendNotification({
       userId: driver.id,
@@ -118,7 +127,7 @@ export class DispatchService {
   }
 
   async acceptJob(jobId: string, driverId: string): Promise<DriverJob> {
-    const job = await this.assertOwnedPendingJob(jobId, driverId);
+    const job = await this.assertOwnedJobWithStatus(jobId, driverId, 'PENDING');
 
     // A single atomic UPDATE, not read-then-write: the $transaction wrapper
     // this replaced only looked atomic — this.jobs.update()/
@@ -197,6 +206,61 @@ export class DispatchService {
     return updated!;
   }
 
+  /** Driver has physically collected the produce from the farmer and is now en route. */
+  async markPickedUp(jobId: string, driverId: string): Promise<DriverJob> {
+    const job = await this.assertOwnedJobWithStatus(jobId, driverId, 'ACCEPTED');
+
+    await prisma.orders.update({
+      where: { id: job.transactionId },
+      data: { order_status: 'in_transit' },
+    });
+
+    await auditService.log('DRIVER_PICKED_UP', job.transactionId, { driverId, jobId: job.id }, driverId);
+
+    const updated = await this.jobs.findById(job.id);
+    return updated!;
+  }
+
+  /**
+   * Driver has physically handed the produce to the buyer. Mints a
+   * one-time delivery code and stores it on the order — the buyer scans it
+   * (rendered as a QR straight off the driver's screen, see
+   * dispatch.repository.prisma's mapPrismaToJob) to confirm receipt and
+   * release escrow. The driver never learns the code has to match anything
+   * beyond what their own screen displays, so there's no path for the
+   * driver to self-confirm without the buyer actually being there.
+   */
+  async markDelivered(jobId: string, driverId: string): Promise<DriverJob> {
+    const job = await this.assertOwnedJobWithStatus(jobId, driverId, 'IN_TRANSIT');
+
+    const deliveryCode = crypto.randomBytes(16).toString('hex');
+    const expiresAt = new Date(Date.now() + DELIVERY_CONFIRMATION_WINDOW_HOURS * 60 * 60 * 1000);
+
+    await prisma.orders.update({
+      where: { id: job.transactionId },
+      data: {
+        order_status: 'delivered_pending_confirmation',
+        delivery_code: deliveryCode,
+        delivery_code_expires_at: expiresAt,
+      },
+    });
+
+    await auditService.log('DRIVER_MARKED_DELIVERED', job.transactionId, { driverId, jobId: job.id }, driverId);
+
+    const order = await prisma.orders.findUnique({ where: { id: job.transactionId } });
+    if (order) {
+      await notificationService.sendNotification({
+        userId: order.buyer_id,
+        type: 'DELIVERY_CODE_READY',
+        message: `Your driver has arrived. Open this order and scan the QR code on the driver's screen to confirm delivery and release payment.`,
+        orderId: order.id,
+      });
+    }
+
+    const updated = await this.jobs.findById(job.id);
+    return updated!;
+  }
+
   /**
    * With broadcast dispatch every eligible driver already has their own
    * offer, so declining just removes this driver's copy — no one needs
@@ -206,7 +270,7 @@ export class DispatchService {
    * both this and the timeout worker (reassignNextDriver) share.
    */
   async declineJob(jobId: string, driverId: string): Promise<{ job: DriverJob; othersStillPending: boolean }> {
-    const job = await this.assertOwnedPendingJob(jobId, driverId);
+    const job = await this.assertOwnedJobWithStatus(jobId, driverId, 'PENDING');
     const declined = await this.jobs.update(job.id, 'DECLINED');
 
     const othersStillPending = await this.handleExhaustionIfNeeded(job.transactionId, driverId);
@@ -268,17 +332,17 @@ export class DispatchService {
         orderId: order.id,
       });
 
-      await auditService.log('DRIVER_DISPATCH_EXHAUSTED' as any, order.id, {}, actorId ?? 'driver-timeout-worker');
+      await auditService.log('DRIVER_DISPATCH_EXHAUSTED', order.id, {}, actorId ?? 'driver-timeout-worker');
     }
 
     return false;
   }
 
-  private async assertOwnedPendingJob(jobId: string, driverId: string): Promise<DriverJob> {
+  private async assertOwnedJobWithStatus(jobId: string, driverId: string, expected: DriverJobStatus): Promise<DriverJob> {
     const job = await this.jobs.findById(jobId);
     if (!job) throw new NotFoundError('Driver job not found');
     if (job.driverId !== driverId) throw new ForbiddenError('This job was not offered to you');
-    if (job.status !== 'PENDING') throw new ForbiddenError(`Job is no longer pending (status: ${job.status})`);
+    if (job.status !== expected) throw new ForbiddenError(`Job is not ${expected.toLowerCase()} (status: ${job.status})`);
     return job;
   }
 }

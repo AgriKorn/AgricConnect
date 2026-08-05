@@ -128,33 +128,57 @@ final filteredJobsProvider = Provider<List<JobRequest>>((ref) {
   }).toList();
 });
 
-/// The driver's one active (accepted, not yet completed) delivery, if any —
-/// derived from real dispatch jobs rather than a separate mock concept.
-/// ETA/distance aren't tracked by the backend, so the trip surfaces the same
-/// real payout/crop/contact data as [JobRequest] without fabricating live
-/// tracking. There is no driver-side "mark complete" action here — delivery
-/// completion is the QR-based confirm-delivery flow (see job_history_screen
-/// and confirm_delivery_screen), which either party (buyer or assigned
-/// driver) can trigger; refresh() re-checks after that flow returns.
+/// The driver's one active delivery, if any — spans three backend statuses
+/// (ACCEPTED, IN_TRANSIT, DELIVERED) since a broadcast-dispatch driver only
+/// ever has one job in flight at a time (accepting one takes them off the
+/// available pool). ETA/distance aren't tracked by the backend, so the trip
+/// surfaces the same real payout/crop/contact data as [JobRequest] without
+/// fabricating live tracking. Driver-side actions here (markPickedUp,
+/// markDelivered) only ever move the order up to DELIVERED — final
+/// completion is the buyer scanning the delivery QR this trip then shows,
+/// which the driver has no path to trigger themselves.
 class ActiveTripController extends AsyncNotifier<ActiveTrip?> {
   @override
   Future<ActiveTrip?> build() => _fetch();
 
   Future<ActiveTrip?> _fetch() async {
-    final jobs = await ref.read(dispatchRepositoryProvider).fetchJobs(status: 'ACCEPTED');
-    if (jobs.isEmpty) return null;
-    final job = jobs.first;
-    return ActiveTrip(
-      tripNumber: job.id.substring(0, job.id.length.clamp(0, 8)),
-      destination: job.buyerName != null ? 'Deliver to ${job.buyerName}' : 'Deliver to buyer',
-      job: _toJobRequest(job),
-    );
+    final repo = ref.read(dispatchRepositoryProvider);
+    final results = await Future.wait([
+      repo.fetchJobs(status: 'ACCEPTED'),
+      repo.fetchJobs(status: 'IN_TRANSIT'),
+      repo.fetchJobs(status: 'DELIVERED'),
+    ]);
+    final job = [...results[0], ...results[1], ...results[2]].firstOrNull;
+    if (job == null) return null;
+    return _toActiveTrip(job);
   }
 
   Future<void> refresh() async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(_fetch);
   }
+
+  Future<void> markPickedUp(String jobId) async {
+    await ref.read(dispatchRepositoryProvider).markPickedUp(jobId);
+    await refresh();
+  }
+
+  Future<void> markDelivered(String jobId) async {
+    await ref.read(dispatchRepositoryProvider).markDelivered(jobId);
+    await refresh();
+  }
+}
+
+ActiveTrip _toActiveTrip(DispatchJobModel job) => ActiveTrip(
+  tripNumber: job.id.substring(0, job.id.length.clamp(0, 8)),
+  destination: job.buyerName != null ? 'Deliver to ${job.buyerName}' : 'Deliver to buyer',
+  job: _toJobRequest(job),
+  status: job.status,
+  deliveryQrImage: job.deliveryQrImage,
+);
+
+extension _FirstOrNull<T> on List<T> {
+  T? get firstOrNull => isEmpty ? null : first;
 }
 
 final activeTripProvider = AsyncNotifierProvider<ActiveTripController, ActiveTrip?>(

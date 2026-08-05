@@ -135,27 +135,67 @@ export class TransactionService {
     return this.repo.findAll();
   }
 
-  async confirmDelivery(transactionId: string, qrHash: string, confirmedBy: string): Promise<Transaction> {
+  /**
+   * Only the buyer ever calls this — for a self-collect order they scan the
+   * farmer's (static, per-listing) QR at pickup; for a driver-delivered
+   * order they scan the (one-time, per-delivery) QR the driver generates by
+   * tapping "Mark Delivered". Either way the code being checked only ever
+   * reaches the buyer by being physically shown to them at the moment of
+   * hand-off, so there's no path for the party handing the produce over to
+   * confirm their own delivery.
+   */
+  async confirmDelivery(transactionId: string, code: string, confirmedBy: string): Promise<Transaction> {
     const transaction = await this.repo.findById(transactionId);
     if (!transaction) throw new NotFoundError('Transaction not found');
-    if (transaction.status !== 'PAYMENT_HELD') {
-      throw new BadRequestError(`Transaction is not awaiting delivery (status: ${transaction.status})`);
+    if (transaction.buyerId !== confirmedBy) {
+      throw new ForbiddenError('Only the buyer can confirm delivery');
     }
 
-    const activeDispatch = await dispatchService.getDriverJobs(confirmedBy);
-    const isAssignedDriver = activeDispatch.some((j) => j.transactionId === transaction.id && (j.status === 'ACCEPTED' || j.status === 'PENDING'));
-    const isBuyer = transaction.buyerId === confirmedBy;
-
-    if (!isBuyer && !isAssignedDriver) {
-      throw new ForbiddenError('Only the buyer or assigned driver can confirm delivery');
+    if (transaction.hasOwnTransport) {
+      if (transaction.status !== 'AWAITING_DRIVER') {
+        throw new BadRequestError(`Order is not awaiting pickup confirmation (status: ${transaction.status})`);
+      }
+      const listing = await listingRepository.findById(transaction.listingId);
+      if (!listing) throw new NotFoundError('Listing not found');
+      if (listing.listingHash !== code) {
+        throw new BadRequestError('QR code does not match this listing — cannot verify pickup');
+      }
+    } else {
+      if (transaction.status !== 'DELIVERED_PENDING_CONFIRMATION') {
+        throw new BadRequestError(`Order is not awaiting delivery confirmation yet (status: ${transaction.status})`);
+      }
+      const order = await prisma.orders.findUnique({ where: { id: transactionId } });
+      const expired = !order?.delivery_code_expires_at || order.delivery_code_expires_at < new Date();
+      if (!order?.delivery_code || order.delivery_code !== code || expired) {
+        throw new BadRequestError('Delivery code is missing, incorrect, or expired — ask the driver to show their QR again');
+      }
     }
 
-    const listing = await listingRepository.findById(transaction.listingId);
-    if (!listing) throw new NotFoundError('Listing not found');
-    if (listing.listingHash !== qrHash) {
-      throw new BadRequestError('QR hash does not match this listing — cannot verify delivery');
-    }
+    return this.releaseEscrow(transaction, confirmedBy, { scannedBy: confirmedBy, scannedHash: code });
+  }
 
+  /**
+   * Called by DeliveryAutoReleaseWorker once a driver-delivered order's
+   * confirmation window has passed with no buyer scan — protects the farmer
+   * from a buyer who never gets around to confirming. Self-collect orders
+   * are exempt: there's no driver leg to time out, and the buyer is already
+   * standing at the farm gate when that QR gets scanned or it doesn't.
+   */
+  async autoReleaseIfExpired(transactionId: string): Promise<Transaction | null> {
+    const transaction = await this.repo.findById(transactionId);
+    if (!transaction || transaction.status !== 'DELIVERED_PENDING_CONFIRMATION') return null;
+
+    const order = await prisma.orders.findUnique({ where: { id: transactionId } });
+    if (!order?.delivery_code_expires_at || order.delivery_code_expires_at > new Date()) return null;
+
+    return this.releaseEscrow(transaction, 'system-auto-release', null);
+  }
+
+  private async releaseEscrow(
+    transaction: Transaction,
+    confirmedBy: string,
+    qrScan: { scannedBy: string; scannedHash: string } | null,
+  ): Promise<Transaction> {
     const farmer = await userRepository.findById(transaction.farmerId);
     if (!farmer?.profile?.momoNumber || !farmer.profile.momoNetwork) {
       throw new PayoutNotConfiguredError('Cannot release payment — the farmer has not set up Mobile Money payout details');
@@ -170,23 +210,24 @@ export class TransactionService {
 
     return await prisma.$transaction(
       async (tx) => {
-        await tx.qr_scans.create({
-          data: {
-            order_id: transaction.id,
-            scanned_by: confirmedBy,
-            scanned_hash: qrHash,
-            hash_match: true,
-          },
-        });
+        if (qrScan) {
+          await tx.qr_scans.create({
+            data: {
+              order_id: transaction.id,
+              scanned_by: qrScan.scannedBy,
+              scanned_hash: qrScan.scannedHash,
+              hash_match: true,
+            },
+          });
+        }
 
         const updated = await this.repo.update(transaction.id, { status: 'RELEASED', transferCode });
 
-        await auditService.log('DELIVERY_CONFIRMED', transaction.id, { qrHash, confirmedBy }, confirmedBy);
+        await auditService.log('DELIVERY_CONFIRMED', transaction.id, { confirmedBy }, confirmedBy);
         await auditService.log('PAYMENT_RELEASED', transaction.id, { amountGhs: transaction.amountGhs }, confirmedBy);
 
         // Record transactional outbox event
         await outboxService.recordEvent(tx, 'ORDER', transaction.id, 'DELIVERY_CONFIRMED', {
-          qrHash,
           confirmedBy,
           farmerId: transaction.farmerId,
           amountGhs: transaction.amountGhs,

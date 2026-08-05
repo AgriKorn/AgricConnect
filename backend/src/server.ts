@@ -4,6 +4,8 @@ import { prisma } from './config/db';
 import logger from './utils/logger';
 import { seedDevAdmin } from './modules/user/seedAdmin';
 import { freshnessMonitorWorker } from './workers/freshness-monitor.worker';
+import { driverTimeoutWorker } from './workers/driver-timeout.worker';
+import { deliveryAutoReleaseWorker } from './workers/delivery-auto-release.worker';
 
 const PORT = env.PORT;
 
@@ -84,6 +86,16 @@ const start = async () => {
   // sweep, safe to run in every environment. Sweeps hourly by default; the
   // window and threshold are configurable via FRESHNESS_ALERT_* env vars.
   freshnessMonitorWorker.start();
+
+  // Was defined but never started — every unanswered driver offer sat as
+  // 'notified' forever with nothing to expire it or trigger the
+  // driver-exhaustion admin-notify fallback. Starting it here is what
+  // actually makes offer timeouts (and reassignment/exhaustion) run at all.
+  driverTimeoutWorker.start();
+
+  // Auto-releases escrow on driver-delivered orders the buyer never scanned
+  // the delivery QR for, once the confirmation window passes.
+  deliveryAutoReleaseWorker.start();
 };
 
 start().catch((err) => {

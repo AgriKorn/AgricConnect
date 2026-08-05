@@ -8,7 +8,7 @@ export const jobIdParamSchema = z.object({
 
 export const getDriverJobsQuerySchema = z.object({
   query: z.object({
-    status: z.enum(['PENDING', 'ACCEPTED', 'DECLINED', 'COMPLETED']).optional(),
+    status: z.enum(['PENDING', 'ACCEPTED', 'IN_TRANSIT', 'DELIVERED', 'DECLINED', 'COMPLETED']).optional(),
   }),
 });
 

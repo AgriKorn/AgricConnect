@@ -4,6 +4,7 @@ import { ConflictError, ForbiddenError, NotFoundError, PayoutNotConfiguredError 
 import { auditService } from '../audit/audit.service';
 import { notificationService } from '../notification/notification.service';
 import { transactionRepository } from '../transaction/transaction.repository.prisma';
+import { isActiveStatus } from '../transaction/transaction.types';
 import { userRepository } from '../user/user.repository.prisma';
 import { disputeRepository, PrismaDisputeRepository } from './dispute.repository.prisma';
 import { Dispute, DisputeType } from './dispute.types';
@@ -17,7 +18,7 @@ export class DisputeService {
     if (transaction.buyerId !== raisedBy && transaction.farmerId !== raisedBy) {
       throw new ForbiddenError('You are not a participant in this transaction');
     }
-    if (transaction.status !== 'PAYMENT_HELD') {
+    if (!isActiveStatus(transaction.status)) {
       throw new ConflictError(`Cannot raise a dispute on an order that is ${transaction.status.toLowerCase()}`);
     }
     const existingOpen = await this.repo.findOpenByTransaction(transactionId);

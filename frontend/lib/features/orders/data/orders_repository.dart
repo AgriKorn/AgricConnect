@@ -69,7 +69,7 @@ abstract class OrdersRepository {
 
   Future<List<OrderItemModel>> fetchUserOrders();
 
-  Future<void> confirmDelivery({required String transactionId, required String qrHash});
+  Future<void> confirmDelivery({required String transactionId, required String code});
 
   Future<void> raiseDispute({
     required String transactionId,
@@ -120,7 +120,7 @@ class HttpOrdersRepository implements OrdersRepository {
         id: item['id']?.toString() ?? '',
         listingName: item['cropType']?.toString() ?? 'Produce Order',
         amount: double.tryParse(item['amountGhs']?.toString() ?? '') ?? 0.0,
-        status: item['status']?.toString() ?? 'PAYMENT_HELD',
+        status: item['status']?.toString() ?? 'AWAITING_DRIVER',
         createdAt: DateTime.tryParse(item['createdAt']?.toString() ?? '') ?? DateTime.now(),
         hasOwnTransport: item['hasOwnTransport'] == true,
         farmerId: item['farmerId']?.toString(),
@@ -139,9 +139,9 @@ class HttpOrdersRepository implements OrdersRepository {
   }
 
   @override
-  Future<void> confirmDelivery({required String transactionId, required String qrHash}) async {
+  Future<void> confirmDelivery({required String transactionId, required String code}) async {
     try {
-      await _dio.post('${ApiEndpoints.transactions}/$transactionId/confirm-delivery', data: {'qrHash': qrHash});
+      await _dio.post('${ApiEndpoints.transactions}/$transactionId/confirm-delivery', data: {'code': code});
     } on DioException catch (e) {
       throw ApiException(_extractDioErrorMessage(e) ?? e.message ?? 'Failed to confirm delivery.');
     }

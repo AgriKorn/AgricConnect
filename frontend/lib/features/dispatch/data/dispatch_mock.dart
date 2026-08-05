@@ -30,6 +30,8 @@ class ActiveTrip {
     required this.tripNumber,
     required this.destination,
     required this.job,
+    required this.status,
+    this.deliveryQrImage,
   });
 
   final String tripNumber;
@@ -41,6 +43,15 @@ class ActiveTrip {
   /// integration exists to back one, so this doesn't invent live-tracking
   /// numbers the way the old always-zero etaMinutes/distanceRemainingKm did.
   final JobRequest job;
+
+  /// One of ACCEPTED, IN_TRANSIT, or DELIVERED — decides which action the
+  /// trip card offers next: Mark Picked Up, Mark Delivered, or (once
+  /// DELIVERED) the delivery QR for the buyer to scan.
+  final String status;
+
+  /// Data-URI QR image of the one-time delivery code, present only once
+  /// [status] is DELIVERED.
+  final String? deliveryQrImage;
 }
 
 enum JobFilter { all, shortHaul, highPayout }

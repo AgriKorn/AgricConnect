@@ -4,6 +4,7 @@ import { listingRepository } from '../listing/listing.repository.prisma';
 import { PricingService, pricingService } from '../pricing/pricing.service';
 import { ITransactionRepository } from '../transaction/transaction.repository';
 import { transactionRepository } from '../transaction/transaction.repository.prisma';
+import { isActiveStatus } from '../transaction/transaction.types';
 import { IUserRepository } from '../user/user.repository';
 import { userRepository } from '../user/user.repository.prisma';
 import { FarmerDashboardSummary } from './dashboard.types';
@@ -34,7 +35,7 @@ export class DashboardService {
       .filter((t) => t.updatedAt >= todayStart)
       .reduce((sum, t) => sum + t.amountGhs, 0);
     const totalEarningsGhs = released.reduce((sum, t) => sum + t.amountGhs, 0);
-    const activeOrders = transactions.filter((t) => t.status === 'PAYMENT_HELD' && t.farmerId === farmerId).length;
+    const activeOrders = transactions.filter((t) => isActiveStatus(t.status) && t.farmerId === farmerId).length;
 
     const cropCounts = new Map<string, number>();
     for (const listing of listings) {

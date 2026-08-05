@@ -7,14 +7,19 @@ enum OrdersTab { active, history, cancelled }
 
 final ordersTabProvider = StateProvider<OrdersTab>((ref) => OrdersTab.active);
 
-/// The backend only tracks a coarse PAYMENT_HELD/RELEASED/CANCELLED status
-/// (not a finer in-transit/processing distinction), so every held order
-/// maps to [BuyerOrderStatus.inTransit] rather than inventing a split the
-/// data doesn't support.
-BuyerOrderStatus _statusFor(String rawStatus) => switch (rawStatus) {
+/// Self-collect orders never get a driver — they sit in AWAITING_DRIVER
+/// until the buyer scans the farmer's listing QR in person, so that raw
+/// status means something different depending on [hasOwnTransport]: for a
+/// self-collect order it's really "ready to confirm", not "waiting on
+/// dispatch".
+BuyerOrderStatus _statusFor(String rawStatus, bool hasOwnTransport) => switch (rawStatus) {
+  'AWAITING_DRIVER' => hasOwnTransport ? BuyerOrderStatus.awaitingConfirmation : BuyerOrderStatus.awaitingDriver,
+  'DRIVER_ASSIGNED' => BuyerOrderStatus.driverAssigned,
+  'IN_TRANSIT' => BuyerOrderStatus.inTransit,
+  'DELIVERED_PENDING_CONFIRMATION' => BuyerOrderStatus.awaitingConfirmation,
   'RELEASED' => BuyerOrderStatus.completed,
   'CANCELLED' => BuyerOrderStatus.cancelled,
-  _ => BuyerOrderStatus.inTransit,
+  _ => BuyerOrderStatus.awaitingDriver,
 };
 
 String _initialsFor(String? name) {
@@ -41,12 +46,12 @@ final myOrdersProvider = FutureProvider<List<OrderItemModel>>((ref) {
 final activeShipmentsProvider = Provider<List<ActiveShipment>>((ref) {
   final orders = ref.watch(myOrdersProvider).valueOrNull ?? const [];
   return orders
-      .where((o) => o.status == 'PAYMENT_HELD')
+      .where((o) => o.status != 'RELEASED' && o.status != 'CANCELLED')
       .map((o) => ActiveShipment(
             id: o.id,
             orderNumber: o.id.substring(0, o.id.length.clamp(0, 8)).toUpperCase(),
             itemName: o.listingName,
-            status: _statusFor(o.status),
+            status: _statusFor(o.status, o.hasOwnTransport),
             escrowTotal: o.amount,
             hasOwnTransport: o.hasOwnTransport,
             farmerId: o.farmerId,

@@ -1,9 +1,11 @@
-enum BuyerOrderStatus { inTransit, processing, completed, cancelled }
+enum BuyerOrderStatus { awaitingDriver, driverAssigned, inTransit, awaitingConfirmation, completed, cancelled }
 
 extension BuyerOrderStatusX on BuyerOrderStatus {
   String get label => switch (this) {
+    BuyerOrderStatus.awaitingDriver => 'Awaiting Driver',
+    BuyerOrderStatus.driverAssigned => 'Driver Assigned',
     BuyerOrderStatus.inTransit => 'In Transit',
-    BuyerOrderStatus.processing => 'Processing',
+    BuyerOrderStatus.awaitingConfirmation => 'Confirm Delivery',
     BuyerOrderStatus.completed => 'Completed',
     BuyerOrderStatus.cancelled => 'Cancelled',
   };

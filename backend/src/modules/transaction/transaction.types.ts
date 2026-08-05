@@ -1,4 +1,19 @@
-export type TransactionStatus = 'PAYMENT_HELD' | 'RELEASED' | 'CANCELLED';
+// Mirrors orders.order_status (minus pending_payment, which purchase()
+// never leaves an order sitting in) so the app can show the buyer/driver
+// where an order actually is instead of collapsing everything pre-release
+// into one generic "in progress" state.
+export type TransactionStatus =
+  | 'AWAITING_DRIVER'
+  | 'DRIVER_ASSIGNED'
+  | 'IN_TRANSIT'
+  | 'DELIVERED_PENDING_CONFIRMATION'
+  | 'RELEASED'
+  | 'DISPUTED'
+  | 'CANCELLED';
+
+/** Pre-release: escrow is still held and the order hasn't been cancelled or disputed. */
+export const isActiveStatus = (status: TransactionStatus): boolean =>
+  status !== 'RELEASED' && status !== 'CANCELLED' && status !== 'DISPUTED';
 
 export interface Transaction {
   id: string;

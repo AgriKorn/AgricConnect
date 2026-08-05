@@ -7,7 +7,9 @@ const TransactionSchema = z.object({
   buyerId: z.string().uuid().openapi({ example: '72882852-6a7e-41dc-9621-57c54fa57ec4' }),
   farmerId: z.string().uuid().openapi({ example: '84130725-3a7e-41dc-9621-57c54fa57ec4' }),
   amountGhs: z.number().openapi({ example: 3000.00 }),
-  status: z.enum(['PAYMENT_HELD', 'RELEASED', 'CANCELLED', 'DISPUTED']).openapi({ example: 'PAYMENT_HELD' }),
+  status: z
+    .enum(['AWAITING_DRIVER', 'DRIVER_ASSIGNED', 'IN_TRANSIT', 'DELIVERED_PENDING_CONFIRMATION', 'RELEASED', 'DISPUTED', 'CANCELLED'])
+    .openapi({ example: 'AWAITING_DRIVER' }),
   hasOwnTransport: z.boolean().openapi({ example: false }),
   paymentReference: z.string().openapi({ example: 'stub_80d7c72a-8635-45a6-9488-6afe9187b94f' }),
   createdAt: z.string().datetime().openapi({ example: '2026-07-22T22:31:00.000Z' }),
@@ -94,7 +96,7 @@ registry.registerPath({
 registry.registerPath({
   method: 'post',
   path: '/api/transactions/{id}/confirm-delivery',
-  summary: 'Confirm Delivery via QR Hash & Release Escrow Funds (Buyer or Driver)',
+  summary: 'Confirm Delivery via Scanned QR Code & Release Escrow Funds (Buyer only)',
   tags: ['Transactions & Escrow'],
   security: [{ bearerAuth: [] }],
   request: {
@@ -105,7 +107,7 @@ registry.registerPath({
       content: {
         'application/json': {
           schema: z.object({
-            qrHash: z.string().openapi({ example: 'a2de10e46d04737a4bf17b6343bbe1190248bde34cb9b1a35604402fc3414920', description: 'Scanned QR code listing hash' }),
+            code: z.string().openapi({ example: 'a2de10e46d04737a4bf17b6343bbe1190248bde34cb9b1a35604402fc3414920', description: "Scanned QR value — the listing's hash for self-collect, or the driver's one-time delivery code" }),
           }),
         },
       },
@@ -123,7 +125,7 @@ registry.registerPath({
         },
       },
     },
-    400: { description: 'QR hash mismatch (`BAD_REQUEST`)' },
-    409: { description: 'Transaction not in PAYMENT_HELD status (`CONFLICT`)' },
+    400: { description: 'Code missing, incorrect, or expired, or order not yet awaiting this confirmation step (`BAD_REQUEST`)' },
+    403: { description: 'Only the buyer may confirm delivery (`FORBIDDEN`)' },
   },
 });

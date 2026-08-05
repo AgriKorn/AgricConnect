@@ -27,8 +27,10 @@ void _openComingSoon(BuildContext context, String title, IconData icon) {
 }
 
 (Color, Color, IconData) _statusStyle(BuyerOrderStatus status, Brightness brightness) => switch (status) {
+  BuyerOrderStatus.awaitingDriver => (AgriStatusColors.warning(brightness), AgriStatusColors.onWarning(brightness), Icons.hourglass_top_rounded),
+  BuyerOrderStatus.driverAssigned => (AgriStatusColors.info(brightness), AgriStatusColors.onInfo(brightness), Icons.assignment_turned_in_rounded),
   BuyerOrderStatus.inTransit => (AgriStatusColors.info(brightness), AgriStatusColors.onInfo(brightness), Icons.local_shipping_rounded),
-  BuyerOrderStatus.processing => (AgriStatusColors.warning(brightness), AgriStatusColors.onWarning(brightness), Icons.autorenew_rounded),
+  BuyerOrderStatus.awaitingConfirmation => (AgriStatusColors.warning(brightness), AgriStatusColors.onWarning(brightness), Icons.qr_code_scanner_rounded),
   BuyerOrderStatus.completed => (AgriStatusColors.success(brightness), AgriStatusColors.onSuccess(brightness), Icons.check_circle_rounded),
   BuyerOrderStatus.cancelled => (AgriStatusColors.error(brightness), AgriStatusColors.onError(brightness), Icons.cancel_rounded),
 };
@@ -38,9 +40,11 @@ void _openComingSoon(BuildContext context, String title, IconData icon) {
 class OrdersScreen extends ConsumerWidget {
   const OrdersScreen({super.key});
 
-  Future<void> _confirmDelivery(BuildContext context, WidgetRef ref, String orderId) async {
+  Future<void> _confirmDelivery(BuildContext context, WidgetRef ref, String orderId, bool hasOwnTransport) async {
     final result = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => ConfirmDeliveryScreen(transactionId: orderId)),
+      MaterialPageRoute(
+        builder: (_) => ConfirmDeliveryScreen(transactionId: orderId, hasOwnTransport: hasOwnTransport),
+      ),
     );
     if (result == true) {
       ref.invalidate(myOrdersProvider);
@@ -141,7 +145,8 @@ class OrdersScreen extends ConsumerWidget {
                                     _ActiveShipmentCard(
                                       colorScheme: colorScheme,
                                       shipment: shipment,
-                                      onConfirmDelivery: () => _confirmDelivery(context, ref, shipment.id),
+                                      onConfirmDelivery: () =>
+                                          _confirmDelivery(context, ref, shipment.id, shipment.hasOwnTransport),
                                       onReportProblem: () => _reportProblem(context, ref, shipment.id),
                                     ),
                                     const SizedBox(height: 16),
@@ -439,19 +444,21 @@ class _ActiveShipmentCard extends StatelessWidget {
                   child: const Text('Report a Problem'),
                 ),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FilledButton(
-                  onPressed: onConfirmDelivery,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: colorScheme.primary,
-                    foregroundColor: colorScheme.onPrimary,
-                    shape: const StadiumBorder(),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+              if (shipment.status == BuyerOrderStatus.awaitingConfirmation) ...[
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: onConfirmDelivery,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colorScheme.primary,
+                      foregroundColor: colorScheme.onPrimary,
+                      shape: const StadiumBorder(),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text('Confirm Delivery'),
                   ),
-                  child: const Text('Confirm Delivery'),
                 ),
-              ),
+              ],
             ],
           ),
         ],
