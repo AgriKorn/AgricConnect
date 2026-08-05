@@ -37,11 +37,9 @@ void main() {
         capturedAt: DateTime(2026, 1, 1),
       );
 
-      expect(record.cropType, 'Tomato');
       expect(record.score, 98); // round(100 * (0.97 + 0.5*0.02))
       expect(record.qualityGrade, 'Grade A');
       expect(record.shelfLifeLabel, '7 Days');
-      expect(record.priceUnit, 'kg');
       expect(record.attributes.first.label, 'Good Condition');
       expect(record.attributes.first.kind, ScanAttributeKind.positive);
     });
@@ -65,7 +63,7 @@ void main() {
       expect(record.attributes.any((a) => a.label == 'Spoilage Detected'), isTrue);
     });
 
-    test('low-confidence prediction is flagged for retake', () {
+    test('low freshness confidence is flagged for retake', () {
       final record = buildScanRecord(
         _result(
           cropType: 'mango',
@@ -82,29 +80,59 @@ void main() {
         record.attributes.any((a) => a.label.contains('Low Confidence')),
         isTrue,
       );
-      expect(record.confidence, 0.42); // min(crop, freshness) confidence
+      // Freshness-head confidence only — the crop head is deliberately ignored.
+      expect(record.confidence, 0.5);
     });
 
-    test('aging call on a two-stage crop is flagged as extrapolated', () {
+    test('a confident crop guess does not suppress the retake warning', () {
+      // The crop head is very sure (0.99) but the freshness head is not (0.45).
+      // The old formula took min(crop, freshness) and this case still warned,
+      // but the point here is that the crop head must not influence the record
+      // at all — species identification is the farmer's job.
       final record = buildScanRecord(
         _result(
-          cropType: 'cucumber',
-          cropConfidence: 0.88,
-          freshnessStage: 'aging',
-          freshnessProbs: [0.7, 0.2, 0.1],
-          shelfLifeDays: 3,
+          cropType: 'tomato',
+          cropConfidence: 0.99,
+          freshnessStage: 'fresh',
+          freshnessProbs: [0.3, 0.45, 0.25],
+          shelfLifeDays: 4,
         ),
         id: 'scan-4',
         capturedAt: DateTime(2026, 1, 1),
       );
 
+      expect(record.confidence, 0.45);
       expect(
-        record.attributes.any((a) => a.label == 'Aging Estimate Extrapolated'),
+        record.attributes.any((a) => a.label.contains('Low Confidence')),
         isTrue,
       );
     });
 
-    test('every known crop resolves to a priced record', () {
+    test('the record never carries a crop species or a price', () {
+      // Regression guard for the two things the engine must not decide. Both
+      // were removed from ScanRecord, so this is enforced by the type system —
+      // this test documents the intent and fails to compile if either returns.
+      final record = buildScanRecord(
+        _result(
+          cropType: 'cucumber',
+          cropConfidence: 0.88,
+          freshnessStage: 'fresh',
+          freshnessProbs: [0.05, 0.9, 0.05],
+          shelfLifeDays: 5,
+        ),
+        id: 'scan-5',
+        capturedAt: DateTime(2026, 1, 1),
+      );
+
+      final json = record.toJson();
+      expect(json.containsKey('cropType'), isFalse);
+      expect(json.containsKey('recommendedPrice'), isFalse);
+      expect(json.containsKey('priceUnit'), isFalse);
+    });
+
+    test('every crop the model can emit produces the same shaped record', () {
+      // The crop label must make no difference to the output now.
+      final scores = <int>{};
       for (final crop in CropScanModel.cropNames) {
         final record = buildScanRecord(
           _result(
@@ -117,8 +145,37 @@ void main() {
           id: 'scan-$crop',
           capturedAt: DateTime(2026, 1, 1),
         );
-        expect(record.recommendedPrice, greaterThan(0));
+        scores.add(record.score);
+        expect(record.qualityGrade, 'Grade A');
       }
+      // Identical freshness input -> identical score for all nine crops.
+      expect(scores, hasLength(1));
+    });
+
+    test('round-trips through JSON', () {
+      final record = buildScanRecord(
+        _result(
+          cropType: 'okra',
+          cropConfidence: 0.8,
+          freshnessStage: 'aging',
+          freshnessProbs: [0.7, 0.2, 0.1],
+          shelfLifeDays: 3,
+        ),
+        id: 'scan-6',
+        capturedAt: DateTime.utc(2026, 1, 1),
+        imagePath: '/tmp/photo.jpg',
+      );
+
+      final restored = ScanRecord.fromJson(record.toJson());
+
+      expect(restored.id, record.id);
+      expect(restored.score, record.score);
+      expect(restored.qualityGrade, record.qualityGrade);
+      expect(restored.shelfLifeDays, record.shelfLifeDays);
+      expect(restored.shelfLifeLabel, record.shelfLifeLabel);
+      expect(restored.confidence, record.confidence);
+      expect(restored.imagePath, '/tmp/photo.jpg');
+      expect(restored.attributes.map((a) => a.label), record.attributes.map((a) => a.label));
     });
   });
 }

@@ -113,6 +113,21 @@ class _ScanCaptureScreenState extends ConsumerState<ScanCaptureScreen>
 
   Future<void> _capture() async {
     final controller = _cameraController;
+
+    // A camera that never initialised (denied permission, init timeout, no
+    // camera) used to fall straight through to a canned sample result, so a
+    // broken camera looked exactly like a successful scan. Refuse instead.
+    if (controller == null || !controller.value.isInitialized) {
+      showAgriToast(
+        context,
+        'Camera not ready. Allow camera access for AgriConnect in Settings, then try again.',
+        icon: Icons.error_outline_rounded,
+        isError: true,
+      );
+      return;
+    }
+    if (controller.value.isTakingPicture) return;
+
     // Flips the shutter button/overlay into their loading state right away
     // — takePicture() below is a real camera-hardware delay (autofocus,
     // exposure, JPEG encode), and without this the screen looked frozen for
@@ -120,14 +135,19 @@ class _ScanCaptureScreenState extends ConsumerState<ScanCaptureScreen>
     ref.read(scanControllerProvider.notifier).beginCapture();
     _scanLineController.repeat();
 
-    String? imagePath;
-    if (controller != null && controller.value.isInitialized && !controller.value.isTakingPicture) {
-      try {
-        final file = await controller.takePicture();
-        imagePath = file.path;
-      } catch (e) {
-        if (kDebugMode) debugPrint('takePicture failed: $e');
-      }
+    final String imagePath;
+    try {
+      imagePath = (await controller.takePicture()).path;
+    } catch (e) {
+      // Previously logged only under kDebugMode — i.e. silent in the release
+      // APK — and then analysed nothing, yielding a fake score.
+      if (kDebugMode) debugPrint('takePicture failed: $e');
+      _scanLineController.stop();
+      const message = 'Could not take the photo. Try again.';
+      ref.read(scanControllerProvider.notifier).failCapture(message);
+      if (!mounted) return;
+      showAgriToast(context, message, icon: Icons.error_outline_rounded, isError: true);
+      return;
     }
 
     await _analyzeAndNavigate(imagePath);
@@ -146,12 +166,11 @@ class _ScanCaptureScreenState extends ConsumerState<ScanCaptureScreen>
     await _analyzeAndNavigate(picked.path);
   }
 
-  /// Shared tail end of both capture paths: runs inference on [imagePath]
-  /// (or the mock cycle when null — no camera on this device/platform),
-  /// then either moves to the result screen or, on failure, stays put and
-  /// surfaces the error as a toast instead of an uncaught exception
-  /// freezing the screen mid-analysis.
-  Future<void> _analyzeAndNavigate(String? imagePath) async {
+  /// Shared tail end of both capture paths: runs real inference on
+  /// [imagePath], then either moves to the result screen or stays put and
+  /// surfaces the failure. There is no fallback result — if inference cannot
+  /// run, the farmer is told, never shown an invented score.
+  Future<void> _analyzeAndNavigate(String imagePath) async {
     try {
       await ref.read(scanControllerProvider.notifier).captureAndAnalyze(imagePath: imagePath);
       _scanLineController.stop();
@@ -161,7 +180,13 @@ class _ScanCaptureScreenState extends ConsumerState<ScanCaptureScreen>
       _scanLineController.stop();
       if (!mounted) return;
       final message = ref.read(scanControllerProvider).errorMessage ?? 'Scan failed. Please try again.';
-      showAgriToast(context, message, icon: Icons.error_outline_rounded, isError: true);
+      showAgriToast(
+        context,
+        message,
+        icon: Icons.error_outline_rounded,
+        isError: true,
+        duration: const Duration(seconds: 5),
+      );
     }
   }
 

@@ -11,6 +11,24 @@ import '../data/scan_record.dart';
 
 const _scanCacheKey = 'latest_scan_record';
 
+/// A scan could not be produced. Carries a farmer-facing [message]; the UI
+/// shows it verbatim.
+///
+/// This type exists because the scan used to *silently* fall back to canned
+/// sample results whenever real inference was impossible — no camera, denied
+/// permission, a failed capture, or web (where `tflite_flutter` cannot run at
+/// all). The screen then presented a hardcoded 94% / 54% / 31% cycle as if it
+/// were a measurement, so a broken camera and a genuine reading looked
+/// identical. A scan now either reports a real inference or fails visibly.
+class ScanUnavailableException implements Exception {
+  const ScanUnavailableException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 class ScanState {
   const ScanState({
     required this.isFlashOn,
@@ -42,15 +60,12 @@ class ScanState {
 }
 
 class ScanController extends Notifier<ScanState> {
-  int _sampleIndex = 0;
   Future<CropScanModel>? _modelFuture;
 
   /// Re-entrancy guard for [captureAndAnalyze], tracked separately from
-  /// [ScanState.isScanning] — that flag now flips on the instant the
-  /// shutter is tapped (see [beginCapture]), before this method even runs,
-  /// so it can no longer double as "a scan is currently in flight" without
-  /// every call seeing it already true and short-circuiting to whatever
-  /// stale result happens to be cached.
+  /// [ScanState.isScanning] — that flag flips on the instant the shutter is
+  /// tapped (see [beginCapture]), before this method runs, so it cannot also
+  /// mean "a scan is in flight".
   bool _analyzing = false;
 
   @override
@@ -87,16 +102,26 @@ class ScanController extends Notifier<ScanState> {
   }
 
   /// Flips [ScanState.isScanning] on immediately, before the camera has even
-  /// finished taking the photo. [captureAndAnalyze] does this too, but only
-  /// once `takePicture()` (a real, noticeable camera-hardware delay) has
-  /// already resolved — leaving a dead gap between tapping the shutter and
-  /// any visible feedback that the tap was registered at all. The capture
-  /// screen calls this the instant the button is pressed instead.
+  /// finished taking the photo — `takePicture()` is a real hardware delay
+  /// (autofocus, exposure, JPEG encode) and without this the screen looked
+  /// frozen with no acknowledgement the tap registered.
   void beginCapture() {
     state = state.copyWith(isScanning: true, errorMessage: null);
   }
 
-  Future<ScanRecord> captureAndAnalyze({String? imagePath}) async {
+  /// Abandons an in-progress capture, clearing the loading state and recording
+  /// [message] for the UI. Used when the failure happens before inference —
+  /// e.g. the camera is unavailable or `takePicture()` threw.
+  void failCapture(String message) {
+    state = state.copyWith(isScanning: false, errorMessage: message);
+  }
+
+  /// Runs real on-device inference on [imagePath].
+  ///
+  /// Throws [ScanUnavailableException] when no real inference is possible on
+  /// this platform, and rethrows anything else after recording a message. It
+  /// never returns a fabricated result.
+  Future<ScanRecord> captureAndAnalyze({required String imagePath}) async {
     if (_analyzing) {
       final existing = state.lastResult;
       if (existing != null) {
@@ -109,9 +134,15 @@ class ScanController extends Notifier<ScanState> {
     final stopwatch = Stopwatch()..start();
 
     try {
-      final result = imagePath != null
-          ? await _analyzeImage(imagePath)
-          : await _analyzeMock();
+      final model = await _model();
+      final bytes = await File(imagePath).readAsBytes();
+      final prediction = await model.predict(bytes);
+      final result = buildScanRecord(
+        prediction,
+        id: 'scan-${DateTime.now().millisecondsSinceEpoch}',
+        capturedAt: DateTime.now(),
+        imagePath: imagePath,
+      );
 
       await ref
           .read(localPrefsProvider)
@@ -120,112 +151,40 @@ class ScanController extends Notifier<ScanState> {
       state = state.copyWith(isScanning: false, lastResult: result);
 
       if (kDebugMode) {
-        debugPrint(
-          'Freshness scan finished in ${stopwatch.elapsedMilliseconds} ms',
-        );
+        debugPrint('Freshness scan finished in ${stopwatch.elapsedMilliseconds} ms');
       }
 
       return result;
-    } catch (_) {
-      state = state.copyWith(
-        isScanning: false,
-        errorMessage: 'Scan failed. Please try again.',
-      );
+    } on UnsupportedError {
+      // `tflite_flutter` is dart:ffi-based and has no web implementation, so
+      // CropScanModel.load() throws here on Flutter Web. Previously this was
+      // swallowed into the canned sample cycle, which is why the web build
+      // appeared to "scan" and always returned 94% first.
+      const message =
+          'On-device scanning is not available in the web app. '
+          'Install the AgriConnect Android app to scan produce.';
+      state = state.copyWith(isScanning: false, errorMessage: message);
+      throw const ScanUnavailableException(message);
+    } catch (error) {
+      // Surface something actionable instead of a bare "try again" — a missing
+      // model asset, an undecodable photo, and a tensor mismatch are very
+      // different problems and used to be indistinguishable.
+      final message = 'Scan failed: ${_describe(error)}';
+      state = state.copyWith(isScanning: false, errorMessage: message);
+      if (kDebugMode) debugPrint('Scan failed: $error');
       rethrow;
     } finally {
       _analyzing = false;
     }
   }
 
-  /// Real on-device inference against `ai/model/agriconnect.tflite`. Falls
-  /// back to the mock cycle on web specifically — `tflite_flutter` has no
-  /// web support (see crop_scan_model_web.dart), even though the `camera`
-  /// plugin can still hand us a real [imagePath] there.
-  Future<ScanRecord> _analyzeImage(String imagePath) async {
-    try {
-      final model = await _model();
-      final bytes = await File(imagePath).readAsBytes();
-      final prediction = await model.predict(bytes);
-      return buildScanRecord(
-        prediction,
-        id: 'scan-${DateTime.now().millisecondsSinceEpoch}',
-        capturedAt: DateTime.now(),
-        imagePath: imagePath,
-      );
-    } on UnsupportedError {
-      return _analyzeMock(imagePath: imagePath);
-    }
-  }
-
-  /// Platforms with no real inference path available — no camera (desktop,
-  /// simulators), or web (no `tflite_flutter` support) — cycle through
-  /// fixed sample results instead, same as pre-integration behavior.
-  Future<ScanRecord> _analyzeMock({String? imagePath}) async {
-    await Future<void>.delayed(const Duration(milliseconds: 1400));
-    final result = _sampleResults[_sampleIndex % _sampleResults.length].copyWith(imagePath: imagePath);
-    _sampleIndex += 1;
-    return result;
+  String _describe(Object error) {
+    if (error is FormatException) return 'the photo could not be read. Try again.';
+    if (error is FileSystemException) return 'the captured photo could not be opened.';
+    return 'unexpected error running the freshness model.';
   }
 }
 
 final scanControllerProvider = NotifierProvider<ScanController, ScanState>(
   ScanController.new,
 );
-
-final _sampleResults = [
-  ScanRecord(
-    id: 'scan-1',
-    cropType: 'Tomatoes',
-    score: 94,
-    shelfLifeLabel: '12 Days',
-    shelfLifeDays: 12,
-    qualityGrade: 'Grade A',
-    recommendedPrice: 45,
-    priceUnit: 'crate',
-    confidence: 0.96,
-    attributes: const [
-      ScanAttribute(label: 'Uniform Color', kind: ScanAttributeKind.positive),
-      ScanAttribute(label: 'Firm Texture', kind: ScanAttributeKind.positive),
-      ScanAttribute(label: 'No Pests', kind: ScanAttributeKind.pest),
-      ScanAttribute(label: 'Organic', kind: ScanAttributeKind.certification),
-    ],
-    capturedAt: DateTime.fromMillisecondsSinceEpoch(1710000000000, isUtc: true),
-    isSampleResult: true,
-  ),
-  ScanRecord(
-    id: 'scan-2',
-    cropType: 'Cassava',
-    score: 54,
-    shelfLifeLabel: '2 Days',
-    shelfLifeDays: 2,
-    qualityGrade: 'Grade B',
-    recommendedPrice: 28,
-    priceUnit: 'bag',
-    confidence: 0.91,
-    attributes: const [
-      ScanAttribute(label: 'Moisture Loss', kind: ScanAttributeKind.caution),
-      ScanAttribute(label: 'Surface Intact', kind: ScanAttributeKind.positive),
-      ScanAttribute(label: 'Sell Soon', kind: ScanAttributeKind.caution),
-    ],
-    capturedAt: DateTime.fromMillisecondsSinceEpoch(1710003600000, isUtc: true),
-    isSampleResult: true,
-  ),
-  ScanRecord(
-    id: 'scan-3',
-    cropType: 'Pepper',
-    score: 31,
-    shelfLifeLabel: '8 Hours',
-    shelfLifeDays: 8 / 24, // kept consistent with the "8 Hours" label above
-    qualityGrade: 'Grade C',
-    recommendedPrice: 12,
-    priceUnit: 'basket',
-    confidence: 0.84,
-    attributes: const [
-      ScanAttribute(label: 'Softening Visible', kind: ScanAttributeKind.caution),
-      ScanAttribute(label: 'Patchy Color', kind: ScanAttributeKind.caution),
-      ScanAttribute(label: 'Use Urgently', kind: ScanAttributeKind.caution),
-    ],
-    capturedAt: DateTime.fromMillisecondsSinceEpoch(1710007200000, isUtc: true),
-    isSampleResult: true,
-  ),
-];

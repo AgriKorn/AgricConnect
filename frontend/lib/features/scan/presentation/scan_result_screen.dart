@@ -7,7 +7,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/utils/currency.dart';
 import '../../../core/utils/freshness.dart';
 import '../../../core/widgets/agri_toast.dart';
 import '../../../core/widgets/empty_state.dart';
@@ -64,8 +63,6 @@ class ScanResultScreen extends ConsumerWidget {
                         const SizedBox(height: 14),
                         _AttributeChips(colorScheme: colorScheme, attributes: result.attributes),
                       ],
-                      const SizedBox(height: 18),
-                      _PriceCard(colorScheme: colorScheme, result: result),
                       if (result.imagePath != null) ...[
                         const SizedBox(height: 26),
                         Text(
@@ -165,14 +162,11 @@ class _ResultAppBar extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(color: colorScheme.onSurface, fontSize: 19, fontWeight: FontWeight.w800),
                 ),
-                // Only claim "sample" when it actually is one — a real
-                // on-device inference must not be captioned as fake.
-                if (result.isSampleResult)
-                  Text(
-                    'Preview — sample result, not a real scan',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600),
-                  ),
+                Text(
+                  'Freshness only — you name the produce',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600),
+                ),
               ],
             ),
           ),
@@ -181,13 +175,12 @@ class _ResultAppBar extends StatelessWidget {
             icon: Icons.ios_share_rounded,
             iconSize: 18,
             onPressed: () async {
-              // Deliberately doesn't assert a crop species (see
-              // crop_scan_presenter.dart) — only the freshness/shelf-life/
-              // price signals the scan is actually reliable for.
+              // Deliberately asserts neither a crop species nor a price — see
+              // crop_scan_presenter.dart for why both were removed.
               await Clipboard.setData(ClipboardData(
                 text:
                     '${result.score}% freshness (${result.qualityGrade}), '
-                    '${result.shelfLifeLabel} shelf life, ${formatGhs(result.recommendedPrice)} / ${result.priceUnit}.',
+                    '${result.shelfLifeLabel} shelf life.',
               ));
               if (context.mounted) {
                 showAgriToast(context, 'Scan summary copied to clipboard');
@@ -410,64 +403,6 @@ class _AttributeChips extends StatelessWidget {
           ),
         );
       }).toList(),
-    );
-  }
-}
-
-class _PriceCard extends StatelessWidget {
-  const _PriceCard({required this.colorScheme, required this.result});
-
-  final ColorScheme colorScheme;
-  final ScanRecord result;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(color: colorScheme.primary, shape: BoxShape.circle),
-            child: Icon(Icons.auto_awesome_rounded, color: colorScheme.onPrimary, size: 20),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'AI Recommended Price',
-                  style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12.5, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      formatGhs(result.recommendedPrice),
-                      style: TextStyle(color: colorScheme.onSurface, fontSize: 24, fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      'per ${result.priceUnit}',
-                      style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12.5, fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Icon(Icons.trending_up_rounded, color: colorScheme.primary, size: 26),
-        ],
-      ),
     );
   }
 }

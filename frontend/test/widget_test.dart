@@ -150,9 +150,15 @@ void main() {
     expect(find.text('Start Scanning'), findsOneWidget);
   });
 
-  testWidgets('Scan flow reaches the result screen and caches a result', (
+  testWidgets('Scanning with no camera reports a failure and never invents a score', (
     tester,
   ) async {
+    // Regression guard. This test previously asserted `find.text('94%')` —
+    // which only ever passed because the scan silently fell back to a
+    // hardcoded 94% / 54% / 31% sample cycle whenever real inference was
+    // impossible. A test environment has no camera, so that fallback made a
+    // broken camera indistinguishable from a genuine reading, on device too.
+    // The fallback is gone: no camera must mean a visible failure and no score.
     final sessionSnapshot = UserModel(
       id: 'mock-1',
       role: UserRole.farmer,
@@ -175,15 +181,22 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Start Scanning'));
-    await tester.pumpAndSettle();
+    // Deliberately not pumpAndSettle: with no camera the capture screen shows
+    // an indefinite CircularProgressIndicator, so settling never completes.
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
 
-    expect(find.text('Allow camera access?'), findsOneWidget);
-    await tester.tap(find.text('Continue'));
-    await tester.pumpAndSettle();
+    expect(find.text('Hold steady'), findsOneWidget);
 
-    expect(find.text('AI Analysis'), findsOneWidget);
-    expect(find.text('Create Listing'), findsOneWidget);
-    expect(find.text('94%'), findsOneWidget);
-    expect(find.text('Grade A'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.camera_alt_rounded));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.textContaining('Camera not ready'), findsOneWidget);
+    // The whole point: no fabricated freshness score anywhere.
+    expect(find.text('94%'), findsNothing);
+    expect(find.text('54%'), findsNothing);
+    expect(find.text('31%'), findsNothing);
+    // And we must still be on the capture screen, not a result screen.
+    expect(find.text('AI Analysis'), findsNothing);
   });
 }

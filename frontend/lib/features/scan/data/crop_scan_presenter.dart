@@ -1,32 +1,24 @@
 import 'crop_scan_model.dart';
 import 'scan_record.dart';
 
-/// Crops the dataset only has 'fresh'/'spoiled' folders for (no 'aging'
-/// examples were collected) — mirrors TWO_STAGE_CROPS in ai/shelf_life.py.
-/// An "aging" prediction for these is extrapolated, not photo-calibrated.
-const _twoStageCrops = {'cucumber', 'okra', 'orange'};
-
-/// Placeholder GH₵/kg reference prices, pending a real pricing feed (the
-/// backend's `mofa_price_references` table isn't exposed to the app yet —
-/// see backend/prisma/schema.prisma). Scaled by freshness below so the
-/// recommendation still reacts to scan quality instead of being a flat rate.
-const _basePricePerKg = {
-  'carrot': 7.0,
-  'cucumber': 5.0,
-  'mango': 5.0,
-  'okra': 10.0,
-  'orange': 4.0,
-  'pepper': 15.0,
-  'plantain': 6.0,
-  'potato': 6.0,
-  'tomato': 8.0,
-};
-
-/// Converts a raw model prediction into the [ScanRecord] shape the scan
-/// result / add-listing UI already expects. All presentation choices below
-/// (score formula, grade cutoffs, price heuristic) are this app's own
-/// calibration — the model itself only outputs crop, freshness stage, and
-/// shelf-life days (see ai/README.md).
+/// Converts a raw model prediction into the [ScanRecord] the scan result /
+/// add-listing UI expects.
+///
+/// **This function must never read [CropScanResult.cropType].** The model has a
+/// fixed 9-crop vocabulary and no "not a crop" class, so its crop head always
+/// names *something* — a hand, a face, or an empty table all come back as one
+/// of the nine crops, sometimes with high confidence. Identifying the produce
+/// is the farmer's job (they type it on the listing form); the scan's job is
+/// freshness only.
+///
+/// That invariant is why there is no price here either: the old recommendation
+/// multiplied a per-crop base price by the freshness score, so a misidentified
+/// crop silently changed the farmer's suggested price. Pricing was removed
+/// rather than left resting on an untrusted guess.
+///
+/// The score / grade cutoffs below are this app's own calibration; the model
+/// itself only outputs the freshness distribution and a shelf-life estimate
+/// (see ai/README.md).
 ScanRecord buildScanRecord(
   CropScanResult result, {
   required String id,
@@ -43,31 +35,26 @@ ScanRecord buildScanRecord(
 
   final qualityGrade = score >= 80 ? 'Grade A' : (score >= 50 ? 'Grade B' : 'Grade C');
 
-  final basePrice = _basePricePerKg[result.cropType] ?? 5.0;
-  final recommendedPrice = (basePrice * (0.35 + 0.65 * score / 100) * 2).round() / 2; // nearest 0.5
-
   final attributes = <ScanAttribute>[
     switch (result.freshnessStage) {
       'fresh' => const ScanAttribute(label: 'Good Condition', kind: ScanAttributeKind.positive),
       'aging' => const ScanAttribute(label: 'Softening / Aging', kind: ScanAttributeKind.caution),
       _ => const ScanAttribute(label: 'Spoilage Detected', kind: ScanAttributeKind.caution),
     },
-    if (result.cropConfidence < 0.6 || result.freshnessConfidence < 0.6)
+    // Uses only the freshness head's confidence. The crop head's confidence is
+    // deliberately ignored — see the note above; a confident wrong species is
+    // exactly the failure mode we stopped surfacing.
+    if (result.freshnessConfidence < 0.6)
       const ScanAttribute(label: 'Low Confidence — Retake in Better Light', kind: ScanAttributeKind.caution),
-    if (_twoStageCrops.contains(result.cropType) && result.freshnessStage == 'aging')
-      const ScanAttribute(label: 'Aging Estimate Extrapolated', kind: ScanAttributeKind.caution),
   ];
 
   return ScanRecord(
     id: id,
-    cropType: _capitalize(result.cropType),
     score: score,
     shelfLifeLabel: _shelfLifeLabel(result.shelfLifeDays),
     shelfLifeDays: result.shelfLifeDays,
     qualityGrade: qualityGrade,
-    recommendedPrice: recommendedPrice,
-    priceUnit: 'kg',
-    confidence: result.cropConfidence < result.freshnessConfidence ? result.cropConfidence : result.freshnessConfidence,
+    confidence: result.freshnessConfidence,
     attributes: attributes,
     capturedAt: capturedAt,
     imagePath: imagePath,
@@ -81,5 +68,3 @@ String _shelfLifeLabel(double days) {
   }
   return '${days.round()} Days';
 }
-
-String _capitalize(String value) => value.isEmpty ? value : '${value[0].toUpperCase()}${value.substring(1)}';

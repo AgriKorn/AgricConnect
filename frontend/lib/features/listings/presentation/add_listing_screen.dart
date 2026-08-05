@@ -52,7 +52,11 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
     // scan feature (see crop_scan_presenter.dart); the farmer names their
     // own produce, the scan only supplies freshness/shelf-life/price.
     _nameController = TextEditingController();
-    _priceController = TextEditingController(text: scan == null ? '' : scan.recommendedPrice.toStringAsFixed(0));
+    // Not prefilled from the scan either: the old "AI recommended price" was a
+    // per-crop base rate looked up by the model's *guessed* species, so a
+    // misidentified crop silently set the farmer's asking price. The farmer
+    // sets their own price; the scan contributes freshness and shelf life only.
+    _priceController = TextEditingController();
     _quantityController = TextEditingController();
     _shelfLifeController = TextEditingController(
       // Reads the scan's raw day count directly rather than re-parsing its
