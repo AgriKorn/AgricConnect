@@ -15,13 +15,6 @@ import '../../home/application/farmer_dashboard_providers.dart';
 import '../../marketplace/data/marketplace_repository.dart';
 import '../../scan/data/scan_record.dart';
 
-/// Pulls the leading integer out of a display label like "12 Days" — best
-/// effort; falls back to null if the scan didn't produce a parseable value.
-int? _parseLeadingInt(String label) {
-  final match = RegExp(r'\d+').firstMatch(label);
-  return match == null ? null : int.tryParse(match.group(0)!);
-}
-
 /// Manual (or scan-assisted, via [prefill]) listing creation — the scan
 /// flow is one way into this form, not the only way. Reuses the auth flow's
 /// glass-card form primitives (widgets/auth_visuals.dart).
@@ -56,7 +49,11 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
     _priceController = TextEditingController(text: scan == null ? '' : scan.recommendedPrice.toStringAsFixed(0));
     _quantityController = TextEditingController();
     _shelfLifeController = TextEditingController(
-      text: scan == null ? '' : (_parseLeadingInt(scan.shelfLifeLabel)?.toString() ?? ''),
+      // Reads the scan's raw day count directly rather than re-parsing its
+      // display label — that label switches to hour units under 1 day
+      // (e.g. "8 Hours"), and grabbing the leading digits from it would
+      // silently submit 8 *days* instead of 8 hours to the backend.
+      text: scan == null ? '' : scan.shelfLifeDays.round().toString(),
     );
     _descriptionController = TextEditingController();
     _freshnessScore = (scan?.score ?? 100).toDouble();

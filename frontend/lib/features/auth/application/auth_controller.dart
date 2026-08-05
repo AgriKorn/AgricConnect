@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/storage/local_prefs.dart';
@@ -151,6 +152,20 @@ class AuthController extends Notifier<SessionState> {
     state = state.copyWith(isSubmitting: true, errorMessage: null);
     try {
       final response = await ref.read(authRepositoryProvider).loginWithGoogle(role: role);
+      await _applyAuthResponse(response);
+    } on ApiException catch (e) {
+      state = state.copyWith(isSubmitting: false, errorMessage: e.message);
+    }
+  }
+
+  /// Web counterpart to [loginWithGoogle]: the web sign-in button hands us
+  /// an already-obtained [GoogleSignInAccount] via a stream (see
+  /// presentation/widgets/google_signin/google_signin_web.dart) instead of
+  /// this controller triggering the native `.signIn()` popup itself.
+  Future<void> completeGoogleSignIn(GoogleSignInAccount googleUser, {UserRole? role}) async {
+    state = state.copyWith(isSubmitting: true, errorMessage: null);
+    try {
+      final response = await ref.read(authRepositoryProvider).completeGoogleSignIn(googleUser, role: role);
       await _applyAuthResponse(response);
     } on ApiException catch (e) {
       state = state.copyWith(isSubmitting: false, errorMessage: e.message);

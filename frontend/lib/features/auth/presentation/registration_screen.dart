@@ -10,6 +10,7 @@ import '../application/session_state.dart';
 import '../data/models/register_request.dart';
 import '../data/models/user_role.dart';
 import 'widgets/auth_visuals.dart';
+import 'widgets/google_auth_button.dart';
 
 const _markAsset = 'assets/images/agri_mark.png';
 
@@ -308,12 +309,10 @@ class _RegistrationScreenState extends ConsumerState<RegistrationScreen> {
                           const SizedBox(height: 18),
                           AuthOrDivider(colorScheme: colorScheme),
                           const SizedBox(height: 18),
-                          AuthGoogleButton(
+                          GoogleAuthButton(
                             loading: session.isSubmitting,
                             colorScheme: colorScheme,
-                            onPressed: () => ref
-                                .read(authControllerProvider.notifier)
-                                .loginWithGoogle(role: widget.role),
+                            role: widget.role,
                           ),
                           const SizedBox(height: 18),
                           Row(

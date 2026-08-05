@@ -49,7 +49,7 @@ void main() {
     }
     addTearDown(model.close);
 
-    final result = model.predict(_syntheticPhoto());
+    final result = await model.predict(_syntheticPhoto());
 
     expect(CropScanModel.cropNames, contains(result.cropType));
     expect(CropScanModel.freshNames, contains(result.freshnessStage));
@@ -77,7 +77,7 @@ void main() {
     // and produce a valid label either way (this is a smoke check on the
     // preprocessing path, not a claim about prediction accuracy).
     for (final image in [wide, tall]) {
-      final result = model.predict(Uint8List.fromList(img.encodePng(image)));
+      final result = await model.predict(Uint8List.fromList(img.encodePng(image)));
       expect(CropScanModel.cropNames, contains(result.cropType));
     }
   });

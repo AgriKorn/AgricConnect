@@ -3,8 +3,19 @@ import { CreateDriverJobRecord, IDispatchRepository } from './dispatch.repositor
 import { DriverJob, DriverJobStatus } from './dispatch.types';
 import { assignment_status } from '../../generated/prisma/client';
 
+// assignment_status (the DB enum) has no distinct "completed" value — a
+// completed delivery's driver_assignments row stays 'accepted' forever.
+// COMPLETED is a real, distinct state at the domain level though, so it has
+// to be read off the linked order's order_status instead (set to 'completed'
+// by TransactionService.confirmDelivery via the RELEASED transaction status).
+// 'expired' assignments (auto-timed-out offers, see DriverTimeoutWorker) have
+// no domain equivalent either — closest is DECLINED: a non-actionable,
+// already-reassigned-elsewhere terminal state, not something the driver
+// should ever see as pending.
 const statusToPrisma = (status: DriverJobStatus): assignment_status => {
   switch (status) {
+    case 'DECLINED':
+      return 'declined';
     case 'ACCEPTED':
     case 'COMPLETED':
       return 'accepted';
@@ -14,14 +25,13 @@ const statusToPrisma = (status: DriverJobStatus): assignment_status => {
   }
 };
 
-const statusFromPrisma = (status: assignment_status): DriverJobStatus => {
-  switch (status) {
+const statusFromPrisma = (assignmentStatus: assignment_status, orderStatus?: string | null): DriverJobStatus => {
+  switch (assignmentStatus) {
     case 'accepted':
-      return 'ACCEPTED';
+      return orderStatus === 'completed' ? 'COMPLETED' : 'ACCEPTED';
     case 'declined':
+    case 'expired':
       return 'DECLINED';
-    case 'completed' as any:
-      return 'COMPLETED';
     case 'notified':
     default:
       return 'PENDING';
@@ -50,7 +60,7 @@ const mapPrismaToJob = (a: any): DriverJob => ({
   cropType: a.orders?.produce_listings?.crop_types?.name || 'crop',
   quantityKg: a.orders?.produce_listings?.quantity_kg ? Number(a.orders.produce_listings.quantity_kg) : 100,
   amountGhs: a.orders?.amount ? Number(a.orders.amount) : 0,
-  status: statusFromPrisma(a.status),
+  status: statusFromPrisma(a.status, a.orders?.order_status),
   createdAt: a.notified_at,
   updatedAt: a.responded_at || a.notified_at,
   farmerName: a.orders?.produce_listings?.users?.full_name || null,
@@ -111,7 +121,19 @@ export class PrismaDispatchRepository implements IDispatchRepository {
 
   async findJobsForDriver(driverId: string, status?: DriverJobStatus): Promise<DriverJob[]> {
     const where: any = { driver_id: driverId };
-    if (status) {
+    // ACCEPTED and COMPLETED share the same assignment_status ('accepted') —
+    // see the note above statusFromPrisma — so telling them apart at the
+    // query level requires filtering on the linked order's order_status too,
+    // not just statusToPrisma's single enum value.
+    if (status === 'ACCEPTED') {
+      where.status = 'accepted';
+      where.orders = { order_status: { not: 'completed' } };
+    } else if (status === 'COMPLETED') {
+      where.status = 'accepted';
+      where.orders = { order_status: 'completed' };
+    } else if (status === 'DECLINED') {
+      where.status = { in: ['declined', 'expired'] };
+    } else if (status) {
       where.status = statusToPrisma(status);
     }
 

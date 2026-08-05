@@ -7,6 +7,7 @@ import '../../../core/utils/currency.dart';
 import '../../../core/utils/freshness.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/responsive_content.dart';
+import '../../marketplace/application/marketplace_providers.dart';
 import '../../marketplace/data/marketplace_mock.dart';
 import '../../orders/data/orders_repository.dart';
 import '../application/checkout_providers.dart';
@@ -152,6 +153,15 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: colorScheme.primary, foregroundColor: colorScheme.onPrimary),
             onPressed: () {
+              // Only the ones that actually purchased successfully — a
+              // failed item has to stay selected, or the buyer would have to
+              // go back and re-find/re-select it on the marketplace grid to
+              // retry, instead of just tapping Pay again.
+              final purchased = results.where((r) => r.error == null).map((r) => r.listing).toSet();
+              if (purchased.isNotEmpty) {
+                final notifier = ref.read(selectedMarketplaceListingsProvider.notifier);
+                notifier.state = notifier.state.difference(purchased);
+              }
               Navigator.of(dialogContext).pop();
               if (mounted) Navigator.of(context).pop();
             },

@@ -19,7 +19,7 @@ void _pushComingSoon(BuildContext context, {required String title, required Icon
 }
 
 /// Driver Home: profile hero + earnings/online snapshot -> availability
-/// toggle -> active delivery preview (map, job details, accept/decline,
+/// toggle -> active trip preview (map, job details, accept/decline,
 /// navigate) -> quick-access logistics tools.
 class DriverHomeScreen extends ConsumerWidget {
   const DriverHomeScreen({super.key});
@@ -55,7 +55,7 @@ class DriverHomeScreen extends ConsumerWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          'Active Delivery',
+                          'Active Trip',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(color: colorScheme.onSurface, fontSize: 18, fontWeight: FontWeight.w800),
@@ -80,11 +80,13 @@ class DriverHomeScreen extends ConsumerWidget {
                     loading: () => const Center(child: CircularProgressIndicator()),
                     error: (error, _) => EmptyState(
                       icon: Icons.wifi_off_rounded,
-                      message: 'Could not check your active delivery. Pull to refresh.',
+                      message: 'Could not check your active trip. Pull to refresh, or tap Retry.',
+                      ctaLabel: 'Retry',
+                      onCta: () => ref.read(activeTripProvider.notifier).refresh(),
                     ),
                     data: (activeTrip) => activeTrip == null
-                        ? _NoActiveDeliveryCard(colorScheme: colorScheme)
-                        : _ActiveDeliveryCard(
+                        ? _NoActiveTripCard(colorScheme: colorScheme)
+                        : _ActiveTripCard(
                             trip: activeTrip,
                             colorScheme: colorScheme,
                             onConfirmDelivery: () async {
@@ -306,8 +308,8 @@ class _StatusCard extends StatelessWidget {
   }
 }
 
-class _NoActiveDeliveryCard extends StatelessWidget {
-  const _NoActiveDeliveryCard({required this.colorScheme});
+class _NoActiveTripCard extends StatelessWidget {
+  const _NoActiveTripCard({required this.colorScheme});
 
   final ColorScheme colorScheme;
 
@@ -319,13 +321,13 @@ class _NoActiveDeliveryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: colorScheme.outline.withValues(alpha: 0.2)),
       ),
-      child: EmptyState(icon: Icons.local_shipping_outlined, message: 'No active delivery right now.'),
+      child: EmptyState(icon: Icons.local_shipping_outlined, message: 'No active trip right now.'),
     );
   }
 }
 
-class _ActiveDeliveryCard extends StatelessWidget {
-  const _ActiveDeliveryCard({
+class _ActiveTripCard extends StatelessWidget {
+  const _ActiveTripCard({
     required this.trip,
     required this.colorScheme,
     required this.onConfirmDelivery,

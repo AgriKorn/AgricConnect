@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../../core/widgets/ambient_background.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../orders/presentation/confirm_delivery_screen.dart';
@@ -15,6 +16,7 @@ class JobHistoryScreen extends ConsumerStatefulWidget {
 
 class _JobHistoryScreenState extends ConsumerState<JobHistoryScreen> {
   bool _loading = true;
+  String? _error;
   List<DispatchJobModel> _jobs = const [];
 
   @override
@@ -24,17 +26,29 @@ class _JobHistoryScreenState extends ConsumerState<JobHistoryScreen> {
   }
 
   Future<void> _load() async {
-    final repo = ref.read(dispatchRepositoryProvider);
-    final results = await Future.wait([
-      repo.fetchJobs(status: 'ACCEPTED'),
-      repo.fetchJobs(status: 'COMPLETED'),
-    ]);
-    if (!mounted) return;
-    final combined = [...results[0], ...results[1]]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
     setState(() {
-      _jobs = combined;
-      _loading = false;
+      _loading = true;
+      _error = null;
     });
+    try {
+      final repo = ref.read(dispatchRepositoryProvider);
+      final results = await Future.wait([
+        repo.fetchJobs(status: 'ACCEPTED'),
+        repo.fetchJobs(status: 'COMPLETED'),
+      ]);
+      if (!mounted) return;
+      final combined = [...results[0], ...results[1]]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      setState(() {
+        _jobs = combined;
+        _loading = false;
+      });
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _loading = false;
+      });
+    }
   }
 
   @override
@@ -51,10 +65,17 @@ class _JobHistoryScreenState extends ConsumerState<JobHistoryScreen> {
               onRefresh: _load,
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
-                  : _jobs.isEmpty
+                  : _error != null
+                      ? EmptyState(
+                          icon: Icons.wifi_off_rounded,
+                          message: 'Could not load your delivery history. Pull to refresh, or tap Retry.',
+                          ctaLabel: 'Retry',
+                          onCta: _load,
+                        )
+                      : _jobs.isEmpty
                       ? const EmptyState(
                           icon: Icons.history_rounded,
-                          message: 'No delivery history yet — accepted and completed jobs will appear here.',
+                          message: 'You have not completed any deliveries yet.',
                         )
                       : ListView(
                           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),

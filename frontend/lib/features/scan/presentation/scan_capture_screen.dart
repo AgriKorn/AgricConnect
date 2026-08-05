@@ -54,9 +54,13 @@ class _ScanCaptureScreenState extends ConsumerState<ScanCaptureScreen>
         (c) => c.lensDirection == CameraLensDirection.back,
         orElse: () => cameras.first,
       );
+      // The model downsamples every photo to 224x224 regardless — capturing
+      // at "high" (1080p+ on most devices) just makes takePicture() and the
+      // JPEG decode both slower for no accuracy benefit. "medium" (~720p)
+      // is still far more detail than the model uses.
       final controller = CameraController(
         description,
-        ResolutionPreset.high,
+        ResolutionPreset.medium,
         enableAudio: false,
       );
       await controller.initialize().timeout(const Duration(seconds: 6));
@@ -106,6 +110,11 @@ class _ScanCaptureScreenState extends ConsumerState<ScanCaptureScreen>
 
   Future<void> _capture() async {
     final controller = _cameraController;
+    // Flips the shutter button/overlay into their loading state right away
+    // — takePicture() below is a real camera-hardware delay (autofocus,
+    // exposure, JPEG encode), and without this the screen looked frozen for
+    // that whole stretch with no acknowledgment the tap even registered.
+    ref.read(scanControllerProvider.notifier).beginCapture();
     _scanLineController.repeat();
 
     String? imagePath;

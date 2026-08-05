@@ -166,7 +166,43 @@ export class PrismaUserRepository implements IUserRepository {
       },
       include: { driver_details: true },
     });
-    return list.map(mapPrismaToUser);
+    if (list.length <= 1) return list.map(mapPrismaToUser);
+
+    // assignDriver() always takes candidates[0] — with no ordering here that
+    // meant the exact same driver (whichever row a plain unordered scan
+    // happens to return first) got offered every single delivery, forever,
+    // and every other approved/available/capable driver never received an
+    // offer at all. Ordering by whichever driver has gone longest without a
+    // job offer (nulls — never offered one — first) rotates offers fairly
+    // instead of concentrating them on one account.
+    const lastOffered = await prisma.driver_assignments.groupBy({
+      by: ['driver_id'],
+      where: { driver_id: { in: list.map((d) => d.id) } },
+      _max: { notified_at: true },
+    });
+    const lastOfferedAt = new Map(lastOffered.map((row) => [row.driver_id, row._max.notified_at]));
+
+    // Shuffle first, then stable-sort by last-offered time — Array.sort is
+    // stable, so without this, every driver who has *never* been offered a
+    // job (by far the common case: dozens of seeded accounts alongside a
+    // handful of real ones) ties at the same priority and the stable sort
+    // silently falls back to the database's own scan order every time,
+    // which deterministically favours whichever handful of rows happen to
+    // sort first there — not actual fairness, just a different fixed
+    // driver instead of one. Shuffling breaks that tie randomly instead.
+    const shuffled = [...list];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    const sorted = shuffled.sort((a, b) => {
+      const aTime = lastOfferedAt.get(a.id)?.getTime() ?? 0;
+      const bTime = lastOfferedAt.get(b.id)?.getTime() ?? 0;
+      return aTime - bTime;
+    });
+
+    return sorted.map(mapPrismaToUser);
   }
 
   async update(id: string, data: Partial<User>): Promise<User> {

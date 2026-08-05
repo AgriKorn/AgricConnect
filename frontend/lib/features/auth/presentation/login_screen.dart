@@ -9,6 +9,7 @@ import '../../../core/widgets/responsive_content.dart';
 import '../../../core/widgets/theme_toggle_button.dart';
 import '../application/auth_controller.dart';
 import 'widgets/auth_visuals.dart';
+import 'widgets/google_auth_button.dart';
 
 const _markAsset = 'assets/images/agri_mark.png';
 
@@ -148,10 +149,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           const SizedBox(height: 18),
                           AuthOrDivider(colorScheme: colorScheme),
                           const SizedBox(height: 18),
-                          AuthGoogleButton(
+                          GoogleAuthButton(
                             loading: isSubmitting,
                             colorScheme: colorScheme,
-                            onPressed: () => ref.read(authControllerProvider.notifier).loginWithGoogle(),
                           ),
                         ],
                       ),

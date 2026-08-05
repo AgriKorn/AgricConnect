@@ -37,7 +37,7 @@ class CropScanModel {
 
   void close() {}
 
-  CropScanResult predict(Uint8List imageBytes) {
+  Future<CropScanResult> predict(Uint8List imageBytes) async {
     throw UnsupportedError('On-device crop scanning is not available on web.');
   }
 }
