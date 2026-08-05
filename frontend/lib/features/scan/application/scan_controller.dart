@@ -86,14 +86,6 @@ class ScanController extends Notifier<ScanState> {
     state = state.copyWith(isFlashOn: !state.isFlashOn);
   }
 
-  /// The crop type the upcoming mock-fallback [captureAndAnalyze] call will
-  /// resolve to when no real photo is available (no camera on this
-  /// device/platform) — lets the capture screen's "detected" label match
-  /// the result it's about to navigate to. Meaningless once a real photo is
-  /// captured, since real detection isn't known until inference finishes.
-  String get previewCropType =>
-      _sampleResults[_sampleIndex % _sampleResults.length].cropType;
-
   /// Flips [ScanState.isScanning] on immediately, before the camera has even
   /// finished taking the photo. [captureAndAnalyze] does this too, but only
   /// once `takePicture()` (a real, noticeable camera-hardware delay) has

@@ -5,7 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
+import '../../../core/widgets/agri_toast.dart';
 import '../application/scan_controller.dart';
 
 /// Full-bleed live camera surface with a centered viewfinder (a plain black
@@ -26,6 +28,7 @@ class ScanCaptureScreen extends ConsumerStatefulWidget {
 class _ScanCaptureScreenState extends ConsumerState<ScanCaptureScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _scanLineController;
+  final _imagePicker = ImagePicker();
   CameraController? _cameraController;
 
   @override
@@ -127,20 +130,45 @@ class _ScanCaptureScreenState extends ConsumerState<ScanCaptureScreen>
       }
     }
 
-    await ref.read(scanControllerProvider.notifier).captureAndAnalyze(imagePath: imagePath);
-    _scanLineController.stop();
+    await _analyzeAndNavigate(imagePath);
+  }
 
-    if (!mounted) {
-      return;
+  /// Lets a farmer scan an existing photo (produce already photographed
+  /// earlier, or sent to them) instead of only ever pointing the live
+  /// camera at it — the same [_analyzeAndNavigate] pipeline the shutter
+  /// button uses, just sourced from the gallery.
+  Future<void> _pickFromGallery() async {
+    final picked = await _imagePicker.pickImage(source: ImageSource.gallery, maxWidth: 1600, imageQuality: 85);
+    if (picked == null || !mounted) return;
+
+    ref.read(scanControllerProvider.notifier).beginCapture();
+    _scanLineController.repeat();
+    await _analyzeAndNavigate(picked.path);
+  }
+
+  /// Shared tail end of both capture paths: runs inference on [imagePath]
+  /// (or the mock cycle when null — no camera on this device/platform),
+  /// then either moves to the result screen or, on failure, stays put and
+  /// surfaces the error as a toast instead of an uncaught exception
+  /// freezing the screen mid-analysis.
+  Future<void> _analyzeAndNavigate(String? imagePath) async {
+    try {
+      await ref.read(scanControllerProvider.notifier).captureAndAnalyze(imagePath: imagePath);
+      _scanLineController.stop();
+      if (!mounted) return;
+      context.go('/farmer/scan/result');
+    } catch (_) {
+      _scanLineController.stop();
+      if (!mounted) return;
+      final message = ref.read(scanControllerProvider).errorMessage ?? 'Scan failed. Please try again.';
+      showAgriToast(context, message, icon: Icons.error_outline_rounded, isError: true);
     }
-    context.go('/farmer/scan/result');
   }
 
   @override
   Widget build(BuildContext context) {
     final scanState = ref.watch(scanControllerProvider);
     final isScanning = scanState.isScanning;
-    final detectedLabel = ref.read(scanControllerProvider.notifier).previewCropType.toUpperCase();
     final controller = _cameraController;
     final cameraReady = controller != null && controller.value.isInitialized;
 
@@ -181,11 +209,21 @@ class _ScanCaptureScreenState extends ConsumerState<ScanCaptureScreen>
                         icon: Icons.close_rounded,
                         onPressed: () => context.canPop() ? context.pop() : context.go('/farmer/home'),
                       ),
-                      if (isScanning && !cameraReady) _DetectedPill(label: detectedLabel),
-                      _GlassIconButton(
-                        icon: scanState.isFlashOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
-                        active: scanState.isFlashOn,
-                        onPressed: _toggleFlash,
+                      if (isScanning && !cameraReady) const _DetectedPill(),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _GlassIconButton(
+                            icon: Icons.photo_library_outlined,
+                            onPressed: isScanning ? null : _pickFromGallery,
+                          ),
+                          const SizedBox(width: 10),
+                          _GlassIconButton(
+                            icon: scanState.isFlashOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+                            active: scanState.isFlashOn,
+                            onPressed: _toggleFlash,
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -275,10 +313,14 @@ class _GlassIconButton extends StatelessWidget {
   }
 }
 
+/// Shown while a scan with no live camera preview is analyzing (no camera
+/// on this device/platform, about to resolve to a mock result). Deliberately
+/// doesn't name a crop: the previous "TOMATO DETECTED"-style pill echoed the
+/// *upcoming mock result's* label before analysis had even run, which read
+/// as a live species identification it wasn't — see crop_scan_presenter.dart
+/// for why the real model can't make that claim reliably either.
 class _DetectedPill extends StatelessWidget {
-  const _DetectedPill({required this.label});
-
-  final String label;
+  const _DetectedPill();
 
   @override
   Widget build(BuildContext context) {
@@ -296,12 +338,12 @@ class _DetectedPill extends StatelessWidget {
           children: [
             Container(width: 8, height: 8, decoration: BoxDecoration(color: primary, shape: BoxShape.circle)),
             const SizedBox(width: 8),
-            Flexible(
+            const Flexible(
               child: Text(
-                '$label DETECTED',
+                'ANALYZING',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
                   fontSize: 12.5,
                   fontWeight: FontWeight.w800,

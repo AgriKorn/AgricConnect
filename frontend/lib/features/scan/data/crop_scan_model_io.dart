@@ -60,7 +60,15 @@ class CropScanModel {
   /// object it holds isn't safely sendable across isolates, and the
   /// inference itself is fast (native code, not pure Dart).
   Future<CropScanResult> predict(Uint8List imageBytes) async {
-    final input = [await compute(_decodeAndPreprocess, imageBytes)];
+    // runForMultipleInputs takes one entry per input TENSOR, and this model
+    // has exactly one, whose own shape already includes the batch dimension
+    // ([1,224,224,3]) — so the outer list here has length 1 (one input
+    // tensor), and that one element must itself be 4D ([1][224][224][3]),
+    // not the raw [224][224][3] frame _decodeAndPreprocess returns. Missing
+    // this extra wrap is what made every real (non-mock) scan fail.
+    final input = [
+      [await compute(_decodeAndPreprocess, imageBytes)],
+    ];
 
     // Output shapes/order per ai/README.md: crop_output [1,9],
     // fresh_output [1,3], shelf_life_days [1] (batch-only, no class dim).

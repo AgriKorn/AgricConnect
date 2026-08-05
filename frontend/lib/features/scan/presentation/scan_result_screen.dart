@@ -174,9 +174,12 @@ class _ResultAppBar extends StatelessWidget {
             icon: Icons.ios_share_rounded,
             iconSize: 18,
             onPressed: () async {
+              // Deliberately doesn't assert a crop species (see
+              // crop_scan_presenter.dart) — only the freshness/shelf-life/
+              // price signals the scan is actually reliable for.
               await Clipboard.setData(ClipboardData(
                 text:
-                    '${result.cropType}: ${result.score}% freshness (${result.qualityGrade}), '
+                    '${result.score}% freshness (${result.qualityGrade}), '
                     '${result.shelfLifeLabel} shelf life, ${formatGhs(result.recommendedPrice)} / ${result.priceUnit}.',
               ));
               if (context.mounted) {

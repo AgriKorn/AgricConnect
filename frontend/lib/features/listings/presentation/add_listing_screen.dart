@@ -45,7 +45,13 @@ class _AddListingScreenState extends ConsumerState<AddListingScreen> {
   void initState() {
     super.initState();
     final scan = widget.prefill;
-    _nameController = TextEditingController(text: scan?.cropType ?? '');
+    // Deliberately not prefilled from scan.cropType: the on-device model has
+    // a fixed 9-crop vocabulary and no "not a crop" class, so it always
+    // guesses *something* — including confidently wrong guesses on
+    // non-produce photos. Species identification is out of scope for this
+    // scan feature (see crop_scan_presenter.dart); the farmer names their
+    // own produce, the scan only supplies freshness/shelf-life/price.
+    _nameController = TextEditingController();
     _priceController = TextEditingController(text: scan == null ? '' : scan.recommendedPrice.toStringAsFixed(0));
     _quantityController = TextEditingController();
     _shelfLifeController = TextEditingController(
