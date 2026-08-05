@@ -257,12 +257,73 @@ Baseline instead:
 
 ---
 
+## 6b. 🟠 Shelf-life days still rests on the model's crop guess
+
+**Status: NOT FIXED — needs a model retrain, not a code change.**
+
+The scan no longer shows a crop species or a price (see §7), because the model's
+crop head is unreliable: it has a fixed 9-crop vocabulary and no "not a crop"
+class, so it names *something* for any photo, including a face.
+
+But `model/agriconnect.tflite` computes its third output, `shelf_life_days`,
+**in-graph from that same crop guess** — `ArgMax` over the crop head, then
+`Gather` against a constant table baked in from `ai/shelf_life.py` (documented in
+`ai/README.md` and `ai/pipeline/07_add_shelf_life_output.py`).
+
+So, of the three numbers the farmer sees:
+
+| Shown | Depends on the crop guess? |
+|---|---|
+| Freshness score (0-100) | **No** — freshness head only. Trustworthy. |
+| Quality grade (A/B/C) | **No** — derived from the score. Trustworthy. |
+| Shelf life ("7 Days") | **Yes** — wrong species ⇒ wrong day count. |
+
+Shelf life was kept because removing it would gut the feature, and it is
+directionally right when the produce *is* one of the nine known crops. But it
+cannot be made trustworthy in Dart — the dependency is inside the TFLite graph.
+
+### Options
+
+1. **Retrain with a "not a crop" class** (the real fix) and reject
+   out-of-distribution photos outright. Also fixes §7's root cause.
+2. **Ask the farmer for the crop first**, then compute shelf life in Dart from
+   `ai/shelf_life.py`'s table using the farmer's answer plus the model's
+   freshness stage — no crop guess anywhere. Cheapest correct option: the table
+   is already committed and the freshness head is reliable.
+3. Re-export the model without the `shelf_life_days` output and do the lookup in
+   Dart (a subset of option 2).
+
+Option 2 is recommended: it keeps every displayed number resting only on things
+that are actually reliable — the freshness head and the farmer's own input.
+
+---
+
 ## 7. Already fixed on 2026-08-05
 
 - **Scan inference was completely broken.** `crop_scan_model_io.dart` fed
   `runForMultipleInputs` a `[224,224,3]` tensor where the model's single input
   is `[1,224,224,3]`, so every real on-device scan failed. Independently
   confirmed by PR #11, which found the same line via device testing.
+- **The scan fabricated freshness scores** (`e191d26`). `scan_controller.dart`
+  held a `_sampleResults` list — Tomatoes 94, Cassava 54, Pepper 31 — cycled by
+  an index, and **three** paths fell into it *silently*, all invisible in a
+  release APK: (1) camera never initialised, logged only under `kDebugMode`;
+  (2) `takePicture()` threw, same debug-only log; (3) web, where
+  `tflite_flutter` cannot run at all and `UnsupportedError` was swallowed. A
+  broken camera and a genuine reading were indistinguishable — this is what
+  users saw as "the model is hardcoded". The fallback is deleted; each failure
+  now names itself. The APK packaging was verified innocent: the release APK
+  bundles the model asset (exact byte match) and `libtensorflowlite_jni.so` for
+  all three ABIs.
+- **The engine no longer names crops** (`e191d26`). Beyond the display removal
+  below, `crop_scan_presenter.dart` was still doing
+  `_basePricePerKg[result.cropType]`, so the guessed species silently set
+  `recommendedPrice`, which prefilled the add-listing price field — a head
+  misread as a tomato moved the farmer's asking price. `cropType`,
+  `recommendedPrice` and `priceUnit` are gone from `ScanRecord`, so the
+  invariant is now enforced by the type system; the presenter reads no part of
+  the crop head, and confidence comes from the freshness head alone. Remaining
+  gap: see §6b.
 - **No way to scan an existing photo.** Added a gallery picker to the scan
   screen; capture failures now surface as a toast instead of hanging the
   analysing overlay.
