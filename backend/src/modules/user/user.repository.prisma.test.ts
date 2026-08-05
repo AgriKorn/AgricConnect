@@ -79,6 +79,27 @@ describe('PrismaUserRepository.findAvailableDrivers', () => {
     expect(result.map((d) => d.id)).toEqual(['never-picked', 'always-picked']);
   });
 
+  it('should not always pick the same driver among several who are equally never-offered', async () => {
+    // Array.sort is stable, so without shuffling first, a large group of
+    // drivers who all tie at "never offered a job" (the common case — a
+    // handful of real drivers alongside dozens of untouched seed accounts)
+    // would fall back to the database's own scan order every single time,
+    // which is a different fixed driver, not real fairness. This is exactly
+    // the bug that let one specific driver never receive an offer even
+    // after the first rotation fix.
+    const candidates = Array.from({ length: 10 }, (_, i) => driverRow(`d${i}`));
+    mockPrisma.user.findMany.mockResolvedValue(candidates as any);
+    (mockPrisma.driver_assignments.groupBy as jest.Mock).mockResolvedValue([] as any);
+
+    const firstPicks = new Set<string>();
+    for (let i = 0; i < 30; i++) {
+      const result = await repo.findAvailableDrivers(1, []);
+      firstPicks.add(result[0].id);
+    }
+
+    expect(firstPicks.size).toBeGreaterThan(1);
+  });
+
   it('should order multiple previously-offered drivers by longest-idle first', async () => {
     mockPrisma.user.findMany.mockResolvedValue([driverRow('recent'), driverRow('stale')] as any);
     (mockPrisma.driver_assignments.groupBy as jest.Mock).mockResolvedValue([
