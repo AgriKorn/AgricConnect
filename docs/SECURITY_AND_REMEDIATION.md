@@ -257,44 +257,38 @@ Baseline instead:
 
 ---
 
-## 6b. 🟠 Shelf-life days still rests on the model's crop guess
+## 6b. ✅ Shelf-life days depended on the crop guess — resolved by removal
 
-**Status: NOT FIXED — needs a model retrain, not a code change.**
+**Status: FIXED (`a1f6350`) — shelf life is no longer shown by the scan.**
 
-The scan no longer shows a crop species or a price (see §7), because the model's
-crop head is unreliable: it has a fixed 9-crop vocabulary and no "not a crop"
-class, so it names *something* for any photo, including a face.
+`agriconnect.tflite` computes its third output, `shelf_life_days`, **in-graph
+from its own crop guess** — `ArgMax` over the crop head, then `Gather` against a
+constant table baked in from `ai/shelf_life.py` (see `ai/README.md` and
+`ai/pipeline/07_add_shelf_life_output.py`). Because the crop head is unreliable
+(fixed 9-crop vocabulary, no "not a crop" class), the day count inherited that
+unreliability, and it could not be corrected in Dart.
 
-But `model/agriconnect.tflite` computes its third output, `shelf_life_days`,
-**in-graph from that same crop guess** — `ArgMax` over the crop head, then
-`Gather` against a constant table baked in from `ai/shelf_life.py` (documented in
-`ai/README.md` and `ai/pipeline/07_add_shelf_life_output.py`).
+Rather than display a number resting on an untrusted guess, shelf life was
+removed from the scan entirely. Everything the scan now reports comes from the
+freshness head alone, which is species-independent:
 
-So, of the three numbers the farmer sees:
+| Shown | Source | Depends on the crop guess? |
+|---|---|---|
+| Freshness score (0-100) | freshness head | No |
+| Quality grade (A/B/C) | derived from the score | No |
+| Low-confidence retake hint | freshness head | No |
 
-| Shown | Depends on the crop guess? |
-|---|---|
-| Freshness score (0-100) | **No** — freshness head only. Trustworthy. |
-| Quality grade (A/B/C) | **No** — derived from the score. Trustworthy. |
-| Shelf life ("7 Days") | **Yes** — wrong species ⇒ wrong day count. |
+`ScanRecord` carries no crop species, no price and no shelf life, enforced by
+the type system. The listing form keeps its "Shelf life (days)" field because
+the backend requires it — the farmer supplies it, along with the crop name and
+price.
 
-Shelf life was kept because removing it would gut the feature, and it is
-directionally right when the produce *is* one of the nine known crops. But it
-cannot be made trustworthy in Dart — the dependency is inside the TFLite graph.
-
-### Options
-
-1. **Retrain with a "not a crop" class** (the real fix) and reject
-   out-of-distribution photos outright. Also fixes §7's root cause.
-2. **Ask the farmer for the crop first**, then compute shelf life in Dart from
-   `ai/shelf_life.py`'s table using the farmer's answer plus the model's
-   freshness stage — no crop guess anywhere. Cheapest correct option: the table
-   is already committed and the freshness head is reliable.
-3. Re-export the model without the `shelf_life_days` output and do the lookup in
-   Dart (a subset of option 2).
-
-Option 2 is recommended: it keeps every displayed number resting only on things
-that are actually reliable — the freshness head and the farmer's own input.
+**If shelf life is wanted back**, the cheapest correct route needs no retrain:
+ask the farmer for the crop first, then look the value up in Dart from
+`ai/shelf_life.py`'s already-committed table using the farmer's answer plus the
+model's freshness stage. That keeps every displayed number resting only on the
+reliable freshness head and the farmer's own input. A retrain with an explicit
+"not a crop" class remains the fuller fix and would also address §7's root cause.
 
 ---
 
