@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' hide Provider, AuthResponse;
+import 'package:supabase_flutter/supabase_flutter.dart' hide AuthResponse;
 
 import '../../../core/config/supabase_config.dart';
 import '../../../core/network/api_endpoints.dart';
@@ -390,8 +390,10 @@ class HttpAuthRepository implements AuthRepository {
         return 'driver';
       case UserRole.admin:
         return 'admin';
+      // No `default:` — UserRole is a closed enum and all four values are
+      // handled, so leaving it off makes adding a fifth role a compile error
+      // here instead of silently serializing it as 'farmer'.
       case UserRole.farmer:
-      default:
         return 'farmer';
     }
   }

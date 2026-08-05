@@ -60,6 +60,10 @@ class ScanResultScreen extends ConsumerWidget {
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
                     children: [
                       _FreshnessCard(colorScheme: colorScheme, result: result, tint: tint),
+                      if (result.attributes.isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        _AttributeChips(colorScheme: colorScheme, attributes: result.attributes),
+                      ],
                       const SizedBox(height: 18),
                       _PriceCard(colorScheme: colorScheme, result: result),
                       if (result.imagePath != null) ...[
@@ -161,11 +165,14 @@ class _ResultAppBar extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(color: colorScheme.onSurface, fontSize: 19, fontWeight: FontWeight.w800),
                 ),
-                Text(
-                  'Preview — sample result, not a real scan',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600),
-                ),
+                // Only claim "sample" when it actually is one — a real
+                // on-device inference must not be captioned as fake.
+                if (result.isSampleResult)
+                  Text(
+                    'Preview — sample result, not a real scan',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11, fontWeight: FontWeight.w600),
+                  ),
               ],
             ),
           ),
@@ -351,6 +358,58 @@ class _StatPill extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The scan's qualifying signals — most importantly the low-confidence
+/// "retake in better light" hint. [buildScanRecord] has always computed these
+/// (see crop_scan_presenter.dart) but nothing rendered them, so the farmer saw
+/// a bare score with no indication the model was unsure about it.
+class _AttributeChips extends StatelessWidget {
+  const _AttributeChips({required this.colorScheme, required this.attributes});
+
+  final ColorScheme colorScheme;
+  final List<ScanAttribute> attributes;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: attributes.map((attribute) {
+        final isCaution = attribute.kind == ScanAttributeKind.caution;
+        // Caution reads against the theme's error colour so a warning can't be
+        // mistaken for a positive finding; everything else stays on primary.
+        final accent = isCaution ? colorScheme.error : colorScheme.primary;
+        final icon = attribute.kind.icon;
+
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: accent.withValues(alpha: 0.4)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 14, color: accent),
+                const SizedBox(width: 6),
+              ],
+              Text(
+                attribute.label,
+                style: TextStyle(
+                  color: colorScheme.onSurface,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 }

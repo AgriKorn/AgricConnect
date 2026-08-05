@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/theme_mode_controller.dart';
 import '../../../core/widgets/account_settings_screen.dart';
 import '../../../core/widgets/agri_dialog.dart';
-import '../../../core/widgets/coming_soon_screen.dart';
 import '../../../core/widgets/edit_profile_screen.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../core/widgets/help_support_screen.dart';
@@ -17,18 +16,6 @@ import '../application/buyer_profile_providers.dart';
 import '../data/address_repository.dart';
 import '../data/buyer_profile_mock.dart';
 import 'edit_address_screen.dart';
-
-void _openComingSoon(BuildContext context, String title, IconData icon) {
-  Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (context) => ComingSoonScreen(
-        title: title,
-        icon: icon,
-        message: '$title will be available in a future update.',
-      ),
-    ),
-  );
-}
 
 void _openBuyerAccountSettings(BuildContext context, BuyerProfileDetails profile, bool verified) {
   Navigator.of(context).push(

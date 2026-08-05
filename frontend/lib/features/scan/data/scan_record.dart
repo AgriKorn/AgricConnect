@@ -46,6 +46,7 @@ class ScanRecord {
     required this.attributes,
     required this.capturedAt,
     this.imagePath,
+    this.isSampleResult = false,
   });
 
   final String id;
@@ -70,6 +71,13 @@ class ScanRecord {
   /// platforms/devices with no camera, where capture never produced a file).
   final String? imagePath;
 
+  /// True only for the canned [ScanController] fallback results used where no
+  /// real inference is possible (no camera, or web — `tflite_flutter` has no
+  /// web support). The result screen previously captioned *every* scan
+  /// "sample result, not a real scan", which told the room a genuine
+  /// on-device TFLite score was fake.
+  final bool isSampleResult;
+
   String get semanticLabel => freshnessStateLabel(score);
 
   ScanRecord copyWith({String? imagePath}) {
@@ -86,6 +94,7 @@ class ScanRecord {
       attributes: attributes,
       capturedAt: capturedAt,
       imagePath: imagePath ?? this.imagePath,
+      isSampleResult: isSampleResult,
     );
   }
 
@@ -103,6 +112,7 @@ class ScanRecord {
       'attributes': attributes.map((a) => a.toJson()).toList(),
       'capturedAt': capturedAt.toIso8601String(),
       'imagePath': imagePath,
+      'isSampleResult': isSampleResult,
     };
   }
 
@@ -122,6 +132,9 @@ class ScanRecord {
           .toList(),
       capturedAt: DateTime.parse(json['capturedAt'] as String),
       imagePath: json['imagePath'] as String?,
+      // Defaulted, not required: records cached by an earlier build predate
+      // this field, and a missing key must not throw on restore.
+      isSampleResult: json['isSampleResult'] as bool? ?? false,
     );
   }
 }

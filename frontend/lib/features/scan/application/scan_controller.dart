@@ -190,6 +190,7 @@ final _sampleResults = [
       ScanAttribute(label: 'Organic', kind: ScanAttributeKind.certification),
     ],
     capturedAt: DateTime.fromMillisecondsSinceEpoch(1710000000000, isUtc: true),
+    isSampleResult: true,
   ),
   ScanRecord(
     id: 'scan-2',
@@ -207,6 +208,7 @@ final _sampleResults = [
       ScanAttribute(label: 'Sell Soon', kind: ScanAttributeKind.caution),
     ],
     capturedAt: DateTime.fromMillisecondsSinceEpoch(1710003600000, isUtc: true),
+    isSampleResult: true,
   ),
   ScanRecord(
     id: 'scan-3',
@@ -224,5 +226,6 @@ final _sampleResults = [
       ScanAttribute(label: 'Use Urgently', kind: ScanAttributeKind.caution),
     ],
     capturedAt: DateTime.fromMillisecondsSinceEpoch(1710007200000, isUtc: true),
+    isSampleResult: true,
   ),
 ];

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import { validate } from '../../middleware/validate';
-import { createAddressSchema, updateAddressSchema } from './address.schema';
+import { addressIdParamSchema, createAddressSchema, updateAddressSchema } from './address.schema';
 import {
   createAddressHandler,
   deleteAddressHandler,
@@ -61,6 +61,6 @@ router.post('/', validate(createAddressSchema), createAddressHandler);
  *       404: { description: Address not found }
  */
 router.patch('/:id', validate(updateAddressSchema), updateAddressHandler);
-router.delete('/:id', deleteAddressHandler);
+router.delete('/:id', validate(addressIdParamSchema), deleteAddressHandler);
 
 export default router;
