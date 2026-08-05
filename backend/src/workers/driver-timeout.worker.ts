@@ -97,20 +97,25 @@ export class DriverTimeoutWorker {
 
     if (expiredList.length === 0) return 0;
 
-    let reassignedCount = 0;
-    for (const assignment of expiredList) {
+    // Broadcast dispatch means every eligible driver got their own offer
+    // for the same order, so they tend to expire together in the same
+    // batch — checking each order once (not once per expired row) is what
+    // keeps the exhaustion notification from firing several times over for
+    // a single order.
+    const uniqueOrderIds = [...new Set(expiredList.map((a) => a.order_id))];
+
+    let processedCount = 0;
+    for (const orderId of uniqueOrderIds) {
       try {
-        logger.info(
-          `[DriverTimeoutWorker] Driver ${assignment.driver_id} timed out for Order #${assignment.order_id}. Triggering auto-reassignment...`,
-        );
-        await dispatchService.reassignNextDriver(assignment.order_id);
-        reassignedCount++;
+        logger.info(`[DriverTimeoutWorker] Offer(s) for Order #${orderId} timed out with no driver accepting.`);
+        await dispatchService.reassignNextDriver(orderId);
+        processedCount++;
       } catch (err) {
-        logger.error(`[DriverTimeoutWorker] Failed to reassign driver for Order #${assignment.order_id}:`, err);
+        logger.error(`[DriverTimeoutWorker] Failed to process expired offer for Order #${orderId}:`, err);
       }
     }
 
-    return reassignedCount;
+    return processedCount;
   }
 }
 

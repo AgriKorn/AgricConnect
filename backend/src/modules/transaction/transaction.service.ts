@@ -38,7 +38,7 @@ export class TransactionService {
     const buyer = await userRepository.findById(buyerId);
     const { reference, authorizationUrl } = await paymentService.initializeTransaction(amountGhs, buyer?.phone ?? 'unknown', { listingId });
 
-    return await prisma.$transaction(
+    const { transaction } = await prisma.$transaction(
       async (tx) => {
         // Atomic status transition lock
         const updatedCount = await tx.produce_listings.updateMany({
@@ -91,20 +91,31 @@ export class TransactionService {
           orderId: transaction.id,
         });
 
-        let dispatch: DriverJob | null = null;
-        if (!hasOwnTransport) {
-          dispatch = await dispatchService.assignDriver({
-            transactionId: transaction.id,
-            listingId,
-            cropType: listing.cropType,
-            quantityKg: listing.quantityKg,
-          });
-        }
-
-        return { transaction, dispatch, authorizationUrl };
+        return { transaction };
       },
       { timeout: 15000 },
     );
+
+    // Broadcasting to every eligible driver means writing and notifying
+    // dozens of rows, not one — reproduced live taking 90+ seconds for ~22
+    // candidates, which blew straight past this transaction's own 15s
+    // timeout and rolled back the entire purchase. The order itself is
+    // already durably committed by this point, so dispatch runs as a
+    // best-effort step afterward instead of inside the same atomic block —
+    // if it doesn't fully succeed, the driver-exhaustion admin-notify path
+    // is the existing recovery route, same as it already was for the
+    // single-driver case.
+    let dispatch: DriverJob | null = null;
+    if (!hasOwnTransport) {
+      dispatch = await dispatchService.assignDriver({
+        transactionId: transaction.id,
+        listingId,
+        cropType: listing.cropType,
+        quantityKg: listing.quantityKg,
+      });
+    }
+
+    return { transaction, dispatch, authorizationUrl };
   }
 
   async getTransaction(id: string, userId: string, role: string): Promise<Transaction> {

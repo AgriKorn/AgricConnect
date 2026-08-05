@@ -11,7 +11,6 @@ export interface AssignDriverParams {
   listingId: string;
   cropType: string;
   quantityKg: number;
-  excludeDriverIds?: string[];
 }
 
 export class DispatchService {
@@ -20,29 +19,56 @@ export class DispatchService {
     private readonly users: typeof userRepository = userRepository,
   ) {}
 
+  /**
+   * Broadcasts the job to every eligible driver at once — each gets their
+   * own driver_assignments row, all live simultaneously — rather than
+   * offering it to one driver at a time. First to accept gets it (see
+   * acceptJob, which expires every sibling offer the instant one is
+   * claimed); everyone else just stops seeing it. Returns the first offer
+   * created (or null if no driver was eligible at all) — nothing currently
+   * depends on which one specifically.
+   */
   async assignDriver(params: AssignDriverParams): Promise<DriverJob | null> {
-    const candidates = await this.users.findAvailableDrivers(params.quantityKg, params.excludeDriverIds ?? []);
-    const driver = candidates[0];
-    if (!driver) return null;
+    const candidates = await this.users.findAvailableDrivers(params.quantityKg, []);
+    if (candidates.length === 0) return null;
 
-    const job = await this.jobs.create({
-      transactionId: params.transactionId,
-      listingId: params.listingId,
-      driverId: driver.id,
-      cropType: params.cropType,
-      quantityKg: params.quantityKg,
-    });
+    // create() assigns each row's sequence_number by counting existing rows
+    // for the order first — safe run one after another, but a real race if
+    // parallelized for the same order (two creates could read the same
+    // count before either commits and collide on the unique
+    // (order_id, sequence_number) constraint). The audit log + notification
+    // for each offer have no such constraint, so those run concurrently
+    // afterward instead of sequentially — with a large candidate pool,
+    // sequential notification sends alone reproduced live at 90+ seconds
+    // for ~22 drivers, which is what made the very first version of this
+    // broadcast blow straight past its caller's transaction timeout.
+    const jobs: DriverJob[] = [];
+    for (const driver of candidates) {
+      const job = await this.jobs.create({
+        transactionId: params.transactionId,
+        listingId: params.listingId,
+        driverId: driver.id,
+        cropType: params.cropType,
+        quantityKg: params.quantityKg,
+      });
+      jobs.push(job);
+    }
 
-    await auditService.log('DRIVER_DISPATCHED', params.transactionId, { driverId: driver.id, jobId: job.id }, driver.id);
+    await Promise.all(
+      jobs.map((job) =>
+        Promise.all([
+          auditService.log('DRIVER_DISPATCHED', params.transactionId, { driverId: job.driverId, jobId: job.id }, job.driverId),
+          notificationService.sendNotification({
+            userId: job.driverId,
+            type: 'DRIVER_JOB_OFFERED',
+            message: `New delivery job offer: Pickup ${params.quantityKg}kg of ${params.cropType}. Open app to accept or decline.`,
+            orderId: params.transactionId,
+          }),
+        ]),
+      ),
+    );
 
-    await notificationService.sendNotification({
-      userId: driver.id,
-      type: 'DRIVER_JOB_OFFERED',
-      message: `New delivery job offer: Pickup ${params.quantityKg}kg of ${params.cropType}. Open app to accept or decline.`,
-      orderId: params.transactionId,
-    });
-
-    return job;
+    return jobs[0] ?? null;
   }
 
   getDriverJobs(driverId: string, status?: DriverJob['status']): Promise<DriverJob[]> {
@@ -128,6 +154,15 @@ export class DispatchService {
       throw new ForbiddenError(`Job is no longer pending`);
     }
 
+    // The job was broadcast to every eligible driver — now that one has
+    // claimed it, every sibling offer has to stop looking live to whoever
+    // else it went to, or they'd still see it sitting in their pending list
+    // as something they could still accept.
+    await prisma.driver_assignments.updateMany({
+      where: { order_id: job.transactionId, status: 'notified', id: { not: job.id } },
+      data: { status: 'expired', responded_at: new Date() },
+    });
+
     await this.users.updateProfile(driverId, { isAvailable: false });
 
     await prisma.orders.update({
@@ -162,52 +197,21 @@ export class DispatchService {
     return updated!;
   }
 
-  async declineJob(jobId: string, driverId: string): Promise<{ job: DriverJob; reassigned: DriverJob | null }> {
+  /**
+   * With broadcast dispatch every eligible driver already has their own
+   * offer, so declining just removes this driver's copy — no one needs
+   * finding a "next" candidate, everyone else already has one. Only once
+   * every offer for the order has been declined or timed out with no one
+   * accepting does this fall into the same admin-notify exhaustion path
+   * both this and the timeout worker (reassignNextDriver) share.
+   */
+  async declineJob(jobId: string, driverId: string): Promise<{ job: DriverJob; othersStillPending: boolean }> {
     const job = await this.assertOwnedPendingJob(jobId, driverId);
     const declined = await this.jobs.update(job.id, 'DECLINED');
 
-    const priorAttempts = await this.jobs.findAllForTransaction(job.transactionId);
-    const excludeDriverIds = priorAttempts.map((attempt) => attempt.driverId);
+    const othersStillPending = await this.handleExhaustionIfNeeded(job.transactionId, driverId);
 
-    const reassigned = await this.assignDriver({
-      transactionId: job.transactionId,
-      listingId: job.listingId,
-      cropType: job.cropType,
-      quantityKg: job.quantityKg,
-      excludeDriverIds,
-    });
-
-    if (!reassigned) {
-      // Driver Exhaustion Terminal Case Handling
-      const order = await prisma.orders.findUnique({ where: { id: job.transactionId } });
-      if (order) {
-        await prisma.orders.update({
-          where: { id: order.id },
-          data: { order_status: 'awaiting_driver' },
-        });
-
-        const admins = await prisma.user.findMany({ where: { role: 'admin' } });
-        for (const admin of admins) {
-          await notificationService.sendNotification({
-            userId: admin.id,
-            type: 'MANUAL_DISPATCH_REQUIRED',
-            message: `Order #${order.id} has no remaining available drivers in the operating region. Manual driver assignment required via POST /api/admin/dispatch/assign.`,
-            orderId: order.id,
-          });
-        }
-
-        await notificationService.sendNotification({
-          userId: order.buyer_id,
-          type: 'DISPATCH_DELAYED',
-          message: `Your order #${order.id} is confirmed! We are matching specialized transport for your crop and will notify you as soon as a driver is assigned.`,
-          orderId: order.id,
-        });
-
-        await auditService.log('DRIVER_DISPATCH_EXHAUSTED' as any, order.id, { declinedDrivers: excludeDriverIds }, driverId);
-      }
-    }
-
-    return { job: declined, reassigned };
+    return { job: declined, othersStillPending };
   }
 
   async markCompleted(transactionId: string): Promise<void> {
@@ -217,19 +221,57 @@ export class DispatchService {
     await this.users.updateProfile(job.driverId, { isAvailable: true });
   }
 
-  async reassignNextDriver(transactionId: string): Promise<DriverJob | null> {
-    const priorAttempts = await this.jobs.findAllForTransaction(transactionId);
-    if (priorAttempts.length === 0) return null;
-    const latestAttempt = priorAttempts[priorAttempts.length - 1];
-    const excludeDriverIds = priorAttempts.map((attempt) => attempt.driverId);
+  /**
+   * Called by DriverTimeoutWorker once an offer has expired unanswered.
+   * Broadcast dispatch means there's no single "next" driver to try — this
+   * just checks whether anyone else the job was offered to can still
+   * accept, and if the whole pool has declined or expired, runs the
+   * exhaustion flow. Multiple siblings for the same order can expire in the
+   * same worker batch; the worker dedupes by order_id before calling this
+   * so the exhaustion notification only fires once per order, not once per
+   * expired row.
+   */
+  async reassignNextDriver(transactionId: string): Promise<void> {
+    await this.handleExhaustionIfNeeded(transactionId, null);
+  }
 
-    return await this.assignDriver({
-      transactionId,
-      listingId: latestAttempt.listingId,
-      cropType: latestAttempt.cropType,
-      quantityKg: latestAttempt.quantityKg,
-      excludeDriverIds,
+  /** Returns true if at least one other offer for this order can still be accepted. */
+  private async handleExhaustionIfNeeded(transactionId: string, actorId: string | null): Promise<boolean> {
+    const remaining = await prisma.driver_assignments.count({
+      where: { order_id: transactionId, status: { in: ['notified', 'accepted'] } },
     });
+    if (remaining > 0) return true;
+
+    // Driver Exhaustion Terminal Case Handling — every driver the job was
+    // broadcast to has declined or timed out, and no one accepted.
+    const order = await prisma.orders.findUnique({ where: { id: transactionId } });
+    if (order) {
+      await prisma.orders.update({
+        where: { id: order.id },
+        data: { order_status: 'awaiting_driver' },
+      });
+
+      const admins = await prisma.user.findMany({ where: { role: 'admin' } });
+      for (const admin of admins) {
+        await notificationService.sendNotification({
+          userId: admin.id,
+          type: 'MANUAL_DISPATCH_REQUIRED',
+          message: `Order #${order.id} has no remaining available drivers in the operating region. Manual driver assignment required via POST /api/admin/dispatch/assign.`,
+          orderId: order.id,
+        });
+      }
+
+      await notificationService.sendNotification({
+        userId: order.buyer_id,
+        type: 'DISPATCH_DELAYED',
+        message: `Your order #${order.id} is confirmed! We are matching specialized transport for your crop and will notify you as soon as a driver is assigned.`,
+        orderId: order.id,
+      });
+
+      await auditService.log('DRIVER_DISPATCH_EXHAUSTED' as any, order.id, {}, actorId ?? 'driver-timeout-worker');
+    }
+
+    return false;
   }
 
   private async assertOwnedPendingJob(jobId: string, driverId: string): Promise<DriverJob> {
